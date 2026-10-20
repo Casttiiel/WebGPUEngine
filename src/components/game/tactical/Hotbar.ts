@@ -1,5 +1,5 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
-import { SkillCatalog, hasEffect, isMetalAction, type SkillDef } from './Skills';
+import { SkillCatalog, isAnchoredBubble, isMetalAction, type SkillDef } from './Skills';
 import { RHYTHM_MAX, RHYTHM_STEP } from './UnitComponent';
 import { Zones } from './Zones';
 import { COST_NAME, attackSummary, fmt, skillMechanics, turns } from './ActionText';
@@ -57,7 +57,7 @@ export function hotbarEntries(unit: UnitComponent): HotbarEntry[] {
       .map((ability): HotbarEntry => ({ ...ABILITIES[ability], attack: null, skill: null })),
     ...skills.map((s): HotbarEntry => {
       // Con su burbuja activa, el hueco la cierra (sin acción).
-      const closes = hasEffect(s, 'bubble') && Zones.ownedBy(unit) !== null;
+      const closes = isAnchoredBubble(s) && Zones.ownedBy(unit) !== null;
       return {
         id: s.id,
         name: closes ? 'Cerrar burbuja' : s.name,

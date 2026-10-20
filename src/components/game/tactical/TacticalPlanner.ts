@@ -12,6 +12,7 @@ import {
 import { SkillCatalog, hasEffect, isMetalAction, type SkillDef } from './Skills';
 import { averageOf } from './Stats';
 import { Cover } from './Cover';
+import { SpiritZones } from './SpiritZones';
 
 export type AIRole = 'melee' | 'ranged';
 
@@ -59,6 +60,12 @@ const FLEE_HIDDEN = 4; // y si no le ve
 const MELEE_REACH = 2; // de borde a borde: "le pueden pegar" si está más cerca
 // Cobertura (GDD §5): acabar a cubierto de un enemigo vale esto (el doble con poca vida).
 const COVER_VALUE = 2.5;
+// Zonas espirituales (GDD §8): acabar en una de Fortuna (si ataca) o de Investidura (si tiene
+// habilidades) vale esto; en una de Conexión, cada aliado que esté dentro con él resta esto
+// (un estado de la party les pillaría a todos).
+const FORTUNE_VALUE = 3;
+const INVESTITURE_VALUE = 3;
+const CONNECTION_RISK = 2.5;
 // Habilidades: mismo baremo que los ataques (≈ puntos de daño).
 const SKILL_BASE = 8;
 const HEAL_WEIGHT = 1.2; // por punto de vida que de verdad recupera
@@ -142,10 +149,26 @@ export function planTurn(
     return value;
   };
 
+  const hasSkills = me
+    .getSkillIds()
+    .some((id) => SkillCatalog.get(id) && !isMetalAction(SkillCatalog.get(id)!));
+  const allies = encounter
+    .getCombatantUnits()
+    .filter((u) => u !== me && u.isAlive() && u.getFaction() === me.getFaction());
+
   /** Valor de quedarse en `feet` después de actuar (separación, a la vista o no…). */
   const positionValue = (feet: vec3): number => {
     const nearest = Math.min(...foes.map((f) => unitDistanceFrom(me, feet, f)));
     let value = 0;
+    // Zonas espirituales: aprovechar las que le benefician y evitar la Conexión con aliados.
+    if (me.getAttacks().length && SpiritZones.at(feet, 'fortune')) value += FORTUNE_VALUE;
+    if (hasSkills && SpiritZones.at(feet, 'investiture')) value += INVESTITURE_VALUE;
+    const connection = SpiritZones.at(feet, 'connection');
+    if (connection) {
+      const p = vec3.create();
+      const together = allies.filter((a) => SpiritZones.contains(connection, a.getFeetPosition(p)));
+      value -= together.length * CONNECTION_RISK;
+    }
     if (profile.role === 'ranged') {
       value += Math.min(nearest, profile.preferredDistance) * RANGED_KEEP_DISTANCE;
       if (nearest < MELEE_REACH) value -= RANGED_IN_MELEE_PENALTY;
@@ -543,7 +566,8 @@ function skillValue(
         value += plan.affected.filter((u) => isFoe(u) && u.isAlive()).length * PUSH_VALUE;
         break;
       case 'status':
-        for (const u of plan.affected) {
+        // También los que lo reciben por la Conexión.
+        for (const u of [...plan.affected, ...plan.connected]) {
           if (!isFoe(u) || !u.isAlive() || u.hasStatus(effect.status)) continue;
           value += STATUS_VALUE;
           useful = true;

@@ -4,6 +4,7 @@ import { hasLineOfSight } from './TacticalQueries';
 import type { SkillDef } from './Skills';
 import { PropComponent } from './PropComponent';
 import { Zones } from './Zones';
+import { SpiritZones } from './SpiritZones';
 import { Cover } from './Cover';
 import { averageOf, critDamageFor, mitigatedRange, rollRange, type DamageRange } from './Stats';
 
@@ -176,7 +177,9 @@ export function previewAttack(
     minDamage: range.min,
     maxDamage: range.max,
     critDamage: critDamageFor(damage * damageTakenMultiplier(target)),
-    critChance: guaranteedCrit(target, attack) ? 1 : attacker.getNextCritChance(),
+    critChance: guaranteedCrit(target, attack)
+      ? 1
+      : attacker.getNextCritChance(SpiritZones.critBonus(attacker)),
   };
 }
 
@@ -198,7 +201,7 @@ export function rollAttack(
   const roll = previewAttack(attacker, target, attack);
   const hit = roll.hitChance >= 1 || Math.random() < roll.hitChance;
   if (!hit) return { hit, crit: false, damage: 0 };
-  const crit = guaranteedCrit(target, attack) || attacker.rollCrit();
+  const crit = guaranteedCrit(target, attack) || attacker.rollCrit(SpiritZones.critBonus(attacker));
   const damage = crit ? roll.critDamage : rollRange({ min: roll.minDamage, max: roll.maxDamage });
   return { hit, crit, damage };
 }

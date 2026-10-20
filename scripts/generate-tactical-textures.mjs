@@ -9,6 +9,9 @@
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
  *   cover_shield.png  escudo de cobertura (al moverse, por cada dirección cubierta)
  *   zone_bendalloy.png  burbuja de bendaleo (decal: círculo translúcido con borde)
+ *   zone_cadmium.png    burbuja de cadmio (el mismo decal, en ámbar y con el borde a trazos)
+ *   zone_fortune.png, zone_connection.png, zone_investiture.png
+ *                       zonas espirituales (Fortuna dorada, Conexión violeta, Investidura blanca)
  *   status_*.png      iconos del resto de estados: Seco, Aturdido, Derribado, Marcado, Burbuja
  *                     de acero y mente de hierro (Ligero / Pesado)
  *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
@@ -67,6 +70,25 @@ const textures = {
   'zone_bendalloy.png': `
     <circle cx="128" cy="128" r="118" fill="#9cc8ff" fill-opacity="0.16" stroke="#e2f0ff" stroke-width="7" stroke-opacity="0.9"/>
     <circle cx="128" cy="128" r="104" fill="none" stroke="#b8d8ff" stroke-width="3" stroke-opacity="0.5" stroke-dasharray="10 12"/>`,
+  // Burbuja de cadmio (tiempo lento): disco ámbar con el borde a trazos largos.
+  'zone_cadmium.png': `
+    <circle cx="128" cy="128" r="118" fill="#ffb347" fill-opacity="0.18" stroke="#ffe0a8" stroke-width="7" stroke-opacity="0.9" stroke-dasharray="26 10"/>
+    <circle cx="128" cy="128" r="102" fill="none" stroke="#ffc878" stroke-width="3" stroke-opacity="0.5"/>`,
+  // Zona espiritual (fortune): disco translúcido con doble borde y un anillo de puntos.
+  'zone_fortune.png': `
+    <circle cx="128" cy="128" r="118" fill="#ffd257" fill-opacity="0.15" stroke="#fff0b8" stroke-width="6" stroke-opacity="0.9"/>
+    <circle cx="128" cy="128" r="108" fill="none" stroke="#fff0b8" stroke-width="2" stroke-opacity="0.7"/>
+    <circle cx="128" cy="128" r="96" fill="none" stroke="#ffd257" stroke-width="5" stroke-opacity="0.55" stroke-dasharray="2 14" stroke-linecap="round"/>`,
+  // Zona espiritual (connection): disco translúcido con doble borde y un anillo de puntos.
+  'zone_connection.png': `
+    <circle cx="128" cy="128" r="118" fill="#a974ff" fill-opacity="0.15" stroke="#e2d0ff" stroke-width="6" stroke-opacity="0.9"/>
+    <circle cx="128" cy="128" r="108" fill="none" stroke="#e2d0ff" stroke-width="2" stroke-opacity="0.7"/>
+    <circle cx="128" cy="128" r="96" fill="none" stroke="#a974ff" stroke-width="5" stroke-opacity="0.55" stroke-dasharray="2 14" stroke-linecap="round"/>`,
+  // Zona espiritual (investiture): disco translúcido con doble borde y un anillo de puntos.
+  'zone_investiture.png': `
+    <circle cx="128" cy="128" r="118" fill="#dff0ff" fill-opacity="0.15" stroke="#ffffff" stroke-width="6" stroke-opacity="0.9"/>
+    <circle cx="128" cy="128" r="108" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.7"/>
+    <circle cx="128" cy="128" r="96" fill="none" stroke="#dff0ff" stroke-width="5" stroke-opacity="0.55" stroke-dasharray="2 14" stroke-linecap="round"/>`,
   // Ritmo: tres marcas en racha.
   'status_rhythm.png': statusIcon(
     '#3c6e3a',

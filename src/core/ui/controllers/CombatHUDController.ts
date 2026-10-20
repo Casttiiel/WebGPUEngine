@@ -343,6 +343,21 @@ export class CombatHUDController extends WidgetController {
       case 'bubble':
         this.spawnFloat(unit, 'Burbuja de bendaleo', FLOAT_METAL, 1.5);
         break;
+      case 'slow-bubble':
+        this.spawnFloat(unit, 'Burbuja de cadmio', FLOAT_METAL, 1.5);
+        break;
+      case 'turn-lost':
+        this.spawnFloat(unit, 'Pierde el turno', FLOAT_DRAINED, 1.5);
+        break;
+      case 'spirit-zone':
+        this.spawnFloat(unit, 'Mente espiritual', FLOAT_METAL, 1.5);
+        break;
+      case 'relic-burst':
+        this.spawnFloat(unit, '¡El relicario se rompe!', FLOAT_CRIT, 1.5);
+        break;
+      case 'connected':
+        this.spawnFloat(unit, 'Conexión', FLOAT_METAL, 1.5);
+        break;
       case 'refill':
         this.spawnFloat(unit, 'Reserva llena', FLOAT_METAL, 1.5);
         break;

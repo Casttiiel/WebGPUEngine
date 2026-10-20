@@ -21,7 +21,7 @@ import {
 import { PropComponent } from './PropComponent';
 import { RHYTHM_ENTRY, hotbarEntries, isAbilityId, unitSkill } from './Hotbar';
 import { circleOutline, coneOutline, isHostile, lineOutline, type SkillDef } from './Skills';
-import type { SkillPlan, SkillTarget } from './EncounterComponent';
+import type { SkillMotion, SkillPlan, SkillTarget } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
 import { AimArrow } from './AimArrow';
@@ -140,7 +140,26 @@ const REASON_TEXT: Record<string, string> = {
   'bubble border': 'el borde de la burbuja lo desvía',
   bubble: 'no se puede salir de la burbuja',
   covered: 'a cubierto',
+  'not allomantic': 'no tiene Reserva de metal',
+  'turn lost': 'pierde el turno (cadmio)',
 };
+
+/**
+ * Daño de un empuje o tirón: a quien golpea y lo que se mueve (una unidad: también contra una
+ * pared, +50 %).
+ */
+function pushDamage(motion: SkillMotion): DamagePreview[] {
+  const out: DamagePreview[] = [];
+  const unitBody = !PropComponent.of(motion.body.getOwner());
+  if (motion.hit?.isAlive()) {
+    out.push({ unit: motion.hit, ...hitRange(null, motion.hit, motion.damage), crit: null });
+  }
+  if (unitBody && (motion.hit || motion.wall)) {
+    const d = motion.hit ? motion.damage : Math.round(motion.damage * 1.5);
+    out.push({ unit: motion.body, ...hitRange(null, motion.body, d), crit: null });
+  }
+  return out;
+}
 
 const reasonText = (reason: string | undefined): string =>
   reason ? (REASON_TEXT[reason] ?? reason) : '';
@@ -210,6 +229,8 @@ export class TacticalPointerComponent extends Component {
   private enemyRing = new GroundMarker('tactical/ring_hover_enemy.prefab');
   private preview: PathPreview | null = null;
   private arrow: AimArrow | null = null;
+  /** Pulso de ettmetal: una flecha más por cada cosa que sale despedida (se crean al usarse). */
+  private extraArrows: AimArrow[] = [];
   /** Objeto para el que está puesto el plano de cámara de apuntar (null: ninguno). */
   private aimShotFor: Entity | null = null;
   private movePlan: MovePlan | null = null;
@@ -283,19 +304,8 @@ export class TacticalPointerComponent extends Component {
         out.push({ unit: motion.body, ...hitRange(null, motion.body, motion.damage), crit: null });
         return out;
       }
-      if (motion && (motion.kind === 'push' || motion.kind === 'pull')) {
-        // Contra quién choca y lo que se mueve (una unidad: también contra una pared, +50 %).
-        const out: DamagePreview[] = [];
-        const unitBody = !PropComponent.of(motion.body.getOwner());
-        if (motion.hit?.isAlive()) {
-          out.push({ unit: motion.hit, ...hitRange(null, motion.hit, motion.damage), crit: null });
-        }
-        if (unitBody && (motion.hit || motion.wall)) {
-          const d = motion.hit ? motion.damage : Math.round(motion.damage * 1.5);
-          out.push({ unit: motion.body, ...hitRange(null, motion.body, d), crit: null });
-        }
-        return out;
-      }
+      if (motion && (motion.kind === 'push' || motion.kind === 'pull')) return pushDamage(motion);
+      if (skill.motions.length) return skill.motions.flatMap(pushDamage);
       const damage = skillDamage(caster, skill.skill, skill.power);
       if (damage <= 0) return [];
       const penetration = Math.max(
@@ -815,7 +825,7 @@ export class TacticalPointerComponent extends Component {
   /** Vista previa de la habilidad: contorno del área, afectados resaltados y etiqueta. */
   private showSkillPreview(plan: SkillPlan): void {
     const skill = plan.skill!;
-    this.highlightAffected(plan.affected.map((u) => u.getOwner()));
+    this.highlightAffected([...plan.affected, ...plan.connected].map((u) => u.getOwner()));
     const names = plan.affected.map((u) => {
       const ally = u.getFaction() === 'party' && isHostile(skill) ? ' (aliado)' : '';
       return `${u.getDisplayName()}${ally}`;
@@ -848,6 +858,11 @@ export class TacticalPointerComponent extends Component {
       label += ` → ${t.getDisplayName()} ${Math.ceil(t.getHp())}/${t.getMaxHp()} PV`;
     } else if (!skill.effects.some((e) => e.type === 'teleport')) {
       label += names.length ? ` · afecta a: ${names.join(', ')}` : ' · no afecta a nadie';
+    }
+
+    // Conexión: a quién se le copiaría el estado.
+    if (plan.canCast && plan.connected.length) {
+      label += ` · Conexión: ${plan.connected.map((u) => u.getDisplayName()).join(', ')}`;
     }
 
     const origin = plan.origin;
@@ -1075,6 +1090,7 @@ export class TacticalPointerComponent extends Component {
 
   /** Flecha de empujar: con Empujar armado y un objeto elegido, o sobre un objeto empujable. */
   private updateArrow(): void {
+    this.updateExtraArrows();
     const motion = this.skillPlan?.canCast ? this.skillPlan.motion : null;
     if (motion && (motion.kind === 'push' || motion.kind === 'pull') && !motion.body.isMoving()) {
       const from = motion.points[0]!;
@@ -1098,6 +1114,25 @@ export class TacticalPointerComponent extends Component {
     } else {
       this.arrow?.hide();
     }
+  }
+
+  /** Pulso de ettmetal: una flecha por cada cosa que sale despedida. */
+  private updateExtraArrows(): void {
+    const motions = this.skillPlan?.canCast ? this.skillPlan.motions : [];
+    let shown = 0;
+    for (const motion of motions) {
+      if (motion.body.isMoving()) continue;
+      const from = motion.points[0]!;
+      const to = motion.points[motion.points.length - 1]!;
+      const dir = vec3.sub(vec3.create(), to, from);
+      const length = vec3.length(dir);
+      if (length < 0.05) continue;
+      vec3.scale(dir, dir, 1 / length);
+      const arrow = (this.extraArrows[shown] ??= new AimArrow());
+      arrow.show(from, dir, length, motion.body.getCapsuleRadius(), !!motion.hit || motion.wall);
+      shown++;
+    }
+    for (let i = shown; i < this.extraArrows.length; i++) this.extraArrows[i]!.hide();
   }
 
   /**
@@ -1285,6 +1320,7 @@ export class TacticalPointerComponent extends Component {
     this.enemyRing.destroy();
     this.preview?.destroy();
     this.arrow?.destroy();
+    for (const a of this.extraArrows) a.destroy();
     if (this.aimShotFor) ActionCameraComponent.find()?.endAim();
     if (this.lastHighlighted) setUnitHighlight(this.lastHighlighted, 0);
     for (const e of this.skillHighlights) setUnitHighlight(e, 0);

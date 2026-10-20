@@ -47,7 +47,7 @@ Partimos de lo que ya tiene el motor (estilo BG3) y añadimos la Reacción:
 | -------------------- | ----------------------- | -------------------------------------------------- |
 | **Movimiento**       | metros (según Reflejos) | Desplazarse. El salto de acero NO gasta movimiento |
 | **Acción**           | 1                       | Ataques, habilidades principales                   |
-| **Acción adicional** | 1                       | Habilidades menores, beber vial, cambiar munición  |
+| **Acción adicional** | 1                       | Habilidades menores, beber vial                    |
 | **Reacción**         | 1 por **ronda**         | Asistencias/combos y la Guardia del Deslizador     |
 | **Reserva de metal** | barra (ver §2)          | Coste de toda la alomancia                         |
 
@@ -218,7 +218,7 @@ que ya tienes** (§14), así que la barra de habilidades no crece.
 | **Lanzamonedas** | **Aviador** (POT, REF): saltos más largos, empujes de props,     | **Artillero** (FUE, AGU): revólver, bala empujada, marca del cazador, críticos y penetración. Talento _Rebote_ (la bala empujada rebota en el metal) |
 | **Deslizador**   | **Virtuoso** (REF, AGU, FUE): Ritmo, Finta, Proyección, críticos | **Inmortal** (RES, TEM): mente de oro más potente, Guardia más frecuente, Pullas, burbujas más largas                                                |
 | **Voz**          | **Titiritero** (POT, TEM): control de grupos, más objetivos      | **Duelista** (FUE, REF): estoque, réplica a los Enfurecidos, se puede elegir como objetivo de su propio Provocar                                     |
-| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, zonas, recargas más cortas   | **Tiradora** (AGU, FUE): munición especial, escopeta, detonación de asistencia                                                                       |
+| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, zonas, recargas más cortas   | **Tiradora** (AGU, FUE): dardo de cromo, pistola, detonación de asistencia                                                                          |
 
 **Ejemplo, la Voz Duelista:** usa _Provocar_ sobre un grupo eligiéndose a sí misma como objetivo
 del ataque. Con el talento _Réplica_, cada enemigo Enfurecido que la ataca recibe un
@@ -470,7 +470,7 @@ En la feruquimia de la Era 2, los tres metales "espirituales" guardan exactament
 
 | Zona            | Efecto                                                                                                    | Sistema que reutiliza            |
 | --------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| **Fortuna**     | Quien ataca desde dentro mete +2 canicas de crítico en su bolsa                                           | La bolsa de canicas              |
+| **Fortuna**     | Quien ataca desde dentro tiene +10 % de crítico (encima de su bolsa de canicas)                           | La bolsa de canicas              |
 | **Conexión**    | Un estado aplicado a una unidad que está dentro se copia a todas las de su bando que también estén dentro | Los estados                      |
 | **Investidura** | Las habilidades que se usan desde dentro hacen **+50 % de efecto**                                        | El multiplicador del duraluminio |
 
@@ -712,14 +712,16 @@ ataca a distancia.
 
 | Habilidad                         | Coste                   | Efecto                                                                                                                                                                                                     |
 | --------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: escopeta o ballesta_ | —                       | Distancia media. **Munición cambiable** (Adicional): normal / **aluminio** (no se puede empujar: atraviesa burbujas de acero enemigas) / **dardo de cromo** (deja Seco al objetivo, 2 de metal, recarga 3) |
-| **Granada de cadmio**             | Acción, 3, recarga 3    | Burbuja de 3 m durante 2 turnos: dentro, el tiempo va **lento**: movimiento ×0,5 y actúan los últimos de la ronda. **Los proyectiles que cruzan el borde se desvían** (pasa en los libros)                 |
+| _Autoataque: pistola_             | —                       | Distancia media                                                                                                                                                                                            |
+| **Dardo de cromo**                | Acción, 2, recarga 3    | Un disparo a un enemigo alomántico: le vacía la Reserva y queda **Seco** (§2). El "silencio" del kit, usando un estado que ya existe                                                                     |
+| **Granada de cadmio**             | Acción, 3, recarga 3    | Burbuja **lanzada** de 3 m donde el tiempo va **lento** hasta tu siguiente turno: quien empieza su turno dentro **lo pierde** y nadie sale andando. Los proyectiles sí cruzan el borde                      |
+| **Granada de bendaleo**           | Acción, 3, recarga 3    | La inversa del cadmio: burbuja **lanzada** de 2 m donde el tiempo va **rápido** hasta tu siguiente turno. Quien acaba su turno dentro juega otro seguido. Nadie sale andando y ningún proyectil cruza el borde. No se puede cerrar |
 | **Pulso de ettmetal**             | Acción, 2, recarga 2    | Empuje radial desde un punto: todo lo metálico en 4 m sale despedido hacia fuera                                                                                                                           |
 | **Carga de ettmetal**             | Adicional, 1            | Pegas una carga a un prop: cuando ese prop sufre un IMPACTO, explota (Directo, 3 m). **En el agua, el ettmetal reacciona de forma violenta** (lore): combina con la superficie de agua                     |
 | **Liberar mente espiritual**      | Acción, 3               | Crea una zona de Fortuna, Conexión o Investidura (§8). Una activa a la vez, 3 turnos                                                                                                                       |
 | **Inyector de oro**               | Adicional, 2, recarga 2 | Cura a un aliado adyacente 12 + Potencia. Es una mente de oro no sellada: la principal curación de la party                                                                                                |
 
-> **Los gadgets de la Artificiera** (granadas, pulso, inyector) **no tienen cargas por
+> **Los gadgets de la Artificiera** (granadas, dardo, pulso, inyector) **no tienen cargas por
 > combate**: gastan metal de la Reserva, como todo lo demás, y se limitan con **recarga**, el
 > mismo sistema que ya tienen todas las habilidades. Un solo recurso, como los otros tres
 > personajes: así no se le suma complejidad a la que ya es la más compleja.
@@ -799,7 +801,7 @@ complique**. Si no, el jugador encuentra una estrategia dominante y la repite si
 | Guardia con placas   | Al Deslizador (mucha armadura)        | Finta del Deslizador, Tirón del Lanzamonedas → Derribado                  |
 | Guardia con aluminio | Al Lanzamonedas (no se puede empujar) | Deslizador, críticos, penetración                                         |
 | Koloss               | Los empujes (es Gigante)              | Aplacar o Encender (son muy emocionales en los libros), terreno, ettmetal |
-| Lanzamonedas enemigo | A la party si lleva metal             | Burbuja de acero, munición de aluminio, dardo de cromo                    |
+| Lanzamonedas enemigo | A la party si lleva metal             | Burbuja de acero, dardo de cromo                                          |
 | Aplacador enemigo    | La Reacción de tu party               | Nube de cobre                                                             |
 | Ahumador (cobre)     | La lectura de intenciones de la Voz   | Entrar a melee (Deslizar)                                                 |
 | Inquisidor de Acero  | Todo: es el jefe de élite             | Combo de cadena completo + cromo                                          |

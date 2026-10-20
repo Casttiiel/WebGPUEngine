@@ -1,0 +1,62 @@
+{
+  "description": "Fase 14, la IA y las zonas espirituales: la Arquera (solo el arco, sin daño) contra la Artificiera. Sin zona cerca, dispara desde donde está; con un relicario de Fortuna a 3,5 m, se mueve dentro de la zona antes de disparar (+10 % de crítico).",
+  "scenes": ["tactical.json", "tactical_enemies.json"],
+  "entities": [
+    {
+      "prefab": "tactical/relic_fortune.prefab",
+      "components": { "name": "RelicFortune", "transform": { "position": [15, 0.3, 15] } }
+    }
+  ],
+  "seed": 14,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => window.__log.push([e, d.unit ? d.unit.getName() : null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__turns = () => __log.filter(l => l[0] === 'turn' && l[1] === 'Archer').length; window.__mark = () => { window.__m = __turns(); }; window.__archerStarts = () => { const s = __engine.getCombatState(); if (__turns() > __m && s.activeUnit === 'Archer') return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__archerDone = () => { const s = __engine.getCombatState(); return s.activeUnit !== 'Archer' && !s.busy; }; window.__plan = () => { const p = __engine.getCombatState().aiPlans.find(p => p.unit === 'Archer'); return [p.kind, p.reason]; }; window.__inZone = () => { const a = __unit('Archer').getFeetPosition(); const r = __unit('RelicFortune').getFeetPosition(); return Math.hypot(a[0] - r[0], a[2] - r[2]) < 3; }"
+    },
+    {
+      "eval": "__unit('Archer').getAttacks().forEach(a => a.damage = 0); __unit('Archer').skills = []; for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) u.sightRange = 0; __enc.joinRadius = 60"
+    },
+    { "command": "damage", "args": { "unit": "Brute", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Skirmisher", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Lanzamonedas", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Voz", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Deslizador", "amount": 1000 } },
+    { "eval": "__tp('Archer', 0, -1); __tp('Artificiera', 0, -8.5); __mark()" },
+    { "wait_frames": 3 },
+    { "command": "start_combat" },
+    { "log": "Sin zona cerca: dispara desde donde está" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__plan()[0], __inZone()]",
+        "value": ["attack", false]
+      }
+    },
+    { "log": "Con un relicario de Fortuna a 3,5 m: se mete en la zona y dispara desde dentro" },
+    { "eval": "__mark()" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "eval": "__tp('Archer', 0, -1); __tp('Artificiera', 0, -8.5); __tp('RelicFortune', -3.5, -1); __unit('Artificiera').getHealth().restore()" },
+    { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__plan()[0], __inZone()]",
+        "value": ["reposition", true]
+      }
+    },
+    { "assert": { "expr": "__engine.getCombatState().aiTimeouts", "value": 0 } },
+    { "assert": { "no_errors": true } }
+  ]
+}

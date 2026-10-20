@@ -14,16 +14,25 @@
       "armor": 0,
       "attacks": [
         {
-          "id": "shotgun",
-          "name": "Escopeta",
+          "id": "pistol",
+          "name": "Pistola",
           "kind": "ranged",
-          "range": 9,
+          "range": 12,
           "damage": 6,
           "metallic": true,
           "clip": "Spell_Simple_Shoot"
         }
       ],
-      "skills": ["fireball", "thunderwave", "heal"]
+      "skills": [
+        "cadmium_grenade",
+        "bendalloy_grenade",
+        "chromium_dart",
+        "ettmetal_pulse",
+        "gold_injector",
+        "spirit_fortune",
+        "spirit_connection",
+        "spirit_investiture"
+      ]
     }
   }
 }

@@ -388,5 +388,169 @@
       }
     ],
     "description": "Te bebes un vial: te declaras Seco. El turno que viene no puedes usar alomancia y, al acabarlo, la Reserva se llena."
+  },
+  "cadmium_grenade": {
+    "name": "Granada de cadmio",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "cooldown": 3,
+    "target": "point",
+    "range": 12,
+    "radius": 3,
+    "affects": "all",
+    "effects": [
+      {
+        "type": "bubble",
+        "rounds": 1,
+        "radius": 3,
+        "time": "slow"
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Una granada de ettmetal con cadmio: una burbuja de 3 m donde el tiempo va lento hasta tu siguiente turno. Quien empieza su turno dentro lo pierde y nadie sale andando, aliados incluidos."
+  },
+  "bendalloy_grenade": {
+    "name": "Granada de bendaleo",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "cooldown": 3,
+    "target": "point",
+    "range": 12,
+    "radius": 2,
+    "affects": "all",
+    "effects": [
+      {
+        "type": "bubble",
+        "rounds": 1,
+        "radius": 2,
+        "time": "fast"
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Una granada de ettmetal con bendaleo: una burbuja de 2 m donde el tiempo va rápido hasta tu siguiente turno. Quien acaba su turno dentro, aliado o enemigo, juega otro seguido. Nadie sale andando y ningún proyectil cruza el borde. No se puede cerrar."
+  },
+  "chromium_dart": {
+    "name": "Dardo de cromo",
+    "cost": "action",
+    "metal": 2,
+    "allomantic": true,
+    "cooldown": 3,
+    "target": "unit",
+    "range": 12,
+    "targets": "enemy",
+    "effects": [
+      {
+        "type": "drain"
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Un dardo con la punta de cromo: le borra los metales a un alomántico. Se queda con la Reserva vacía y su turno siguiente no puede usar alomancia."
+  },
+  "ettmetal_pulse": {
+    "name": "Pulso de ettmetal",
+    "scale": "POT",
+    "cost": "action",
+    "metal": 2,
+    "allomantic": true,
+    "cooldown": 2,
+    "target": "point",
+    "range": 10,
+    "radius": 4,
+    "affects": "all",
+    "effects": [
+      {
+        "type": "radialPush"
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Una carga de ettmetal estalla en el punto elegido: todo lo metálico a 4 m (objetos y quien lleve metal) sale despedido hacia fuera. Lo que choca recibe el golpe."
+  },
+  "gold_injector": {
+    "name": "Inyector de oro",
+    "scale": "POT",
+    "cost": "bonusAction",
+    "metal": 2,
+    "allomantic": true,
+    "cooldown": 2,
+    "target": "unit",
+    "range": 1.5,
+    "targets": "ally",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "heal",
+        "amount": 12
+      }
+    ],
+    "clip": "Push_Enter",
+    "description": "Una mente de oro no sellada en una jeringa: cura a un aliado pegado a ti (o a ti misma). Basta para levantar a uno caído."
+  },
+  "spirit_fortune": {
+    "name": "Liberar Fortuna",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "cooldown": 3,
+    "group": "spirit",
+    "target": "point",
+    "range": 10,
+    "radius": 3,
+    "affects": "all",
+    "effects": [
+      {
+        "type": "spiritZone",
+        "zone": "fortune",
+        "rounds": 3,
+        "radius": 3
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Liberas una mente de cromo feruquímica en el suelo: una zona de Fortuna de 3 m durante 3 turnos tuyos. Quien ataca desde dentro, de cualquier bando, tiene +10 % de crítico. Solo una zona a la vez; las tres mentes comparten la recarga."
+  },
+  "spirit_connection": {
+    "name": "Liberar Conexión",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "cooldown": 3,
+    "group": "spirit",
+    "target": "point",
+    "range": 10,
+    "radius": 3,
+    "affects": "all",
+    "effects": [
+      {
+        "type": "spiritZone",
+        "zone": "connection",
+        "rounds": 3,
+        "radius": 3
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Liberas una mente de duraluminio feruquímica en el suelo: una zona de Conexión de 3 m durante 3 turnos tuyos. Un estado aplicado a una unidad de dentro se copia a las de su bando que también estén dentro (aliados o enemigos). Solo una zona a la vez; las tres mentes comparten la recarga."
+  },
+  "spirit_investiture": {
+    "name": "Liberar Investidura",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "cooldown": 3,
+    "group": "spirit",
+    "target": "point",
+    "range": 10,
+    "radius": 3,
+    "affects": "all",
+    "effects": [
+      {
+        "type": "spiritZone",
+        "zone": "investiture",
+        "rounds": 3,
+        "radius": 3
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Liberas una mente de niquelsil feruquímica en el suelo: una zona de Investidura de 3 m durante 3 turnos tuyos. Las habilidades lanzadas desde dentro, de cualquier bando, hacen +50 %. Solo una zona a la vez; las tres mentes comparten la recarga."
   }
 }

@@ -660,11 +660,14 @@ export class UnitComponent extends Component {
     return this.critChance;
   }
 
-  /** Probabilidad (0-1) de que el próximo ataque que impacte sea crítico. */
-  public getNextCritChance(): number {
-    if (this.critChance <= 0) return 0;
+  /**
+   * Probabilidad (0-1) de que el próximo ataque que impacte sea crítico. `bonus`: lo que se
+   * suma por encima de la bolsa (la zona de Fortuna), sin cambiar sus canicas.
+   */
+  public getNextCritChance(bonus = 0): number {
+    if (this.critChance <= 0) return Math.min(1, bonus);
     if (this.bagMarbles <= 0) this.refillCritBag();
-    return this.bagCrits / this.bagMarbles;
+    return Math.min(1, this.bagCrits / this.bagMarbles + bonus);
   }
 
   /** Para pruebas: fija el % de crítico (y rellena la bolsa). */
@@ -674,10 +677,12 @@ export class UnitComponent extends Component {
     this.refillCritBag();
   }
 
-  /** Saca una canica de la bolsa para un ataque que ha impactado. */
-  public rollCrit(): boolean {
-    if (this.critChance <= 0) return false;
-    const crit = Math.random() < this.getNextCritChance();
+  /** Saca una canica de la bolsa para un ataque que ha impactado (con `bonus`, la Fortuna). */
+  public rollCrit(bonus = 0): boolean {
+    const chance = this.getNextCritChance(bonus);
+    if (chance <= 0) return false;
+    const crit = Math.random() < chance;
+    if (this.critChance <= 0) return crit;
     if (crit) this.refillCritBag();
     else this.bagMarbles--;
     return crit;

@@ -153,7 +153,53 @@ atraer y empujar) y Cajas apiladas (madera), de 1,9 m: por debajo de la altura d
 - [x] **12.7 IA.** TacticalPlanner valora acabar a cubierto de las amenazas (usando el mismo
       snap), flanquear al que lo está y quitarle la cobertura (empujar o atraer el prop, áreas).
 
-### Fase 13 — Voz (GDD §10.3)
+### Fase 13 — Artificiera (GDD §10.4)
+
+Escenario `phase13_artificer`. Las burbujas de `Zones` pasan a tener tiempo (rápido / lento) y a
+poder ser ancladas (la del Deslizador) o lanzadas (una granada: no se rompen ni se cierran y
+duran hasta el siguiente turno de quien las lanzó, así todos juegan un turno con ellas).
+
+- [x] Gadgets sin cargas por combate: gastan metal de la Reserva y tienen recarga (cooldown),
+      como el resto de habilidades.
+- [x] Pistola (autoataque a distancia, 12 m, 6 de daño).
+- [x] Granada de cadmio (Acción, 3 de metal, recarga 3): burbuja lanzada de 3 m. Quien empieza
+      su turno dentro lo pierde (una vez por burbuja) y nadie sale andando. Los proyectiles sí
+      cruzan el borde.
+- [x] Granada de bendaleo (Acción, 3 de metal, recarga 3): la burbuja del Deslizador, pero
+      lanzada a un punto, de 2 m y sin poder cerrarla.
+- [x] Dardo de cromo (Acción, 2 de metal, recarga 3): vacía la Reserva del objetivo y lo deja
+      **Seco** (al acabar ese turno, la Reserva se llena). Solo contra quien tiene Reserva.
+- [x] Pulso de ettmetal (Acción, 2 de metal, recarga 2): todo lo metálico a 4 m del punto
+      (menos ella) sale despedido hacia fuera `3 + POT/2` m, con IMPACTO; una flecha por cada uno
+      en la vista previa.
+- [x] Inyector de oro (Adicional, 2 de metal, recarga 2): cura a un aliado pegado `12 + POT`
+      (también la levanta si está caído).
+- **Liberar mente espiritual** va con las zonas espirituales (fase 14).
+
+### Fase 14 — Zonas espirituales (GDD §8)
+
+Hecho en `SpiritZones.ts`. Escenarios: `phase14_zones` y `phase14_ai`.
+
+- [x] Fortuna: +10 % de crítico de quien ataca desde dentro (por encima de la bolsa de canicas,
+      sin cambiarla; también en la vista previa).
+- [x] Conexión: un estado aplicado dentro se copia al resto de unidades del mismo bando que
+      estén dentro (la vista previa dice a quién; el Seco del dardo de cromo también vacía la
+      Reserva de las copias).
+- [x] Investidura: las habilidades lanzadas desde dentro hacen +50 % de efecto (el `power` que
+      ya usa el duraluminio; se multiplica con él).
+- [x] Afectan a **los dos bandos**; la IA lo tiene en cuenta: prefiere acabar en Fortuna (si
+      ataca) o Investidura (si tiene habilidades), evita la Conexión con aliados dentro y cuenta
+      las copias de la Conexión al valorar una habilidad de estado.
+- [x] Liberar mente espiritual (Artificiera): tres habilidades (Fortuna, Conexión, Investidura;
+      Acción, 3 de metal, punto a 10 m, 3 m de radio) con la recarga compartida (`group`). Una
+      zona activa a la vez, durante 3 turnos suyos.
+- [x] Relicarios (`relic_fortune/connection/investiture.prefab`): props metálicos que emiten
+      una zona que va con ellos (empuje y tirón la mueven); al romperse, sueltan la zona de
+      golpe donde estaban hasta la ronda siguiente.
+      _Hecho cuando:_ `phase14_zones`: el Lanzamonedas atrae un relicario de Conexión y una
+      Marca del cazador se reparte entre 3 enemigos (el Enfurecido llega con la Voz).
+
+### Fase 15 — Voz (GDD §10.3)
 
 - [ ] **Estados emocionales** (GDD §6): `enraged` (Enfurecido: objetivo forzado, que la IA
       tiene que respetar; +25 % de daño hecho, −3 de armadura) y `soothed` (Aplacado: sin
@@ -166,9 +212,9 @@ atraer y empujar) y Cajas apiladas (madera), de 1,9 m: por debajo de la altura d
 - [ ] Aplacar: en un enemigo, Aplacado y le quita los buffs; en un aliado, le quita los estados
       negativos.
 - [ ] Calma: el enemigo no es hostil durante 1 turno; se rompe si recibe daño.
-- La **Nube de cobre** es una zona: va en la fase 14.
+- La **Nube de cobre** es una zona: va en la fase 16.
 
-### Fase 14 — Zonas genéricas (burbujas, nubes y lo que necesita la Artificiera)
+### Fase 16 — Zonas genéricas (burbujas, nubes y lo que necesita la Artificiera)
 
 - [ ] **14.1 Zonas genéricas**: círculo con duración y eventos al entrar, al salir, al empezar
       el turno dentro y al cruzar el borde un proyectil. Ampliar `Surfaces` o crear `Zones` con
@@ -181,21 +227,7 @@ atraer y empujar) y Cajas apiladas (madera), de 1,9 m: por debajo de la altura d
 - [ ] **14.4 Nube de cobre** de la Voz: inmunidad a los estados mentales y ocultación frente al
       bronce.
 
-### Fase 15 — Artificiera (GDD §10.4)
-
-- [ ] Gadgets sin cargas por combate: gastan metal de la Reserva y tienen recarga (cooldown),
-      como el resto de habilidades.
-- [ ] Munición cambiable (Acción adicional): normal / aluminio (atraviesa la Burbuja de acero) /
-      dardo de cromo (aplica Seco; 2 de metal, recarga 3).
-- [ ] Granada de cadmio (zona): movimiento ×0,5 y **se actúa al final de la ronda** (hace falta
-      poder reordenar la iniciativa en caliente) y el borde bloquea proyectiles.
-- [ ] Pulso de ettmetal: empuje radial de 4 m sobre todo lo metálico.
-- [ ] Carga de ettmetal (Adicional, 1 de metal): etiqueta en un prop que lo hace explotar al
-      recibir un IMPACTO. Nueva superficie de **agua** con la que el ettmetal reacciona.
-- [ ] Inyector de oro: cura a un aliado adyacente `12 + POT`.
-- **Liberar mente espiritual** va con las zonas espirituales (fase 17).
-
-### Fase 16 — Reacciones y asistencias (GDD §7) ⚠️ el sistema más arriesgado
+### Fase 17 — Reacciones y asistencias (GDD §7) ⚠️ el sistema más arriesgado
 
 Con los cuatro personajes ya hechos, todos los disparadores existen y se prueban las
 interacciones que se han diseñado, no unas de prueba.
@@ -239,25 +271,6 @@ interacciones que se han diseñado, no unas de prueba.
       _Hecho cuando:_ se juega entero sin errores. **Decisión de seguir o no:** si el combate no es
       divertido, se revisan el metal, los empujes, la cobertura y las asistencias antes de
       seguir.
-
----
-
-## HITO 3 — Zonas espirituales
-
-### Fase 17 — Zonas espirituales (GDD §8)
-
-- [ ] Fortuna: +2 canicas de crítico en la bolsa de quien ataca desde dentro.
-- [ ] Conexión: un estado aplicado dentro se copia al resto de unidades del mismo bando que
-      estén dentro.
-- [ ] Investidura: las habilidades lanzadas desde dentro hacen +50 % de efecto (el `power` que
-      ya usa el duraluminio).
-- [ ] Afectan a **los dos bandos**; la IA lo tiene en cuenta (evita las zonas que le perjudican
-      y aprovecha las que le benefician).
-- [ ] Liberar mente espiritual (Artificiera): una zona activa a la vez, durante 3 turnos.
-- [ ] Relicarios: props metálicos que emiten una zona; se mueven con empuje y tirón; al
-      romperse, sueltan la zona de golpe durante 1 ronda.
-      _Hecho cuando:_ `phase17_zones`: el Lanzamonedas atrae un relicario de Conexión y un
-      Enfurecido se reparte entre 3 enemigos.
 
 ---
 

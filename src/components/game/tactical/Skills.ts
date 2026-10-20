@@ -6,6 +6,7 @@ import { hasLineOfSight } from './TacticalQueries';
 import type { SurfaceType } from './Surfaces';
 import type { UnitStatusId } from './UnitComponent';
 import type { AttributeId } from './Stats';
+import type { SpiritKind } from './SpiritZones';
 
 /**
  * Habilidades: modelo de datos genérico (public/data/skills.json) y geometría de sus áreas.
@@ -76,10 +77,31 @@ export type SkillEffect =
    */
   | { type: 'finisher' }
   /**
-   * Burbuja de bendaleo centrada en el lanzador, `radius` + `radiusPerPoint`·POT m, durante
-   * `rounds` rondas (Zones).
+   * Burbuja de tiempo (Zones), `radius` + `radiusPerPoint`·POT m, durante `rounds` rondas.
+   * Centrada en el lanzador (`self`: se rompe si sale y se puede cerrar) o lanzada a un punto
+   * (`point`: una granada). `time`: fast (bendaleo: quien acaba su turno dentro juega otro) o
+   * slow (cadmio: quien empieza su turno dentro lo pierde). Default fast.
    */
-  | { type: 'bubble'; rounds: number; radius: number; radiusPerPoint?: number }
+  | {
+      type: 'bubble';
+      rounds: number;
+      radius: number;
+      radiusPerPoint?: number;
+      time?: 'fast' | 'slow';
+    }
+  /** Dardo de cromo: vacía la Reserva del objetivo y lo deja Seco su turno siguiente. */
+  | { type: 'drain' }
+  /**
+   * Pulso de ettmetal: todo lo metálico dentro del área (menos el lanzador) sale despedido
+   * hacia fuera desde el centro, `3 + POT/2` m. Lo que choca recibe un IMPACTO.
+   */
+  | { type: 'radialPush' }
+  /**
+   * Liberar mente espiritual: una zona de Fortuna, Conexión o Investidura (SpiritZones) de
+   * `radius` m en el punto, hasta el turno de quien la lanza en `rounds` rondas. Una a la vez:
+   * la nueva sustituye a la anterior.
+   */
+  | { type: 'spiritZone'; zone: SpiritKind; rounds: number; radius: number }
   /**
    * Acciones de metal (GDD §2, §11), sobre uno mismo y al momento:
    *   duralumin: quema toda la Reserva; la siguiente, ×(1 + quemado / máximo) y sin coste.
@@ -95,6 +117,8 @@ export interface SkillDef {
   cost: 'action' | 'bonusAction' | 'free';
   /** Turnos del lanzador que hay que esperar para volver a usarla (0 = sin cooldown). */
   cooldown: number;
+  /** Las del mismo grupo comparten la recarga (las tres mentes espirituales). */
+  group?: string;
   target: SkillTargeting;
   /** unit / point: alcance (m). Unidad: de borde a borde; punto: desde el lanzador. */
   range: number;
@@ -165,6 +189,7 @@ function normalize(id: string, s: SkillJson): SkillDef {
     name: s.name,
     cost: s.cost,
     cooldown: s.cooldown ?? 0,
+    ...(s.group !== undefined && { group: s.group }),
     target: s.target,
     range: s.range ?? 0,
     minRange: s.minRange ?? 0,
@@ -188,6 +213,10 @@ function normalize(id: string, s: SkillJson): SkillDef {
 export const hasEffect = (skill: SkillDef, type: SkillEffect['type']): boolean =>
   skill.effects.some((e) => e.type === type);
 
+/** ¿Crea una burbuja centrada en el lanzador? (con la suya activa, la habilidad la cierra) */
+export const isAnchoredBubble = (skill: SkillDef): boolean =>
+  skill.target === 'self' && hasEffect(skill, 'bubble');
+
 /** ¿Es una acción de metal (duraluminio, recargar)? */
 export const isMetalAction = (skill: SkillDef): boolean =>
   skill.effects.some((e) => e.type === 'duralumin' || e.type === 'refill');
@@ -200,6 +229,8 @@ export const isHostile = (skill: SkillDef): boolean =>
     hasEffect(skill, 'status') ||
     hasEffect(skill, 'steelPush') ||
     hasEffect(skill, 'ironPull') ||
+    hasEffect(skill, 'radialPush') ||
+    hasEffect(skill, 'drain') ||
     hasEffect(skill, 'hurl') ||
     hasEffect(skill, 'finisher'));
 

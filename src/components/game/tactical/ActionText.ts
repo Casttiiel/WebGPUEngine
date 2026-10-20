@@ -1,5 +1,6 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
 import type { SkillDef } from './Skills';
+import { SPIRIT_NAME } from './SpiritZones';
 import { skillDamage } from './CombatRules';
 import { steelDistanceFor, steelJumpFor, type AttributeId } from './Stats';
 
@@ -92,7 +93,7 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
         return `${scaledText(base, skill.scale, caster)} de daño${pen}`;
       }
       case 'heal':
-        return `cura ${e.amount}`;
+        return `cura ${scaledText(e.amount, skill.scale, caster)}`;
       case 'push':
         return `empuja ${fmt(e.distance)} m`;
       case 'teleport':
@@ -131,8 +132,30 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
           pot !== null
             ? `${fmt(e.radius + (e.radiusPerPoint ?? 0) * pot)} m`
             : `${fmt(e.radius)} m + ${fmt(e.radiusPerPoint ?? 0)} por POT`;
-        return `burbuja de ${r} durante ${turns(e.rounds).replace('turno', 'ronda')}: quien acaba su turno dentro juega otro seguido; ningún proyectil cruza el borde`;
+        // Lanzada: dura rondas completas, hasta el turno de quien la lanzó.
+        const time =
+          skill.target === 'point' && e.rounds === 1
+            ? 'hasta tu siguiente turno'
+            : `durante ${turns(e.rounds).replace('turno', 'ronda')}`;
+        const rule =
+          e.time === 'slow'
+            ? 'quien empieza su turno dentro lo pierde; nadie sale andando'
+            : 'quien acaba su turno dentro juega otro seguido; ningún proyectil cruza el borde';
+        return `burbuja de ${r} ${time}: ${rule}`;
       }
+      case 'drain':
+        return 'le vacía la Reserva: Seco su turno siguiente';
+      case 'spiritZone': {
+        const rule = {
+          fortune: '+10 % de crítico a quien ataca desde dentro',
+          connection: 'un estado aplicado dentro se copia a los de su bando que estén dentro',
+          investiture: 'las habilidades lanzadas desde dentro hacen +50 %',
+        }[e.zone];
+        const time = e.rounds === 1 ? 'hasta tu siguiente turno' : `${e.rounds} turnos tuyos`;
+        return `zona de ${SPIRIT_NAME[e.zone]} de ${fmt(e.radius)} m (${time}; una a la vez): ${rule}, a los dos bandos`;
+      }
+      case 'radialPush':
+        return `todo lo metálico sale despedido hacia fuera ${distanceText(steelDistanceFor, caster)}`;
       case 'duralumin':
         return 'quema toda la Reserva: la siguiente, gratis y ×(1 + quemado / máximo)';
       case 'refill':

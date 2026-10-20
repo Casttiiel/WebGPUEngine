@@ -15,7 +15,7 @@
       "wait_frames": 5
     },
     {
-      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__los = (from, to, attack) => __engine.gameCommand('plan_attack', { unit: from, target: to, attack }).then(r => r.lineOfSight); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy())"
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__los = (from, to, attack) => __engine.gameCommand('plan_attack', { unit: from, target: to, attack }).then(r => r.lineOfSight); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); __unit('Artificiera').skills = ['fireball', 'thunderwave', 'heal']"
     },
     {
       "log": "Snap: el destino se pega a la columna y queda a cubierto hacia ella (+z)"

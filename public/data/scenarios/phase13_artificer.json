@@ -1,0 +1,309 @@
+{
+  "description": "Fase 13, Artificiera: autoataque Pistola y cinco gadgets que gastan metal de la Reserva y tienen recarga, sin cargas por combate. Dardo de cromo (vacía la Reserva y deja Seco; al acabar su turno Seco, se llena; contra quien no tiene Reserva, no). Pulso de ettmetal (todo lo metálico a 4 m sale despedido hacia fuera 3 + POT/2 = 5 m; lo de madera no se mueve). Inyector de oro (aliado pegado, cura 12 + POT = 16; si está lejos, se acerca). Granada de bendaleo (burbuja lanzada de 2 m: quien acaba su turno dentro juega otro; el borde corta los proyectiles; no se cierra ni se rompe aunque la Artificiera se mueva). Granada de cadmio (burbuja lanzada de 3 m: quien empieza su turno dentro lo pierde, una vez; los proyectiles sí cruzan el borde). Las dos lanzadas duran hasta el siguiente turno de la Artificiera.",
+  "scenes": ["tactical.json", "tactical_props.json", "tactical_dummies.json"],
+  "seed": 13,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null, d.status ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__S = 'Artificiera'; window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__turns = (n, from = 0) => __log.slice(from).filter(l => l[0] === 'turn' && l[1] === n).length; window.__marks = {}; window.__mark = (n) => { __marks[n] = __turns(n); }; window.__turnOf = (n) => { const s = __engine.getCombatState(); if (__turns(n) > (__marks[n] ?? -1) && s.activeUnit === n && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__bubbles = (time) => __engine.getCombatState().bubbles.filter(b => b.time === time); window.__x = (n) => Math.round(__unit(n).getFeetPosition()[0] * 10) / 10; window.__ui = (a) => Engine.getModules().getModule('ui').getWidgetByAlias(a); window.__hotbar = () => Array.from({ length: 12 }, (_, i) => __ui('hotbar_' + (i + 1) + '_name')).filter(Boolean).map(w => w.getText())"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; } __enc.joinRadius = 60; __tp(__S, -10, -12); __tp('Deslizador', -9.2, -12); __tp('Voz', -4, -7); __tp('Lanzamonedas', -6, -8); __tp('Enemy1', -4.5, -16); __tp('PushCrate2', -7.5, -16); __tp('Crate', -6, -17.5); __tp('Enemy2', -15, -4); __tp('Enemy3', -15, -17); __unit('Enemy1').setMetallic(true); __unit('Enemy3').maxMetal = 0; __unit('Enemy3').setMetal(0)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "eval": "__mark(__S)"
+    },
+    {
+      "command": "start_combat"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf(__S)",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "eval": "__enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit(__S).maxMetal = 20; __unit(__S).setMetal(20); __unit('Enemy3').setMetal(0); window.__round0 = __engine.getCombatState().round"
+    },
+    {
+      "log": "El kit: Pistola, cinco gadgets y las tres mentes espirituales (más duraluminio y recargar)"
+    },
+    {
+      "assert": {
+        "expr": "[__unit(__S).getAttacks().map(a => a.id), __unit(__S).getSkillIds()]",
+        "value": [
+          ["pistol"],
+          [
+            "cadmium_grenade",
+            "bendalloy_grenade",
+            "chromium_dart",
+            "ettmetal_pulse",
+            "gold_injector",
+            "spirit_fortune",
+            "spirit_connection",
+            "spirit_investiture",
+            "duralumin",
+            "refill"
+          ]
+        ]
+      }
+    },
+    {
+      "log": "Dardo de cromo: Enemy1 se queda sin Reserva y Seco; contra quien no tiene Reserva, no se puede"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: __S, skill: 'chromium_dart', target: 'Enemy3' }).then(r => [r.canCast, r.reason])",
+        "value": [false, "not allomantic"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'chromium_dart', target: 'Enemy1' }).then(r => [r.ok, r.metalCost, r.affected])",
+        "value": [true, 2, ["Enemy1"]]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__unit('Enemy1').getMetal(), __unit('Enemy1').isDrained()]",
+        "value": [0, true]
+      }
+    },
+    {
+      "log": "Pulso de ettmetal en (-6, -16): la caja de metal y Enemy1 (con metal) salen hacia fuera; la de madera no"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: __S, skill: 'ettmetal_pulse', to: [-6, 0, -16] }).then(r => [r.canCast, r.affected.sort(), r.motions.map(m => m.body).sort()])",
+        "value": [true, ["Enemy1", "PushCrate2"], ["Enemy1", "PushCrate2"]]
+      }
+    },
+    {
+      "screenshot": "01-pulse-aim"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'ettmetal_pulse', to: [-6, 0, -16] }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 2]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__x('Enemy1') > -0.5, __x('PushCrate2') < -11.5, __x('Crate')]",
+        "value": [true, true, -6],
+        "message": "5 m hacia fuera (3 + POT 4 / 2); la de madera, quieta"
+      }
+    },
+    {
+      "log": "Inyector de oro: al Deslizador (pegado) le cura 12 + POT 4 = 16; a la Voz (lejos) se acercaría"
+    },
+    {
+      "command": "damage",
+      "args": {
+        "unit": "Deslizador",
+        "amount": 18
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: __S, skill: 'gold_injector', target: 'Voz' }).then(r => [r.canCast, r.approach > 0])",
+        "value": [true, true]
+      }
+    },
+    {
+      "eval": "window.__from = __log.length"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'gold_injector', target: 'Deslizador' }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 2]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__log.slice(__from).filter(l => l[0] === 'heal').map(l => [l[1], l[2]])",
+        "value": [["Deslizador", 16]]
+      }
+    },
+    {
+      "log": "Granada de bendaleo sobre Enemy2: lanzada, 2 m, no se cierra"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'bendalloy_grenade', to: [-15, 0, -4] }).then(r => [r.ok, r.metalCost, r.affected])",
+        "value": [true, 3, ["Enemy2"]]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "(() => { const b = __bubbles('fast'); return [b.length, b[0].radius, b[0].anchored, b[0].untilRound - __round0]; })()",
+        "value": [1, 2, false, 1]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: __S, skill: 'bendalloy_grenade', to: [-15, 0, -4] }).then(r => [r.canCast, r.reason, __hotbar().includes('Cerrar burbuja')])",
+        "value": [false, "on cooldown", false],
+        "message": "no se cierra: la habilidad sigue siendo la granada (recargando)"
+      }
+    },
+    {
+      "log": "Granada de cadmio sobre Enemy3: lanzada, 3 m"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'cadmium_grenade', to: [-15, 0, -17] }).then(r => [r.ok, r.metalCost, r.affected])",
+        "value": [true, 3, ["Enemy3"]]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "(() => { const b = __bubbles('slow'); return [b.length, b[0].radius, b[0].anchored]; })()",
+        "value": [1, 3, false]
+      }
+    },
+    {
+      "screenshot": "02-bubbles"
+    },
+    {
+      "log": "Los proyectiles cruzan el borde del cadmio, no el del bendaleo"
+    },
+    {
+      "assert": {
+        "expr": "Promise.all([__engine.gameCommand('plan_attack', { unit: __S, target: 'Enemy3', attack: 'pistol' }), __engine.gameCommand('plan_attack', { unit: __S, target: 'Enemy2', attack: 'pistol' })]).then(([a, b]) => [a.lineOfSight, b.lineOfSight])",
+        "value": [true, false]
+      }
+    },
+    {
+      "log": "Gadgets: metal y recarga, sin cargas por combate"
+    },
+    {
+      "assert": {
+        "expr": "[__unit(__S).getMetal(), __engine.getCombatState().units.find(u => u.name === __S).cooldowns]",
+        "value": [
+          8,
+          {
+            "cadmium_grenade": 3,
+            "bendalloy_grenade": 3,
+            "chromium_dart": 3,
+            "ettmetal_pulse": 2,
+            "gold_injector": 2
+          }
+        ]
+      }
+    },
+    {
+      "log": "Mover a la Artificiera no rompe sus burbujas lanzadas"
+    },
+    {
+      "eval": "__tp(__S, -10, -11)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "[__bubbles('fast').length, __bubbles('slow').length]",
+        "value": [1, 1]
+      }
+    },
+    {
+      "log": "Una ronda completa hasta su siguiente turno: Enemy2 juega dos seguidos, Enemy3 pierde el suyo, Enemy1 acaba Seco y se llena"
+    },
+    {
+      "eval": "window.__from = __log.length; __mark(__S); __engine.gameCommand('end_turn', {})"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf(__S)",
+        "value": true
+      },
+      "timeout_frames": 6000
+    },
+    {
+      "assert": {
+        "expr": "(() => { const l = __log.slice(__from); const t = l.filter(x => x[0] === 'turn').map(x => x[1]); const i = t.indexOf('Enemy2'); return [__turns('Enemy2', __from), t[i + 1], l.some(x => x[0] === 'extra-turn' && x[1] === 'Enemy2')]; })()",
+        "value": [2, "Enemy2", true]
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const l = __log.slice(__from); return [__turns('Enemy3', __from), l.filter(x => x[0] === 'turn-lost').map(x => x[1])]; })()",
+        "value": [1, ["Enemy3"]]
+      }
+    },
+    {
+      "assert": {
+        "expr": "[__log.slice(__from).some(x => x[0] === 'refill' && x[1] === 'Enemy1'), __unit('Enemy1').getMetal(), __unit('Enemy1').isDrained()]",
+        "value": [true, 6, false]
+      }
+    },
+    {
+      "assert": {
+        "expr": "[__bubbles('fast').length, __bubbles('slow').length]",
+        "value": [0, 0],
+        "message": "las dos caducan al empezar su turno"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().aiTimeouts",
+        "value": 0
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

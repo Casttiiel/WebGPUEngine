@@ -6,6 +6,7 @@ import { KeyCode } from '../../../types/KeyCode.enum';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { ModuleGameController } from '../../../modules/game/ModuleGameController';
 import { Zones, type TimeBubble } from './Zones';
+import { SpiritZones } from './SpiritZones';
 import { Cover, rayToProp } from './Cover';
 import {
   RHYTHM_MAX,
@@ -60,6 +61,7 @@ import {
   SkillCatalog,
   coneDirection,
   hasEffect,
+  isAnchoredBubble,
   isHostile,
   isMetalAction,
   lineReach,
@@ -152,6 +154,13 @@ export interface SkillPlan {
   closesBubble?: boolean;
   /** Empuje, tirón, desarme o salto: qué se mueve y por dónde (vista previa). */
   motion: SkillMotion | null;
+  /** Pulso de ettmetal: todo lo que sale despedido a la vez. */
+  motions: SkillMotion[];
+  /**
+   * Conexión: quién recibiría también los estados (de su bando, en la misma zona que un
+   * afectado). No reciben daño ni el resto de efectos.
+   */
+  connected: UnitComponent[];
   /** Metal que gastaría de la Reserva (con duraluminio, nada). */
   metalCost: number;
   /** Multiplicador del efecto (duraluminio: ×(1 + quemado / máximo)). */
@@ -407,6 +416,8 @@ export class EncounterComponent extends Component {
   private turnIndex = 0;
   private round = 0;
   private resources: TurnResources = { action: 0, bonusAction: 0, movement: 0 };
+  /** El turno actual se pierde (empezó dentro de una burbuja de cadmio): pasa solo. */
+  private turnLost = false;
   private turnTimer = 0;
   /** Segundos que lleva el turno de la IA (vigilante). */
   private aiTurnTime = 0;
@@ -483,6 +494,7 @@ export class EncounterComponent extends Component {
     this.surfaces.update(dt, this.state === 'combat');
     this.updateFire();
     this.updateBubbles();
+    SpiritZones.syncRelics();
 
     if (this.canRestart() && Engine.getInput().isKeyJustPressed(KeyCode.R)) this.restart();
 
@@ -539,7 +551,7 @@ export class EncounterComponent extends Component {
    */
   public hasPendingExtraTurn(unit: UnitComponent): boolean {
     if (this.state !== 'combat' || !unit.isAlive()) return false;
-    const bubble = Zones.containing(unit);
+    const bubble = Zones.containing(unit, 'fast');
     return !!bubble && bubble.extraTurns.get(unit) !== this.round;
   }
 
@@ -583,7 +595,9 @@ export class EncounterComponent extends Component {
    * Eventos: state:<estado>, turn, round, join, move, attack, damage, death, downed, revive,
    * restart, skill, status, status-end, impact, pushed, pulled, disarm, jump; metal (amount =
    * gastado), duralumin,
-   * declare-drained y refill (la Reserva se llena al acabar el turno Seco).
+   * declare-drained y refill (la Reserva se llena al acabar el turno Seco); bubble,
+   * slow-bubble, bubble-end, extra-turn y turn-lost (burbujas de bendaleo y cadmio);
+   * spirit-zone, relic-burst y connected (un estado copiado por la Conexión: source = de quién).
    */
   public onEvent(listener: (event: string, data: EncounterEventData) => void): () => void {
     this.listeners.push(listener);
@@ -1270,6 +1284,8 @@ export class EncounterComponent extends Component {
       reach: 0,
       closesBubble: false,
       motion: null,
+      motions: [],
+      connected: [],
       metalCost: 0,
       power: 1,
       approach: null,
@@ -1279,7 +1295,7 @@ export class EncounterComponent extends Component {
     if (!unit) return fail('not a unit');
     if (!skill || !unit.hasSkill(skillId)) return fail(`unknown skill '${skillId}'`);
     // Con su burbuja activa, la habilidad la cierra (sin acción ni metal).
-    if (hasEffect(skill, 'bubble') && Zones.ownedBy(unit)) {
+    if (isAnchoredBubble(skill) && Zones.ownedBy(unit)) {
       result.origin = unit.getFeetPosition(vec3.create());
       result.inRange = result.lineOfSight = true;
       result.affected = [unit];
@@ -1292,7 +1308,9 @@ export class EncounterComponent extends Component {
     }
     const cost = metalCost(unit, skill);
     result.metalCost = this.state === 'combat' ? cost.metal : 0;
-    result.power = cost.power;
+    // Investidura: lanzada desde dentro, +50 % (como el multiplicador del duraluminio).
+    const power = cost.power * (isMetalAction(skill) ? 1 : SpiritZones.powerFor(unit));
+    result.power = power;
 
     const feet = unit.getFeetPosition(vec3.create());
     const targetUnit = (target.unit?.getComponent('unit') as UnitComponent | null) ?? null;
@@ -1313,6 +1331,10 @@ export class EncounterComponent extends Component {
         if (skill.targets === 'enemy' && ally) return fail('target must be an enemy');
         const revive = ally && hasEffect(skill, 'heal');
         if (!targetUnit.isAlive() && !revive) return fail('target is down');
+        // Dardo de cromo: solo contra quien tiene Reserva (los alománticos).
+        if (hasEffect(skill, 'drain') && !targetUnit.hasReserve()) {
+          return fail('not allomantic');
+        }
         const self = targetUnit === unit;
         const distance = unitDistance(unit, targetUnit);
         result.inRange =
@@ -1321,7 +1343,7 @@ export class EncounterComponent extends Component {
         result.affected =
           skill.radius > 0 ? unitsInCircle(skill, unit, result.origin, skill.radius) : [targetUnit];
         if (hasEffect(skill, 'hurl')) {
-          const hurl = this.planHurl(unit, targetUnit, skill, target, cost.power);
+          const hurl = this.planHurl(unit, targetUnit, skill, target, power);
           if ('reason' in hurl) return fail(hurl.reason);
           result.motion = hurl.motion;
           if (hurl.motion?.hit) result.affected = [targetUnit, hurl.motion.hit];
@@ -1331,7 +1353,7 @@ export class EncounterComponent extends Component {
             unit,
             targetUnit,
             skill,
-            cost.power,
+            power,
             target.direction ?? null,
           );
           if ('reason' in motion) return fail(motion.reason);
@@ -1355,6 +1377,16 @@ export class EncounterComponent extends Component {
             !Cover.propBlocks(eye, aim, [unit]) &&
             !Zones.blocksProjectile(feet, point));
         result.affected = skill.radius > 0 ? unitsInCircle(skill, unit, point, skill.radius) : [];
+        // El tiempo de una burbuja (o una zona espiritual) no afecta a los objetos.
+        if (hasEffect(skill, 'bubble') || hasEffect(skill, 'spiritZone')) {
+          result.affected = result.affected.filter((u) => !PropComponent.of(u.getOwner()));
+        }
+        if (hasEffect(skill, 'radialPush')) {
+          // Pulso de ettmetal: solo lo metálico se mueve (y lo que pille, recibe el golpe).
+          result.motions = this.planRadialPush(unit, skill, point, power);
+          const hit = result.motions.flatMap((m) => (m.hit ? [m.body, m.hit] : [m.body]));
+          result.affected = [...new Set(hit)];
+        }
         if (
           (hasEffect(skill, 'leap') || hasEffect(skill, 'teleport')) &&
           this.leavesBubble(unit, point)
@@ -1363,7 +1395,7 @@ export class EncounterComponent extends Component {
         }
         if (hasEffect(skill, 'leap')) {
           // Salto de acero: llega hasta donde dé el salto (no por el alcance de la habilidad).
-          const arc = jumpArc(feet, point, this.leapDistance(unit, cost.power));
+          const arc = jumpArc(feet, point, this.leapDistance(unit, power));
           if ('reason' in arc) return fail(arc.reason);
           result.affected = [unit];
           result.inRange = result.lineOfSight = true;
@@ -1421,6 +1453,15 @@ export class EncounterComponent extends Component {
         result.affected = unitsInLine(skill, unit, point, result.reach);
         break;
       }
+    }
+
+    // Conexión: los estados se copian a los del mismo bando que estén en la zona.
+    if (hasEffect(skill, 'status') || hasEffect(skill, 'drain')) {
+      const copies = new Set<UnitComponent>();
+      for (const u of result.affected) {
+        for (const c of SpiritZones.connectedTo(u)) if (!result.affected.includes(c)) copies.add(c);
+      }
+      result.connected = [...copies];
     }
 
     if (unit.hasStatus('fear') && isHostile(skill)) return fail('frightened');
@@ -1515,6 +1556,25 @@ export class EncounterComponent extends Component {
     return arc;
   }
 
+  /**
+   * Pulso de ettmetal: lo metálico dentro del área (menos el lanzador) sale en línea recta
+   * alejándose del centro (si está justo en el centro, alejándose del lanzador).
+   */
+  private planRadialPush(
+    caster: UnitComponent,
+    skill: SkillDef,
+    center: vec3,
+    power: number,
+  ): SkillMotion[] {
+    const out: SkillMotion[] = [];
+    for (const u of unitsInCircle(skill, caster, center, skill.radius)) {
+      if (u === caster || !isMetallic(u) || u.isImmovable()) continue;
+      const motion = this.planMetalMotion(caster, u, skill, power, null, center);
+      if (!('reason' in motion)) out.push(motion);
+    }
+    return out;
+  }
+
   /** Radio de una burbuja de bendaleo: el del efecto + lo que sume por POT. */
   private bubbleRadius(unit: UnitComponent, skill: SkillDef): number {
     const e = skill.effects.find((x) => x.type === 'bubble');
@@ -1526,6 +1586,7 @@ export class EncounterComponent extends Component {
    * Empuje o tirón de `caster` sobre `target` (GDD §5): solo lo metálico, en línea recta
    * (alejándose o hacia él), `3 + POT/2` m por el multiplicador; el tirón se para al llegar a su
    * lado. Lo que no es de metal pero lleva un arma de metal, con el tirón, se queda sin ella.
+   * `from`: desde dónde se empuja (default: el lanzador; el pulso, desde su centro).
    */
   private planMetalMotion(
     caster: UnitComponent,
@@ -1533,6 +1594,7 @@ export class EncounterComponent extends Component {
     skill: SkillDef,
     power: number,
     wanted: vec3 | null = null,
+    from: vec3 | null = null,
   ): SkillMotion | { reason: string } {
     if (target === caster) return { reason: 'no target' };
     const pull = hasEffect(skill, 'ironPull');
@@ -1543,10 +1605,12 @@ export class EncounterComponent extends Component {
       return { reason: 'not metallic' };
     }
     if (target.isImmovable()) return { reason: 'immovable' };
-    const from = target.getFeetPosition(vec3.create());
+    const feet = target.getFeetPosition(vec3.create());
     const casterFeet = caster.getFeetPosition(vec3.create());
     const away =
-      horizontalDirection(vec3.sub(vec3.create(), from, casterFeet)) ?? caster.getFacing();
+      (from && horizontalDirection(vec3.sub(vec3.create(), feet, from))) ??
+      horizontalDirection(vec3.sub(vec3.create(), feet, casterFeet)) ??
+      caster.getFacing();
     const dir = pull ? vec3.negate(vec3.create(), away) : aimWithin(away, wanted, skill);
     let max = steelDistanceFor(caster.getAttributes()) * power;
     if (pull) max = Math.min(max, Math.max(0, unitDistance(caster, target) - PULL_GAP));
@@ -1556,7 +1620,7 @@ export class EncounterComponent extends Component {
     return {
       kind: pull ? 'pull' : 'push',
       body: target,
-      points: [from, vec3.scaleAndAdd(vec3.create(), from, dir, path.length)],
+      points: [feet, vec3.scaleAndAdd(vec3.create(), feet, dir, path.length)],
       hit: path.hit,
       wall: path.blocked,
       damage: Math.round((base + caster.getAttribute('POT')) * power),
@@ -1652,6 +1716,12 @@ export class EncounterComponent extends Component {
         this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
       }
       unit.setCooldown(skill.id, skill.cooldown);
+      // Las del mismo grupo comparten la recarga.
+      if (skill.group) {
+        for (const id of unit.getSkillIds()) {
+          if (SkillCatalog.get(id)?.group === skill.group) unit.setCooldown(id, skill.cooldown);
+        }
+      }
       if (plan.metalCost > 0) {
         unit.spendMetal(plan.metalCost);
         this.emit('metal', { unit: entity, amount: plan.metalCost });
@@ -1801,9 +1871,12 @@ export class EncounterComponent extends Component {
           }
           break;
         }
-        case 'heal':
-          for (const u of affected()) this.healUnit(u, Math.round(effect.amount * plan.power));
+        case 'heal': {
+          // Inyector de oro: 12 + POT.
+          const base = effect.amount + (skill.scale ? caster.getAttribute(skill.scale) : 0);
+          for (const u of affected()) this.healUnit(u, Math.round(base * plan.power));
           break;
+        }
         case 'push': {
           // Lejos del lanzador (cono, unidad) o del centro del área (punto).
           const from = skill.target === 'point' ? origin : caster.getFeetPosition(vec3.create());
@@ -1859,12 +1932,37 @@ export class EncounterComponent extends Component {
           }
           break;
         case 'bubble': {
-          const center = caster.getFeetPosition(vec3.create());
+          // Centrada en el lanzador (anclada) o lanzada al punto (una granada).
+          const anchored = skill.target === 'self';
+          const center = anchored ? caster.getFeetPosition(vec3.create()) : vec3.clone(origin);
           const radius = this.bubbleRadius(caster, skill);
-          Zones.add(caster, center, radius, this.round + effect.rounds);
-          this.emit('bubble', { unit: caster.getOwner(), amount: radius });
+          const time = effect.time ?? 'fast';
+          Zones.add(caster, center, radius, this.round + effect.rounds, time, anchored);
+          this.emit(time === 'slow' ? 'slow-bubble' : 'bubble', {
+            unit: caster.getOwner(),
+            amount: radius,
+          });
           break;
         }
+        case 'drain':
+          // Dardo de cromo: Seco su turno siguiente (applyStatus le vacía la Reserva).
+          for (const u of affected()) {
+            if (u.isAlive() && u.hasReserve()) this.applyStatus(u, 'drained', caster, 1);
+          }
+          break;
+        case 'spiritZone': {
+          // Una a la vez: la nueva sustituye a la anterior.
+          SpiritZones.clear((z) => z.caster === caster);
+          SpiritZones.add(effect.zone, origin, effect.radius, {
+            caster,
+            untilRound: this.round + effect.rounds,
+          });
+          this.emit('spirit-zone', { unit: caster.getOwner() });
+          break;
+        }
+        case 'radialPush':
+          for (const m of plan.motions) this.launch(caster, m);
+          break;
         case 'teleport':
         case 'leap':
         case 'flank':
@@ -1962,9 +2060,12 @@ export class EncounterComponent extends Component {
     source: UnitComponent | null,
     turns = 1,
     options: StatusOptions = {},
+    spread = true,
   ): boolean {
     // Los objetos (cajas, barriles) no tienen estados.
     if (!unit.isAlive() || PropComponent.of(unit.getOwner())) return false;
+    // Conexión: se copia a los de su bando que estén en la misma zona (las copias, no otra vez).
+    const connected = spread ? SpiritZones.connectedTo(unit) : [];
     if (id === 'prone' && unit.hasStatus('iron_heavy')) return false;
     // Peltre avivado: inmune a Derribado y Aturdido.
     if ((id === 'prone' || id === 'stunned') && unit.hasStatus('pewter')) return false;
@@ -1982,7 +2083,18 @@ export class EncounterComponent extends Component {
     }
     // Mente de oro: la primera curación, al decantar.
     if (id === 'gold_heal' && options.amount) this.healUnit(unit, options.amount);
+    // Seco por otro (dardo de cromo): la Reserva, vacía (al acabar el turno Seco, se llena).
+    if (id === 'drained') {
+      unit.burnAllMetal();
+      unit.setMetalBoost(null);
+      unit.setDrainPending(false);
+    }
     this.emit('status', { unit: unit.getOwner(), source: source?.getOwner() ?? null, status: id });
+    for (const c of connected) {
+      if (this.applyStatus(c, id, source, turns, options, false)) {
+        this.emit('connected', { unit: c.getOwner(), source: unit.getOwner(), status: id });
+      }
+    }
     return true;
   }
 
@@ -2081,7 +2193,7 @@ export class EncounterComponent extends Component {
       }
       this.settleMetal(unit);
       // Burbuja de bendaleo: quien acaba su turno dentro juega otro seguido (uno por ronda).
-      const bubble = unit.isAlive() ? Zones.containing(unit) : null;
+      const bubble = unit.isAlive() && !this.turnLost ? Zones.containing(unit, 'fast') : null;
       if (bubble && bubble.extraTurns.get(unit) !== this.round) {
         bubble.extraTurns.set(unit, this.round);
         this.emit('extra-turn', { unit: unit.getOwner() });
@@ -2108,7 +2220,9 @@ export class EncounterComponent extends Component {
     this.pendingAction = null;
     this.round = 0;
     this.turnIndex = 0;
+    this.turnLost = false;
     Zones.clear();
+    SpiritZones.clear((z) => !z.relic);
     for (const u of UnitComponent.getAll()) {
       u.clearCooldowns();
       u.clearStatuses();
@@ -2142,12 +2256,14 @@ export class EncounterComponent extends Component {
     this.disengaged.clear();
     this.round = 0;
     this.turnIndex = 0;
+    this.turnLost = false;
     for (const unit of UnitComponent.getAll()) {
       unit.resetToSpawn();
       this.getAI(unit)?.clearPlan();
     }
     this.surfaces.reset();
     Zones.clear();
+    SpiritZones.clear((z) => !z.relic);
     this.inFire.clear();
     this.detectionTimer = DETECTION_INTERVAL;
     this.setState('exploration');
@@ -2193,6 +2309,7 @@ export class EncounterComponent extends Component {
     const entity = unit.getOwner();
     if (this.state === 'combat') {
       if (entity !== this.getActiveUnit()) return 'not this unit’s turn';
+      if (this.turnLost) return 'turn lost';
       if (cost && this.resources[cost] <= 0)
         return cost === 'action' ? 'no action left' : 'no bonus action left';
       return skill ? this.metalBlocker(unit, skill) : null;
@@ -2214,7 +2331,7 @@ export class EncounterComponent extends Component {
    */
   public metalBlocker(unit: UnitComponent, skill: SkillDef): string | null {
     // Cerrar la burbuja propia no cuesta nada.
-    if (hasEffect(skill, 'bubble') && Zones.ownedBy(unit)) return null;
+    if (isAnchoredBubble(skill) && Zones.ownedBy(unit)) return null;
     // Mente de metal: una carga por combate, que no se recarga.
     if (skill.charge && this.state === 'combat' && unit.getCharges(skill.charge) <= 0) {
       return 'no charges';
@@ -2417,6 +2534,14 @@ export class EncounterComponent extends Component {
     const prop = PropComponent.of(unit.getOwner());
     if (prop) {
       this.emit('destroyed', { unit: unit.getOwner() });
+      // Un relicario roto suelta su zona de golpe, donde estaba, hasta la ronda siguiente.
+      const relic = prop.getRelic();
+      if (relic && this.state === 'combat') {
+        SpiritZones.add(relic.zone, unit.getFeetPosition(vec3.create()), relic.radius, {
+          untilRound: this.round + 1,
+        });
+        this.emit('relic-burst', { unit: unit.getOwner() });
+      }
       const explosion = prop.getExplosion();
       if (explosion) this.explode(unit, explosion, instigator);
       else this.surfaces.spawnEffect(DEBRIS_PREFAB, unit.getFeetPosition(), DEBRIS_LIFETIME, 0.4);
@@ -2513,6 +2638,13 @@ export class EncounterComponent extends Component {
 
     if (active.unit.isBusy() || this.isResolving()) return;
 
+    // Turno perdido (cadmio): se ve un momento y pasa.
+    if (this.turnLost) {
+      this.turnTimer -= dt;
+      if (this.turnTimer <= 0) this.endTurn();
+      return;
+    }
+
     if (this.isPlayerTurn()) {
       const input = Engine.getInput();
       if (input.isKeyJustPressed(KeyCode.SPACE) && !CharacterSheetController.isOpen()) {
@@ -2568,9 +2700,10 @@ export class EncounterComponent extends Component {
     return !!bubble && !Zones.contains(bubble, destination);
   }
 
-  /** Una burbuja de bendaleo se rompe si quien la creó sale de ella (o cae). */
+  /** Una burbuja anclada se rompe si quien la creó sale de ella (o cae). */
   private updateBubbles(): void {
     for (const b of [...Zones.getAll()]) {
+      if (!b.anchored) continue;
       const feet = b.caster.getFeetPosition(this.tmpA);
       if (!b.caster.isAlive() || !Zones.contains(b, feet)) this.endBubble(b);
     }
@@ -2607,9 +2740,13 @@ export class EncounterComponent extends Component {
       this.turnIndex = 0;
       this.round++;
       this.surfaces.onRound();
+      // Las lanzadas caducan en el turno de quien las lanzó (beginTurn); aquí, por si ha caído.
       for (const b of [...Zones.getAll()]) {
-        if (this.round >= b.untilRound) this.endBubble(b);
+        if (this.round >= b.untilRound + (b.anchored ? 0 : 1)) this.endBubble(b);
       }
+      // Las de un relicario roto, al empezar la ronda; las liberadas, en el turno de quien las
+      // liberó (beginTurn) o aquí, una ronda después, si ha caído.
+      SpiritZones.clear((z) => this.round >= z.untilRound + (z.caster ? 1 : 0));
       this.emit('round', {});
     }
   }
@@ -2623,6 +2760,20 @@ export class EncounterComponent extends Component {
     const active = this.combatants[this.turnIndex];
     if (!active) return;
     this.resources = { action: 1, bonusAction: 1, movement: active.unit.getMovement() };
+    // Una burbuja lanzada dura rondas completas: caduca al empezar el turno de quien la lanzó.
+    for (const b of [...Zones.getAll()]) {
+      if (!b.anchored && b.caster === active.unit && this.round >= b.untilRound) {
+        this.endBubble(b);
+      }
+    }
+    SpiritZones.clear((z) => z.caster === active.unit && this.round >= z.untilRound);
+    // Burbuja de cadmio: quien empieza su turno dentro lo pierde (una vez por burbuja).
+    const slow = Zones.containing(active.unit, 'slow');
+    this.turnLost = !!slow && !slow.lostTurns.has(active.unit);
+    if (this.turnLost) {
+      slow!.lostTurns.add(active.unit);
+      this.resources = { action: 0, bonusAction: 0, movement: 0 };
+    }
     // Peltre avivado: +3 m. Arrastre: la mitad. Aturdido: pierde la Acción. Derribado:
     // levantarse cuesta la mitad del movimiento.
     if (active.unit.hasStatus('pewter')) this.resources.movement += PEWTER_MOVEMENT;
@@ -2639,7 +2790,7 @@ export class EncounterComponent extends Component {
     this.turnTimer = this.enemyTurnDelay;
     this.aiTurnTime = 0;
     active.unit.tickCooldowns();
-    this.getAI(active.unit)?.beginTurn(this);
+    if (!this.turnLost) this.getAI(active.unit)?.beginTurn(this);
 
     const entity = active.unit.getOwner();
     const party = PartyComponent.find();
@@ -2649,6 +2800,7 @@ export class EncounterComponent extends Component {
       this.getCamera()?.focusOn(entity, true);
     }
     this.emit('turn', { unit: entity });
+    if (this.turnLost) this.emit('turn-lost', { unit: entity });
     // Empezar el turno dentro del fuego quema.
     const feet = active.unit.getFeetPosition(this.tmpA);
     if (this.surfaces.fireAt(feet, active.unit.getCapsuleRadius())) this.burn(active.unit);
@@ -2740,7 +2892,17 @@ export class EncounterComponent extends Component {
           caster: b.caster.getOwner().getName(),
           center: Array.from(b.center).map((v) => Math.round(v * 100) / 100),
           radius: Math.round(b.radius * 100) / 100,
+          time: b.time,
+          anchored: b.anchored,
           untilRound: b.untilRound,
+        })),
+        spiritZones: SpiritZones.getAll().map((z) => ({
+          kind: z.kind,
+          center: Array.from(z.center).map((v) => Math.round(v * 100) / 100),
+          radius: z.radius,
+          caster: z.caster?.getOwner().getName() ?? null,
+          relic: z.relic?.getOwner().getName() ?? null,
+          untilRound: Number.isFinite(z.untilRound) ? z.untilRound : null,
         })),
         surfaces: this.surfaces.getAll().map((sf) => ({
           type: sf.type,
@@ -3000,20 +3162,9 @@ export class EncounterComponent extends Component {
               metalCost: r.metalCost,
               power: r.power,
               reach: r.reach,
-              motion: r.motion
-                ? {
-                    kind: r.motion.kind,
-                    body: r.motion.body.getOwner().getName(),
-                    to: r.motion.points.length
-                      ? Array.from(r.motion.points[r.motion.points.length - 1]!).map(
-                          (v) => Math.round(v * 100) / 100,
-                        )
-                      : null,
-                    hit: r.motion.hit?.getOwner().getName() ?? null,
-                    wall: r.motion.wall,
-                    damage: r.motion.damage,
-                  }
-                : null,
+              motion: r.motion ? motionSummary(r.motion) : null,
+              motions: r.motions.map(motionSummary),
+              connected: r.connected.map((u) => u.getOwner().getName()),
               approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
@@ -3078,6 +3229,20 @@ function slideTime(speed: number, slide: number, length: number): number {
   const decel = (speed * speed) / (2 * Math.max(slide, length));
   const end = Math.sqrt(Math.max(0, speed * speed - 2 * decel * length));
   return (speed - end) / decel;
+}
+
+/** Un movimiento de habilidad para el MCP (plan_skill / skill). */
+function motionSummary(m: SkillMotion) {
+  return {
+    kind: m.kind,
+    body: m.body.getOwner().getName(),
+    to: m.points.length
+      ? Array.from(m.points[m.points.length - 1]!).map((v) => Math.round(v * 100) / 100)
+      : null,
+    hit: m.hit?.getOwner().getName() ?? null,
+    wall: m.wall,
+    damage: m.damage,
+  };
 }
 
 function horizontalDirection(v: vec3): vec3 | null {
