@@ -1010,7 +1010,12 @@ export class EncounterComponent extends Component {
     if (plan.hit) shotTargets.push(plan.hit.getOwner());
     const delay =
       plan.hit || camera?.isAiming()
-        ? (camera?.frameAction(entity, shotTargets, PUSH_CONTACT + travel + SHOT_AFTER_HIT) ?? 0)
+        ? (camera?.frameAction(
+            entity,
+            shotTargets,
+            PUSH_CONTACT + travel + SHOT_AFTER_HIT,
+            'push',
+          ) ?? 0)
         : 0;
     // Se resuelve ya (no al acabar el plano): mientras, nadie puede actuar (isResolving).
     const impact: PendingImpact = {
@@ -1176,6 +1181,7 @@ export class EncounterComponent extends Component {
           unit.getOwner(),
           [plan.hit.getOwner(), prop.getOwner()],
           THROW_TIME + SHOT_AFTER_HIT,
+          'throw',
         ) ?? 0)
       : 0;
     // Se resuelve ya (no al acabar el plano): mientras, nadie puede actuar (isResolving).
@@ -1795,6 +1801,7 @@ export class EncounterComponent extends Component {
         caster.getOwner(),
         targets,
         SKILL_DELAY + SHOT_AFTER_HIT,
+        'skill',
       ) ?? 0
     );
   }
@@ -2433,6 +2440,7 @@ export class EncounterComponent extends Component {
         unit.getOwner(),
         [target.getOwner()],
         HIT_DELAY + SHOT_AFTER_HIT,
+        attack.kind,
       ) ?? 0;
     this.windUp(unit, delay, () => {
       unit.faceTowards(target.getPosition(this.tmpA));
