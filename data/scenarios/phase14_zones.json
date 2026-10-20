@@ -1,0 +1,215 @@
+{
+  "description": "Fase 14, zonas espirituales (GDD §8). Relicario de Conexión: el Lanzamonedas lo atrae junto a 3 enemigos (la zona va con él) y la Marca del cazador sobre uno se copia a los otros dos. Fortuna: +10 % de crítico a quien ataca desde dentro. Investidura: las habilidades lanzadas desde dentro, ×1,5. Liberar mente espiritual (Artificiera): una zona a la vez durante 3 turnos suyos; las tres comparten la recarga. Un relicario roto suelta su zona donde estaba hasta la ronda siguiente.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "entities": [
+    {
+      "prefab": "tactical/relic_connection.prefab",
+      "components": { "name": "RelicConnection", "transform": { "position": [-6, 0.3, -9] } }
+    },
+    {
+      "prefab": "tactical/relic_fortune.prefab",
+      "components": { "name": "RelicFortune", "transform": { "position": [12, 0.3, 14] } }
+    }
+  ],
+  "seed": 14,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.source ? d.source.getName() : null, d.status ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__turns = (n) => __log.filter(l => l[0] === 'turn' && l[1] === n).length; window.__marks = {}; window.__mark = (n) => { __marks[n] = __turns(n); }; window.__turnOf = (n) => { const s = __engine.getCombatState(); if (__turns(n) > (__marks[n] ?? -1) && s.activeUnit === n && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__zones = () => __engine.getCombatState().spiritZones; window.__fresh = (n) => { __enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit(n).clearCooldowns(); __unit(n).setMetal(99); }"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; } __enc.joinRadius = 60; __tp('Lanzamonedas', -6, -14); __tp('Enemy1', -7.8, -14.8); __tp('Enemy2', -8, -12.6); __tp('Enemy3', -8.6, -14); __tp('Artificiera', 6, -2); __tp('Deslizador', 8, -1); __tp('Voz', 9, 2)"
+    },
+    { "wait_frames": 3 },
+    { "log": "Los relicarios emiten su zona desde que existen (también fuera de combate)" },
+    {
+      "assert": {
+        "expr": "__zones().map(z => [z.kind, z.relic, z.radius]).sort()",
+        "value": [
+          ["connection", "RelicConnection", 3],
+          ["fortune", "RelicFortune", 3]
+        ]
+      }
+    },
+    { "eval": "__mark('Lanzamonedas')" },
+    { "command": "start_combat" },
+    {
+      "wait_until": { "expr": "__turnOf('Lanzamonedas')", "value": true },
+      "timeout_frames": 3000
+    },
+    { "eval": "__fresh('Lanzamonedas')" },
+    {
+      "log": "Sin la Conexión cerca, la Marca solo pilla a uno"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Lanzamonedas', skill: 'hunter_mark', target: 'Enemy1' }).then(r => [r.canCast, r.connected])",
+        "value": [true, []]
+      }
+    },
+    {
+      "log": "El Lanzamonedas atrae el relicario de Conexión: la zona va con él"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Lanzamonedas', skill: 'iron_pull', target: 'RelicConnection' }).then(r => [r.ok, r.motion && r.motion.kind])",
+        "value": [true, "pull"]
+      }
+    },
+    { "wait_until": { "expr": "__idle()", "value": true }, "timeout_frames": 600 },
+    {
+      "assert": {
+        "expr": "(() => { const z = __zones().find(z => z.relic === 'RelicConnection'); return [__unit('RelicConnection').isAlive(), z.center[2] < -12.5, Math.abs(z.center[0] + 6) < 0.3]; })()",
+        "value": [true, true, true]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Lanzamonedas', skill: 'hunter_mark', target: 'Enemy1' }).then(r => [r.affected, r.connected.sort()])",
+        "value": [["Enemy1"], ["Enemy2", "Enemy3"]],
+        "message": "la vista previa ya dice a quién se copia"
+      }
+    },
+    { "screenshot": "01-connection" },
+    { "eval": "window.__from = __log.length" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Lanzamonedas', skill: 'hunter_mark', target: 'Enemy1' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    { "wait_until": { "expr": "__idle()", "value": true }, "timeout_frames": 600 },
+    {
+      "assert": {
+        "expr": "[['Enemy1', 'Enemy2', 'Enemy3'].map(n => __unit(n).hasStatus('marked')), __log.slice(__from).filter(l => l[0] === 'connected').map(l => [l[1], l[2], l[3]]).sort(), __unit('Lanzamonedas').hasStatus('marked')]",
+        "value": [
+          [true, true, true],
+          [
+            ["Enemy2", "Enemy1", "marked"],
+            ["Enemy3", "Enemy1", "marked"]
+          ],
+          false
+        ],
+        "message": "se copia a los de su bando dentro (no al Lanzamonedas, que también está dentro)"
+      }
+    },
+    { "eval": "__mark('Artificiera')" },
+    {
+      "wait_until": { "expr": "__turnOf('Artificiera')", "value": true },
+      "timeout_frames": 3000
+    },
+    { "eval": "__fresh('Artificiera')" },
+    { "log": "Fortuna: quien ataca desde dentro tiene +10 % de crítico" },
+    {
+      "eval": "window.__crit = () => __engine.gameCommand('plan_attack', { unit: 'Artificiera', target: 'Enemy2', attack: 'pistol' }).then(r => r.critChance); window.__c0 = null; __crit().then(c => window.__c0 = c)"
+    },
+    { "wait_frames": 2 },
+    { "eval": "__tp('RelicFortune', 6.8, -2.6)" },
+    { "wait_frames": 3 },
+    {
+      "assert": {
+        "expr": "__crit().then(c => [__c0 > 0, Math.round((c - __c0) * 100)])",
+        "value": [true, 10]
+      }
+    },
+    { "eval": "__tp('RelicFortune', 12, 14)" },
+    { "wait_frames": 3 },
+    { "log": "Liberar Investidura: zona de la Artificiera; lo que lanza desde dentro, ×1,5" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Artificiera', skill: 'gold_injector', target: 'Deslizador' }).then(r => r.power)",
+        "value": 1
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Artificiera', skill: 'spirit_investiture', to: [6.5, 0, -1.5] }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 3]
+      }
+    },
+    { "wait_until": { "expr": "__idle()", "value": true }, "timeout_frames": 600 },
+    {
+      "assert": {
+        "expr": "(() => { const z = __zones().filter(z => z.caster === 'Artificiera'); return [z.length, z[0].kind, z[0].radius, z[0].untilRound - __engine.getCombatState().round]; })()",
+        "value": [1, "investiture", 3, 3]
+      }
+    },
+    { "screenshot": "02-investiture" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Artificiera', skill: 'gold_injector', target: 'Deslizador' }).then(r => r.power)",
+        "value": 1.5
+      }
+    },
+    {
+      "command": "damage",
+      "args": { "unit": "Deslizador", "amount": 30 }
+    },
+    { "eval": "window.__from = __log.length; window.__hp = __unit('Deslizador').getHp()" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Artificiera', skill: 'gold_injector', target: 'Deslizador' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    { "wait_until": { "expr": "__idle()", "value": true }, "timeout_frames": 600 },
+    {
+      "assert": {
+        "expr": "__unit('Deslizador').getHp() - __hp",
+        "value": 24,
+        "message": "(12 + POT 4) × 1,5"
+      }
+    },
+    { "log": "Las tres mentes comparten la recarga; otra zona sustituye a la anterior" },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().units.find(u => u.name === 'Artificiera').cooldowns",
+        "value": { "gold_injector": 2, "spirit_fortune": 3, "spirit_connection": 3, "spirit_investiture": 3 }
+      }
+    },
+    { "eval": "__fresh('Artificiera')" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Artificiera', skill: 'spirit_fortune', to: [3, 0, -4] }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    { "wait_until": { "expr": "__idle()", "value": true }, "timeout_frames": 600 },
+    {
+      "assert": {
+        "expr": "__zones().filter(z => z.caster === 'Artificiera').map(z => z.kind)",
+        "value": ["fortune"]
+      }
+    },
+    { "log": "Un relicario roto suelta su zona de golpe, donde estaba, hasta la ronda siguiente" },
+    { "command": "damage", "args": { "unit": "RelicConnection", "amount": 1000 } },
+    { "wait_frames": 2 },
+    {
+      "assert": {
+        "expr": "(() => { const z = __zones().filter(z => z.kind === 'connection'); return [z.length, z[0].relic, z[0].caster, z[0].untilRound - __engine.getCombatState().round, __log.some(l => l[0] === 'relic-burst' && l[1] === 'RelicConnection')]; })()",
+        "value": [1, null, null, 1, true]
+      }
+    },
+    { "eval": "window.__round = __engine.getCombatState().round" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.round > __round) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 6000
+    },
+    {
+      "assert": {
+        "expr": "__zones().map(z => z.kind).sort()",
+        "value": ["fortune", "fortune"],
+        "message": "queda la del relicario de Fortuna y la de la Artificiera"
+      }
+    },
+    { "assert": { "expr": "__engine.getCombatState().aiTimeouts", "value": 0 } },
+    { "assert": { "no_errors": true } }
+  ]
+}

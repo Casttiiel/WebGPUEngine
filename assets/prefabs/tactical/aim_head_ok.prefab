@@ -1,0 +1,14 @@
+{
+  "children": [],
+  "components": {
+    "name": "AimMarker",
+    "transform": {
+      "position": [0, -1000, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 0.6, 1]
+    },
+    "render": {
+      "meshes": [{ "mesh": "unit_cube.obj", "material": "tactical_aim_head_ok.mat", "visible": true }]
+    }
+  }
+}

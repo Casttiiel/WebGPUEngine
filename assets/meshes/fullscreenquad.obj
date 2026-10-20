@@ -1,0 +1,10 @@
+# Full-screen quad exported from 2D vertices
+
+v -1.0 -1.0 0.0
+v  1.0 -1.0 0.0
+v -1.0  1.0 0.0
+v  1.0  1.0 0.0
+
+# Dos triángulos: (v1, v2, v3) y (v3, v2, v4)
+f 1 2 3
+f 3 2 4

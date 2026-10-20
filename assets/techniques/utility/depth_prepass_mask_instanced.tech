@@ -1,0 +1,6 @@
+{
+    "vs": "utility/depth_prepass_instanced.vs",
+    "fs": "utility/depth_prepass_mask.fs",
+    "writesOn": "depth_only",
+    "uniforms": ["CameraUniforms", "MaterialTextures", "InstanceStorage"]
+}

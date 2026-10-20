@@ -1,0 +1,13 @@
+{
+  "vs": "utility/presentation.vs",
+  "fs": "volumetric/froxel_raymarch.fs",
+  "blend": "volumetric",
+  "z": "disable_all",
+  "writesOn": "texture",
+  "uniforms": [
+    "FroxelUniforms",
+    "GBufferUniforms",
+    "GodRaysVolumetricCSM",
+    "FroxelRaymarchSlice"
+  ]
+}

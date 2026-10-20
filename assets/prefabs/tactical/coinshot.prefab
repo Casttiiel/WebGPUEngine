@@ -1,0 +1,41 @@
+{
+  "prefab": "tactical/hero.prefab",
+  "components": {
+    "name": "Lanzamonedas",
+    "unit": {
+      "attributes": {
+        "FUE": 4,
+        "RES": 2,
+        "POT": 6,
+        "TEM": 3,
+        "REF": 5,
+        "AGU": 4
+      },
+      "armor": 0,
+      "attacks": [
+        {
+          "id": "revolver",
+          "name": "Revólver",
+          "kind": "ranged",
+          "range": 18,
+          "damage": 7,
+          "metallic": true,
+          "clip": "Spell_Simple_Shoot"
+        }
+      ],
+      "skills": [
+        "steel_jump",
+        "steel_push",
+        "iron_pull",
+        "pushed_bullet",
+        "hunter_mark",
+        "steel_bubble",
+        "iron_light",
+        "iron_heavy"
+      ],
+      "metalminds": {
+        "iron": 1
+      }
+    }
+  }
+}

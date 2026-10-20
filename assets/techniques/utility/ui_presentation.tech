@@ -1,0 +1,8 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "utility/presentation.fs",
+    "blend": "additive_by_src_alpha",
+    "writesOn": "screen",
+    "z": "disable_all",
+    "uniforms": ["SingleTexture"]
+}

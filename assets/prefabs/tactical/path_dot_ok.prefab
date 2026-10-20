@@ -1,0 +1,14 @@
+{
+  "children": [],
+  "components": {
+    "name": "PathDot",
+    "transform": {
+      "position": [0, -1000, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.42, 0.6, 0.42]
+    },
+    "render": {
+      "meshes": [{ "mesh": "unit_cube.obj", "material": "tactical_path_dot_ok.mat", "visible": true }]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+    "technique": "viewmodel/viewmodel.tech",
+    "textures": {
+        "txAlbedo": "white.png",
+        "txNormal": "no-normal.jpg",
+        "txMetallic": "white.png",
+        "txRoughness": "white.png",
+        "txEmissive": "black.png"
+    },
+    "casts_shadows": false,
+    "category": "view_model"
+}

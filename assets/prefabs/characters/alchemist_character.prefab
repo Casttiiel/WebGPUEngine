@@ -1,0 +1,213 @@
+{
+  "components": {
+    "name": "Player",
+    "transform": {
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "PLAYER",
+      "collisionMask": "PLAYER_INTERACTIONS"
+    },
+    "kcc_movement": {
+      "maxSpeed": 11,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airControl": 0.65,
+      "airDrag": 0.3,
+      "jumpHeight": 1.3,
+      "jumpTimeToPeak": 0.38,
+      "jumpTimeToDescent": 0.32,
+      "jumpCutFactor": 0.7,
+      "jumpCutVelocityLimit": 1,
+      "coyoteTime": 0.15,
+      "maxAirJumps": 0,
+      "apexThreshold": 2,
+      "apexGravityScale": 0.35
+    },
+    "alchemist_controller": {
+      "moveSpeed": 11,
+      "mantleDetectionDistance": 1.5,
+      "mantleMaxHeight": -0.025,
+      "mantlingMinVerticalVelocity": -9,
+      "minMantleVelocity": 8,
+      "markerMaxCharges": 3,
+      "markerRechargeTime": 2.5,
+      "markerShotDamage": 5,
+      "markerMarkDuration": 15,
+      "dashPunchSpeed": 28,
+      "dashPunchMaxDistance": 12,
+      "dashPunchDamage": 60,
+      "dashPunchCooldown": 10,
+      "impulsePadInputDisableTime": 0.3
+    },
+    "fps_camera_controller": {
+      "eyeOffset": [
+        0,
+        0.6,
+        0.1
+      ],
+      "mouseSensitivity": 0.1,
+      "invertY": true
+    },
+    "head_bob": {},
+    "head_tilt": {
+      "maxTiltAmplitude": 0.03,
+      "tiltSpeed": 0.3,
+      "mantlingTiltAmplitude": 0.15,
+      "mantlingTiltSpeed": 1,
+      "enabled": true
+    },
+    "landing_camera": {
+      "maxDipAmplitude": 0.2,
+      "maxImpactSpeed": 12,
+      "minImpactSpeed": 2,
+      "dipStiffness": 200,
+      "dipDamping": 18,
+      "maxPitchPunch": 3,
+      "pitchStiffness": 120,
+      "pitchDamping": 18,
+      "enabled": true
+    },
+    "camera_fov_modifier": {
+      "maxFOVIncrease": 6,
+      "speedThreshold": 3,
+      "lerpSpeed": 5,
+      "enabled": true
+    },
+    "health": {
+      "maxHp": 100
+    }
+  },
+  "children": [
+    {
+      "prefab": "cameras/player_camera.prefab"
+    },
+    {
+      "components": {
+        "name": "DaggerManager",
+        "bullet_pool": {
+          "prefab": "gameplay/dagger.prefab",
+          "size": 15,
+          "projectileType": "dagger_projectile"
+        }
+      }
+    },
+    {
+      "children": [
+        {
+          "prefab": "weapons/sword.prefab",
+          "components": {}
+        }
+      ],
+      "components": {
+        "name": "PlayerMesh",
+        "transform": {
+          "position": [
+            0,
+            -0.9,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "skeletal_mesh": {
+          "gltf": "character.gltf"
+        },
+        "animator": {
+          "extraAnimations": [
+            "universal_animations.gltf"
+          ],
+          "states": [
+            {
+              "name": "Idle",
+              "clip": "Sword_Idle",
+              "loop": true
+            },
+            {
+              "name": "Run",
+              "clip": "Jog_Fwd_Loop",
+              "loop": true
+            },
+            {
+              "name": "InAir",
+              "clip": "Jump_Loop",
+              "loop": true
+            }
+          ],
+          "default": "Idle",
+          "transitions": [
+            {
+              "from": "Idle",
+              "to": "Run",
+              "condition": "isMoving",
+              "blendTime": 0.2
+            },
+            {
+              "from": "Run",
+              "to": "Idle",
+              "conditionFalse": "isMoving",
+              "blendTime": 0.3
+            },
+            {
+              "from": "Idle",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Run",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "InAir",
+              "to": "Idle",
+              "conditionFalse": "isInAir",
+              "blendTime": 0.2
+            }
+          ]
+        },
+        "foot_ik": {
+          "leftThigh": "thigh_l",
+          "leftKnee": "calf_l",
+          "leftFoot": "foot_l",
+          "rightThigh": "thigh_r",
+          "rightKnee": "calf_r",
+          "rightFoot": "foot_r",
+          "pelvis": "pelvis",
+          "ankleHeight": 0.09,
+          "raycastUpOffset": 0.3,
+          "raycastMaxDown": 0.5,
+          "footLerpSpeed": 12,
+          "pelvisLerpSpeed": 8
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/vignette.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": ["SingleTexture", "BufferUniform"]
+}

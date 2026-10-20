@@ -1,0 +1,38 @@
+{
+  "prefab": "tactical/hero.prefab",
+  "components": {
+    "name": "Artificiera",
+    "unit": {
+      "attributes": {
+        "FUE": 3,
+        "RES": 3,
+        "POT": 4,
+        "TEM": 5,
+        "REF": 4,
+        "AGU": 5
+      },
+      "armor": 0,
+      "attacks": [
+        {
+          "id": "pistol",
+          "name": "Pistola",
+          "kind": "ranged",
+          "range": 12,
+          "damage": 6,
+          "metallic": true,
+          "clip": "Spell_Simple_Shoot"
+        }
+      ],
+      "skills": [
+        "cadmium_grenade",
+        "bendalloy_grenade",
+        "chromium_dart",
+        "ettmetal_pulse",
+        "gold_injector",
+        "spirit_fortune",
+        "spirit_connection",
+        "spirit_investiture"
+      ]
+    }
+  }
+}

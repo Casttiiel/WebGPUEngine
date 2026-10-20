@@ -1,0 +1,8 @@
+{
+  "components": {
+    "name": "GameManager",
+    "combat_director": {
+      "maxActiveAttackers": 2
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+    "technique": "utility/stone.tech",
+    "textures":{
+        "txAlbedo": "stone_albedo.png",
+        "txNormal": "stone_normal.png",
+        "txMetallic": "black.png",
+        "txRoughness": "stone_rough.png",
+        "txEmissive": "brush.png"
+    },
+    "casts_shadows": true,
+    "uvXScale": 40.0,
+    "uvYScale": 40.0,
+    "category": "solids",
+    "shadows": false
+}

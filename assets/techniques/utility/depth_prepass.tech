@@ -1,0 +1,5 @@
+{
+    "vs": "utility/depth_prepass.vs",
+    "writesOn": "depth_only",
+    "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms"]
+}

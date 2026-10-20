@@ -1,0 +1,11 @@
+{
+  "children": [],
+  "components": {
+    "name": "ReflectionProbe",
+    "transform": {},
+    "reflection_probe": {
+      "resolution": 128,
+      "type": "indoor"
+    }
+  }
+}

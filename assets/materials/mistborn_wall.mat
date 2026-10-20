@@ -1,0 +1,58 @@
+{
+  "technique": "gbuffer/gbuffer_pom.tech",
+  "features": [
+    "BOX",
+    "SILHOUETTE",
+    "POM_SHADOW",
+    "LAYER",
+    "DIRT",
+    "ASH"
+  ],
+  "category": "solids",
+  "textures": {
+    "txAlbedo": "mistborn/medieval_blocks_02_diff_1k.jpg",
+    "txNormal": "mistborn/medieval_blocks_02_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/medieval_blocks_02_rough_1k.jpg",
+    "txEmissive": "black.png",
+    "txHeight": "mistborn/medieval_blocks_02_disp_1k.jpg",
+    "txAlbedo2": "mistborn/medieval_wall_01_diff_1k.jpg",
+    "txNormal2": "mistborn/medieval_wall_01_nor_gl_1k.jpg",
+    "txRoughness2": "mistborn/medieval_wall_01_rough_1k.jpg",
+    "txHeight2": "mistborn/medieval_wall_01_disp_1k.jpg"
+  },
+  "uvXScale": 0.33,
+  "uvYScale": 0.33,
+  "pomScale": 0.05,
+  "pomShadow": 0.85,
+  "baseColorFactor": [
+    0.5,
+    0.48,
+    0.47,
+    1
+  ],
+  "roughnessFactor": 1.0,
+  "metallicFactor": 0,
+  "casts_shadows": true,
+  "shadows": false,
+  "layerCoverage": 0.45,
+  "layerNoiseScale": 0.25,
+  "layerSharpness": 0.08,
+  "layerUvScale": 0.4,
+  "layerTint": [
+    0.72,
+    0.7,
+    0.68
+  ],
+  "antiTileScale": 0.35,
+  "cavityDirt": 0.35,
+  "baseDirtHeight": 0.6,
+  "layerHeightOffset": 0.35,
+  "ashAmount": 0.95,
+  "ashNoiseScale": 0.5,
+  "ashColor": [
+    0.17,
+    0.165,
+    0.16
+  ]
+}

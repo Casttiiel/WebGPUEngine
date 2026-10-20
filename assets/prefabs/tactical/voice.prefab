@@ -1,0 +1,38 @@
+{
+  "prefab": "tactical/hero.prefab",
+  "components": {
+    "name": "Voz",
+    "unit": {
+      "attributes": {
+        "FUE": 2,
+        "RES": 3,
+        "POT": 6,
+        "TEM": 6,
+        "REF": 3,
+        "AGU": 4
+      },
+      "armor": 0,
+      "attacks": [
+        {
+          "id": "rapier",
+          "name": "Estoque",
+          "kind": "melee",
+          "range": 1.5,
+          "damage": 4,
+          "metallic": true,
+          "clip": "Sword_Attack_Standing"
+        },
+        {
+          "id": "pistol",
+          "name": "Pistola ligera",
+          "kind": "ranged",
+          "range": 12,
+          "damage": 3,
+          "metallic": true,
+          "clip": "Spell_Simple_Shoot"
+        }
+      ],
+      "skills": ["fear"]
+    }
+  }
+}

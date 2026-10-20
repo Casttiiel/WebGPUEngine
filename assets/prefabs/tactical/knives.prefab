@@ -1,0 +1,47 @@
+{
+  "children": [],
+  "components": {
+    "name": "Knives",
+    "transform": {
+      "position": [0, 0.06, 0],
+      "scale": [0.45, 0.08, 0.18]
+    },
+    "capsule_collider": {
+      "height": 0.4,
+      "radius": 0.2,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 2,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_crate_metal.mat"
+        }
+      ]
+    },
+    "unit": {
+      "faction": "neutral",
+      "displayName": "Cuchillos",
+      "movement": 0,
+      "moveSpeed": 6,
+      "sightRange": 0,
+      "attacks": [],
+      "hideWhenDown": true
+    },
+    "health": {
+      "maxHp": 10
+    },
+    "tactical_prop": {
+      "size": "small",
+      "metallic": true
+    }
+  }
+}

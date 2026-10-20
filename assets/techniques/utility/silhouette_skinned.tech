@@ -1,0 +1,13 @@
+{
+    "vs": "gbuffer/gbuffer_skinned.vs",
+    "fs": "utility/silhouette.fs",
+    "writesOn": "texture",
+    "z": "test_but_no_write",
+    "blend": "combinative",
+    "skinned": true,
+    "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms", "SkinMatrices"],
+    "materialSlots": [
+        { "name": "txLinearDepth",    "binding": 0, "type": "texture2d", "defaultValue": "@engine:linear_depth" },
+        { "name": "silhouetteParams", "binding": 1, "type": "uniform" }
+    ]
+}

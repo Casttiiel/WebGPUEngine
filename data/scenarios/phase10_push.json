@@ -1,0 +1,431 @@
+{
+  "description": "Fase 10.1-10.6, 10.8 y 10.10: props Pequeños y Grandes, metálicos o no; Empuje de acero (3 + POT/2 m: con POT 6, 6 m; solo lo metálico), Tirón de hierro (hacia el lanzador; quien lleva metal llega Derribado; quien solo lleva un arma de metal, se queda sin ella), regla de impacto (base del tamaño + POT: Grande 10 + 6 = 16 y Aturdido; Pequeño 6 + 6 = 12, solo daño; una unidad contra una pared, ×1,5 y Derribada), la distancia mínima del Empuje (3 m), su ángulo de apuntado (±20°), que los objetos no tienen estados, que Lanzar ya no existe y la vista previa al apuntar. El Lanzamonedas actúa en su turno con recursos de sobra (__fresh) para encadenar pruebas.",
+  "scenes": ["tactical.json", "tactical_props.json", "tactical_dummies.json"],
+  "seed": 10,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__ptr = Engine.getEntities().getObjectManagerByName('tactical_pointer').getList()[0]; window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null, d.status ?? null, d.cause ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__fresh = () => { __enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit('Lanzamonedas').clearCooldowns(); __unit('Lanzamonedas').setMetal(9); }; window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__cast = (skill, target) => __engine.gameCommand('skill', { unit: 'Lanzamonedas', skill, target }).then(r => [r.ok, r.reason]); window.__plan = (skill, target) => __engine.gameCommand('plan_skill', { unit: 'Lanzamonedas', skill, target }); window.__dmg = (n) => __log.filter(l => l[0] === 'damage' && l[1] === n).map(l => l[2]); window.__st = (n) => __unit(n).getStatuses().map(s => s.id); window.__x = (n) => Math.round(__unit(n).getFeetPosition()[0] * 10) / 10"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; u.setCritChance(0); } for (const n of ['Enemy1', 'Enemy2', 'Enemy3']) { const h = __unit(n).getHealth(); h.setMaxHp(200); h.restore(); __unit(n).setArmor(0); } __enc.joinRadius = 60; __tp('Deslizador', -13, -3); __tp('Voz', -13, -5); __tp('Artificiera', -13, -1)"
+    },
+    {
+      "log": "10.1: tamaño y metal de los props"
+    },
+    {
+      "assert": {
+        "expr": "['Crate', 'PushCrate2', 'Knives1', 'Barrel1'].map(n => { const p = Engine.getEntities().getEntityByName(n).getComponent('tactical_prop'); return [p.getSize(), p.isMetallic(), p.getImpactBase()]; })",
+        "value": [
+          ["large", false, 10],
+          ["large", true, 10],
+          ["small", true, 6],
+          ["large", true, 10]
+        ]
+      }
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "command": "start_combat"
+    },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Lanzamonedas' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "log": "10.3: Empuje de una caja de hierro: 6 m en línea recta (3 + POT 6 / 2)"
+    },
+    {
+      "eval": "__fresh(); __tp('Lanzamonedas', -13, -10); __tp('PushCrate3', -9, -10)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__plan('steel_push', 'PushCrate3').then(r => [r.canCast, r.metalCost, r.motion.kind, r.motion.to[0], r.motion.hit, r.motion.wall])",
+        "value": [true, 2, "push", -3, null, false]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__cast('steel_push', 'PushCrate3')",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__x('PushCrate3'), __unit('Lanzamonedas').getMetal()]",
+        "value": [-3, 7],
+        "message": "la caja ha recorrido 6 m y el Empuje ha costado 2 de metal"
+      }
+    },
+    {
+      "log": "10.3: una caja de madera no es metálica"
+    },
+    {
+      "assert": {
+        "expr": "__plan('steel_push', 'Crate').then(r => [r.canCast, r.reason])",
+        "value": [false, "not metallic"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__plan('iron_pull', 'Crate').then(r => [r.canCast, r.reason])",
+        "value": [false, "not metallic"]
+      }
+    },
+    {
+      "log": "Empuje: hay que estar al menos a 3 m (de borde a borde); si no, se aparta primero"
+    },
+    {
+      "eval": "__fresh(); __tp('Lanzamonedas', -10.5, -10); __tp('PushCrate3', -8, -10)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__plan('steel_push', 'PushCrate3').then(r => [r.canCast, r.inRange, r.approach !== null])",
+        "value": [true, false, true]
+      }
+    },
+    {
+      "log": "Empuje: se puede desviar ±20° de 'alejarlo de ti'"
+    },
+    {
+      "eval": "__tp('Lanzamonedas', -12, -10)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Lanzamonedas', skill: 'steel_push', target: 'PushCrate3', direction: [0.966, 0.259] }).then(r => [r.motion.to[0], r.motion.to[2]])",
+        "op": "approx",
+        "tolerance": 0.15,
+        "value": [-2.2, -8.45],
+        "message": "15°: dentro del ángulo"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Lanzamonedas', skill: 'steel_push', target: 'PushCrate3', direction: [0, 1] }).then(r => [r.motion.to[0], r.motion.to[2]])",
+        "op": "approx",
+        "tolerance": 0.15,
+        "value": [-2.36, -7.95],
+        "message": "90° pedido: se queda en 20°"
+      }
+    },
+    {
+      "log": "Los objetos no tienen estados: una caja golpeada por otra Grande no queda Aturdida"
+    },
+    {
+      "eval": "__tp('Crate', -4, -10)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__cast('steel_push', 'PushCrate3')",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__dmg('Crate'), __st('Crate'), __log.some(l => l[0] === 'status' && l[1] === 'Crate')]",
+        "value": [[16], [], false]
+      }
+    },
+    {
+      "log": "10.6 + 10.10: caja de hierro Grande contra una unidad: la vista previa y el golpe (10 + POT 6 = 16, Aturdido)"
+    },
+    {
+      "eval": "__fresh(); __tp('Lanzamonedas', -13, -14); __tp('PushCrate2', -9, -14); __tp('Enemy1', -5, -14)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn(Engine.getEntities().getEntityByName('PushCrate2'), false); __ptr.armAttack('steel_push')"
+    },
+    {
+      "wait_frames": 60
+    },
+    {
+      "input": {
+        "type": "move",
+        "entity": "PushCrate2"
+      }
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "(() => { const p = __ptr.getSkillPlan(); return [p && p.canCast, p && p.motion && p.motion.hit && p.motion.hit.getOwner().getName(), __ptr.getDamagePreview().map(d => [d.unit.getOwner().getName(), d.min, d.max])]; })()",
+        "value": [true, "Enemy1", [["Enemy1", 16, 16]]],
+        "message": "al apuntar se ve a quién golpea y cuánto"
+      }
+    },
+    {
+      "screenshot": "01-preview-push"
+    },
+    {
+      "log": "10.10: con el ratón: el primer click elige la caja; después se apunta y el segundo click empuja"
+    },
+    {
+      "input": {
+        "type": "click",
+        "entity": "PushCrate2"
+      }
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__ptr.getSkillHeld() && __ptr.getSkillHeld().getName()",
+        "value": "PushCrate2"
+      }
+    },
+    {
+      "input": {
+        "type": "move",
+        "entity": "Enemy1"
+      }
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "(() => { const p = __ptr.getSkillPlan(); return [p.canCast, p.motion.hit && p.motion.hit.getOwner().getName()]; })()",
+        "value": [true, "Enemy1"]
+      }
+    },
+    {
+      "input": {
+        "type": "click",
+        "entity": "Enemy1"
+      }
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "[__ptr.getArmedAttack(), __ptr.getSkillHeld()]",
+        "value": [null, null],
+        "message": "lanzado: se desarma"
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__dmg('Enemy1'), __st('Enemy1'), __unit('PushCrate2').isAlive(), __log.some(l => l[0] === 'impact' && l[1] === 'Enemy1')]",
+        "value": [[16], ["stunned"], false, true],
+        "message": "16 de daño, Aturdido, y la caja se rompe al chocar"
+      }
+    },
+    {
+      "log": "10.6: una unidad con metal empujada contra una columna: 16 × 1,5 = 24 y Derribada"
+    },
+    {
+      "eval": "__fresh(); __unit('Enemy2').setMetallic(true); __tp('Lanzamonedas', -9, -12); __tp('Enemy2', -5, -12)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__plan('steel_push', 'Enemy2').then(r => [r.canCast, r.motion.hit, r.motion.wall, r.motion.damage])",
+        "value": [true, null, true, 16]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__cast('steel_push', 'Enemy2')",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__dmg('Enemy2'), __st('Enemy2')]",
+        "value": [[24], ["prone"]]
+      }
+    },
+    {
+      "log": "10.4: Tirón de alguien con armadura de metal: viene hasta el lanzador y llega Derribado"
+    },
+    {
+      "eval": "__fresh(); __unit('Enemy3').setMetallic(true); __tp('Lanzamonedas', -12, -16); __tp('Enemy3', -6, -16)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__plan('iron_pull', 'Enemy3').then(r => [r.canCast, r.metalCost, r.motion.kind])",
+        "value": [true, 1, "pull"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__cast('iron_pull', 'Enemy3')",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__x('Enemy3') < -10.8, __st('Enemy3'), __dmg('Enemy3')]",
+        "value": [true, ["prone"], []],
+        "message": "llega a su lado, Derribado y sin daño (no ha chocado)"
+      }
+    },
+    {
+      "log": "10.5: Tirón de alguien sin metal pero con un arma de metal: desarme"
+    },
+    {
+      "eval": "__fresh(); __unit('Enemy1').attacks[0].metallic = true; __tp('Enemy1', -8, -14); __tp('Lanzamonedas', -12, -14)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__plan('iron_pull', 'Enemy1').then(r => [r.canCast, r.motion.kind])",
+        "value": [true, "disarm"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__cast('iron_pull', 'Enemy1')",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__unit('Enemy1').isDisarmed(), __unit('Enemy1').getAttack().id, __unit('Enemy1').getAttack().damage, __log.some(l => l[0] === 'disarm' && l[1] === 'Enemy1')]",
+        "value": [true, "fists", 2, true]
+      }
+    },
+    {
+      "log": "10.6: unos cuchillos (Pequeño) atraídos golpean al que está en medio: 6 + POT 6 = 12, sin estado; se rompen al usarlos"
+    },
+    {
+      "eval": "__fresh(); __unit('Enemy1').clearStatuses(); __tp('Lanzamonedas', -12, -15); __tp('Enemy1', -9, -15); __tp('Knives1', -6, -15)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__plan('iron_pull', 'Knives1').then(r => r.motion.hit)",
+        "value": "Enemy1"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__cast('iron_pull', 'Knives1')",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__dmg('Enemy1').slice(-1), __st('Enemy1'), __unit('Knives1').isAlive()]",
+        "value": [[12], [], false]
+      }
+    },
+    {
+      "log": "Lanzar ya no existe para los personajes (solo saltar como acción de entorno)"
+    },
+    {
+      "assert": {
+        "expr": "['Lanzamonedas', 'Deslizador', 'Voz', 'Artificiera'].map(n => __unit(n).getAbilities())",
+        "value": [["jump"], ["jump"], ["jump"], ["jump"]]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_throw', { unit: 'Lanzamonedas', object: 'Knives1', target: 'Enemy2' }).then(r => r.reason)",
+        "value": "cannot throw"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().aiTimeouts",
+        "value": 0
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

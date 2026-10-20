@@ -1,0 +1,298 @@
+{
+  "description": "Fase 10, kit del Lanzamonedas: Salto de acero (Adicional, 1 de metal; 6 + POT m: con POT 4 salta 10 m y no gasta movimiento), Mente de hierro (sin gastar acción; 1 carga por combate que no se recarga: Ligero dobla el salto este turno; Pesado: no le pueden empujar), Bala empujada (Acción, 3 de metal; línea que atraviesa a todos los enemigos alineados con +4 de penetración: 6 + POT 6 = 12) y Burbuja de acero (Adicional, 2 de metal: los proyectiles contra él tienen un 50 % de fallar hasta su siguiente turno).",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "entities": [
+    {
+      "prefab": "tactical/enemy.prefab",
+      "components": {
+        "name": "Enemy4",
+        "transform": {
+          "position": [-7, 0, -12]
+        }
+      }
+    },
+    {
+      "prefab": "tactical/enemy_archer.prefab",
+      "components": {
+        "name": "Archer",
+        "transform": {
+          "position": [10, 0, 10]
+        }
+      }
+    }
+  ],
+  "seed": 12,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__w = (a) => Engine.getModules().getModule('ui').getWidgetByAlias(a); window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null, d.status ?? null, d.cause ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__fresh = () => { __enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit('Lanzamonedas').clearCooldowns(); __unit('Lanzamonedas').setMetal(9); }; window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__skill = (cmd, skill, args = {}) => __engine.gameCommand(cmd, Object.assign({ unit: 'Lanzamonedas', skill }, args)); window.__dmg = (n) => __log.filter(l => l[0] === 'damage' && l[1] === n).map(l => l[2]); window.__feet = (n) => Array.from(__unit(n).getFeetPosition()).map(v => Math.round(v * 10) / 10)"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; u.setCritChance(0); } for (const n of ['Enemy1', 'Enemy2', 'Enemy3', 'Enemy4']) { const h = __unit(n).getHealth(); h.setMaxHp(200); h.restore(); } __enc.joinRadius = 25; __tp('Lanzamonedas', -12, -16); __tp('Deslizador', -13, -3); __tp('Voz', -13, -5); __tp('Artificiera', -13, -1); __tp('Enemy1', -9, -14); __tp('Enemy2', -7, -14); __tp('Enemy3', -5, -14)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "command": "start_combat"
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().turnOrder.some(c => c.name === 'Archer')",
+        "value": false,
+        "message": "la Arquera, lejos, no entra en el combate"
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Lanzamonedas' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "log": "Salto de acero con POT 4: 10 m, Acción adicional y 1 de metal, sin gastar movimiento"
+    },
+    {
+      "eval": "__fresh(); __unit('Lanzamonedas').attributes.POT = 4"
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'steel_jump', { to: [-1.5, 0, -16] }).then(r => [r.canCast, r.reason])",
+        "value": [false, "too far to jump"],
+        "message": "10,5 m: no llega"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'steel_jump', { to: [-2, 0, -16] }).then(r => [r.canCast, r.metalCost, r.motion.kind])",
+        "value": [true, 1, "leap"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__skill('skill', 'steel_jump', { to: [-2, 0, -16] }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__feet('Lanzamonedas')[0], __engine.getCombatState().resources.movement, __engine.getCombatState().resources.bonusAction, __unit('Lanzamonedas').getMetal()]",
+        "value": [-2, 99, 8, 8]
+      }
+    },
+    {
+      "log": "Mente de hierro, Ligero (sin acción): el salto llega el doble (20 m) y se puede combinar con el Salto de acero; gasta la única carga"
+    },
+    {
+      "eval": "__fresh()"
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'steel_jump', { to: [13, 0, -16] }).then(r => r.reason)",
+        "value": "too far to jump"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__skill('skill', 'iron_light').then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'steel_jump', { to: [13, 0, -16] }).then(r => r.canCast)",
+        "value": true,
+        "message": "15 m con Ligero"
+      }
+    },
+    {
+      "assert": {
+        "expr": "[__unit('Lanzamonedas').getCharges('iron'), __unit('Lanzamonedas').getMetal(), __engine.getCombatState().resources.bonusAction]",
+        "value": [0, 9, 9],
+        "message": "decantar no gasta acción ni metal, solo la única carga: el Salto de acero sigue disponible"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'iron_heavy').then(r => r.reason)",
+        "value": "no charges"
+      }
+    },
+    {
+      "eval": "__unit('Lanzamonedas').attributes.POT = 6"
+    },
+    {
+      "log": "Mente de hierro, Pesado: no le pueden empujar (lo comprueba el Empuje del Lanzamonedas contra el Deslizador)"
+    },
+    {
+      "eval": "__fresh(); __unit('Deslizador').setMetallic(true); __tp('Deslizador', 0, -16)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'steel_push', { target: 'Deslizador' }).then(r => r.canCast)",
+        "value": true
+      }
+    },
+    {
+      "eval": "__unit('Deslizador').addStatus('iron_heavy', 1, null, { untilTurnStart: true })"
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'steel_push', { target: 'Deslizador' }).then(r => r.reason)",
+        "value": "immovable"
+      }
+    },
+    {
+      "log": "Bala empujada: atraviesa a los tres enemigos de la línea (12 cada uno: penetración 4 + 2 contra armadura 2) y no al de al lado"
+    },
+    {
+      "eval": "__fresh(); __tp('Lanzamonedas', -12, -14); __tp('Deslizador', -13, -3)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'pushed_bullet', { to: [0, 0, -14] }).then(r => [r.canCast, r.metalCost, r.affected])",
+        "value": [true, 3, ["Enemy1", "Enemy2", "Enemy3"]]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__skill('skill', 'pushed_bullet', { to: [0, 0, -14] }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "['Enemy1', 'Enemy2', 'Enemy3', 'Enemy4'].map(n => __dmg(n))",
+        "value": [[12], [12], [12], []]
+      }
+    },
+    {
+      "eval": "__tp('Lanzamonedas', -12, -12)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__skill('plan_skill', 'pushed_bullet', { to: [4, 0, -12] }).then(r => [r.affected, Math.round(r.reach)])",
+        "value": [["Enemy4"], 9],
+        "message": "desde (-12, -12) hacia el este la línea se corta en la columna de (-2, -12): no llega a los 18 m"
+      }
+    },
+    {
+      "log": "Burbuja de acero: hasta su siguiente turno, los proyectiles contra él tienen un 50 % de fallar"
+    },
+    {
+      "eval": "__fresh()"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Archer', target: 'Lanzamonedas' }).then(r => r.hitChance)",
+        "value": 1
+      }
+    },
+    {
+      "assert": {
+        "expr": "__skill('skill', 'steel_bubble').then(r => [r.ok, r.metalCost])",
+        "value": [true, 2]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Archer', target: 'Lanzamonedas' }).then(r => r.hitChance)",
+        "value": 0.5
+      }
+    },
+    {
+      "assert": {
+        "expr": "(async () => { let miss = 0; for (let i = 0; i < 200; i++) { const r = await __engine.gameCommand('roll_attack', { unit: 'Archer', target: 'Lanzamonedas' }); if (!r.hit) miss++; } return miss > 70 && miss < 130; })()",
+        "value": true,
+        "message": "≈ la mitad fallan"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Archer', target: 'Lanzamonedas', attack: 'melee' }).then(r => r.hitChance)",
+        "value": 1,
+        "message": "el cuerpo a cuerpo no es un proyectil"
+      }
+    },
+    {
+      "eval": "__engine.gameCommand('end_turn', {})"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__unit('Lanzamonedas').hasStatus('steel_bubble')",
+        "value": true,
+        "message": "dura durante los turnos de los demás"
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Lanzamonedas' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "assert": {
+        "expr": "[__unit('Lanzamonedas').hasStatus('steel_bubble'), __unit('Lanzamonedas').getCharges('iron')]",
+        "value": [false, 0],
+        "message": "se acaba al empezar su turno; las cargas no vuelven hasta el siguiente combate"
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

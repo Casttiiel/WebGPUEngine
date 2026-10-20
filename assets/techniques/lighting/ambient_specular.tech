@@ -1,0 +1,12 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "lighting/ambient_specular.fs",
+    "writesOn": "texture",
+    "blend": "additive_by_src_alpha",
+    "z": "disable_all",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferUniforms",
+        "SSRComposeUniforms"
+    ]
+}

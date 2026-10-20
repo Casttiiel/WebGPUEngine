@@ -1,0 +1,82 @@
+{
+  "name": "pause_menu",
+  "alias": "pause",
+  "type": "image",
+  "visible": true,
+  "x": 0,
+  "y": 0,
+  "width": 1920,
+  "height": 1080,
+  "imageParams": {
+    "texture": "white.png",
+    "size": [1920, 1080],
+    "color": [0, 0, 0, 0.7]
+  },
+  "children": [
+    {
+      "name": "pause_panel",
+      "type": "image",
+      "x": 704,
+      "y": 390,
+      "width": 512,
+      "height": 300,
+      "imageParams": {
+        "texture": "white.png",
+        "size": [512, 300],
+        "color": [0.15, 0.15, 0.2, 0.95]
+      },
+      "children": [
+        {
+          "name": "btn_continue",
+          "alias": "btn_continue",
+          "type": "button",
+          "x": 156,
+          "y": 100,
+          "width": 200,
+          "height": 60,
+          "states": {
+            "NORMAL": {
+              "imageParams": {
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.3, 0.3, 0.4, 1]
+              }
+            },
+            "HOVER": {
+              "imageParams": {
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.6, 0.6, 1.0, 1]
+              }
+            }
+          }
+        },
+        {
+          "name": "btn_options",
+          "alias": "btn_options",
+          "type": "button",
+          "x": 156,
+          "y": 200,
+          "width": 200,
+          "height": 60,
+          "states": {
+            "NORMAL": {
+              "imageParams": {
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.3, 0.3, 0.4, 1]
+              }
+            },
+            "HOVER": {
+              "imageParams": {
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.6, 0.6, 1.0, 1]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+    "vs": "lighting/skybox.vs",
+    "fs": "lighting/volumetric_clouds_temporal.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": ["CameraUniforms", "CloudTemporalUniforms"]
+}
