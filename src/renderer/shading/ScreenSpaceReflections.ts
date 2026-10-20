@@ -11,7 +11,7 @@ import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Texture } from '../resources/Texture';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
-import type { AmbientLight } from './AmbientLight';
+import { ProbeManager } from '../core/managers/ProbeManager';
 
 // Must match SSRTraceParams in ssr_common.wgsl: 4 × mat4 + 28 × f32
 const TRACE_PARAMS_FLOATS = 4 * 16 + 32;
@@ -70,7 +70,7 @@ export class ScreenSpaceReflections {
   private lastCameraBuffer: GPUBuffer | null = null;
   // Bind groups that reference the ping-pong pair are cached per parity
   private traceInputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
-  private traceInputKeys: [GPUTextureView[], GPUTextureView[]] = [[], []];
+  private traceInputKeys: [unknown[], unknown[]] = [[], []];
   private temporalInputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
   private denoiseInputBindGroup: GPUBindGroup | null = null;
   private rawOutputBindGroup: GPUBindGroup | null = null;
@@ -195,10 +195,10 @@ export class ScreenSpaceReflections {
       { binding: 0, visibility: C, texture: { sampleType: 'float' } }, // accLight
       { binding: 1, visibility: C, buffer: { type: 'uniform' } }, // SSRTraceParams
       { binding: 2, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube' } },
-      { binding: 3, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube' } },
-      { binding: 4, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube' } },
+      // Probe cubemaps + ProbeSet (common/probes.wgsl)
+      { binding: 3, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube-array' } },
       { binding: 5, visibility: C, sampler: { type: 'filtering' } },
-      { binding: 6, visibility: C, buffer: { type: 'uniform' } }, // PCC data
+      { binding: 6, visibility: C, buffer: { type: 'read-only-storage' } },
       { binding: 7, visibility: C, texture: { sampleType: 'float' } }, // history (multi-bounce)
       { binding: 8, visibility: C, texture: { sampleType: 'float' } }, // BRDF LUT
       { binding: 9, visibility: C, sampler: { type: 'filtering' } },
@@ -269,7 +269,6 @@ export class ScreenSpaceReflections {
     gBufferComputeBindGroup: GPUBindGroup,
     gNormals: RenderTarget,
     gLinearDepth: RenderTarget,
-    ambientLight: AmbientLight,
   ): GPUTextureView {
     if (
       !this.isActive() ||
@@ -300,9 +299,10 @@ export class ScreenSpaceReflections {
 
     // Trace inputs depend on accLight and on which env/probe cubemaps are active
     const env = Engine.getEnvironmentManager().getSSREnvironmentTexture();
-    const probes = ambientLight.getProbeEnvViews();
+    const probeEnv = ProbeManager.getInstance().getEnvArrayView();
+    const probeBuffer = ProbeManager.getInstance().getProbeSetBuffer();
     const envView = env.getTextureView()!;
-    const key = [accLights, envView, probes.envA, probes.envB];
+    const key = [accLights, envView, probeEnv, probeBuffer];
     if (!this.traceInputBindGroups[p] || key.some((v, i) => v !== this.traceInputKeys[p]![i])) {
       this.traceInputKeys[p] = key;
       this.traceInputBindGroups[p] = BindGroupFactory.createBindGroup(
@@ -312,10 +312,9 @@ export class ScreenSpaceReflections {
           { binding: 0, resource: accLights },
           { binding: 1, resource: { buffer: this.traceParamsBuffer } },
           { binding: 2, resource: envView },
-          { binding: 3, resource: probes.envA },
-          { binding: 4, resource: probes.envB },
+          { binding: 3, resource: probeEnv },
           { binding: 5, resource: env.getSampler()! },
-          { binding: 6, resource: { buffer: ambientLight.getPCCSpecularBuffer() } },
+          { binding: 6, resource: { buffer: probeBuffer } },
           { binding: 7, resource: history.getView() },
           { binding: 8, resource: this.brdfLUT.getTextureView()! },
           { binding: 9, resource: SamplerLibrary.simpleSampler },

@@ -1,32 +1,54 @@
 import { vec3 } from 'gl-matrix';
 import { Engine } from '../../../core/engine/Engine';
-import { TransformComponent } from '../../../components/core/TransformComponent';
+import { ResourceManager } from '../../../core/engine/ResourceManager';
+import { GPUUtils } from '../utils/GPUUtils';
+import { SamplerLibrary } from '../utils/SamplerLibrary';
 import type { ReflectionProbeComponent } from '../../../components/render/ReflectionProbeComponent';
 
-export interface BlendedProbes {
-  /** Primary probe (highest weight). null when no probes are loaded. */
-  probeA: ReflectionProbeComponent | null;
-  /** Secondary probe. null when the player overlaps only one probe volume. */
-  probeB: ReflectionProbeComponent | null;
-  /**
-   * Blend factor [0, 1] — 0.0 = 100% probeA, 1.0 = 100% probeB.
-   * When probeB is null this is always 0.
-   */
-  blendWeight: number;
+/** Captured cube faces: 6 × size² RGBA half floats, WebGPU face order and orientation. */
+export interface ProbeFaces {
+  size: number;
+  data: Uint16Array; // 6 · size · size · 4
 }
 
+/** Probes uploaded per frame (the closest to the camera); common/probes.wgsl loops them. */
+const MAX_ACTIVE = 32;
+const HEADER_FLOATS = 4 + 9 * 4; // count, hasGlobalSH, envMaxMip, pad + globalSH[9]
+const PROBE_FLOATS = 13 * 4; // pos, boxMin, boxMax, fade + sh[9]
+const GGX_SAMPLES = 96;
+
 /**
- * ProbeManager — singleton that tracks all active ReflectionProbeComponents
- * and computes the two dominant probes + blend weight for the player's position.
- *
- * Used by AmbientLight every frame to provide soft irradiance transitions
- * when the player moves between probe volumes.
+ * ProbeManager — owns the GPU side of every ReflectionProbeComponent:
+ *   • a cube array with each probe's GGX-prefiltered radiance (one cube per probe)
+ *   • a storage buffer (ProbeSet, common/probes.wgsl) with the probes near the camera:
+ *     box, fade, cube index and SH irradiance
+ * The lighting shaders pick and blend probes per pixel from those, so any number of probes
+ * work at once, whoever the "player" is (tactical camera, FPS, probe capture…).
  */
 export class ProbeManager {
   private static _instance: ProbeManager | null = null;
   private _probes: ReflectionProbeComponent[] = [];
-  /** When true, getBlendedProbes() returns null probes — used during probe baking to avoid irradiance feedback. */
-  private _bakingMode: boolean = false;
+  /** During a bake only the sky lights the scene (bounce 1) unless a pass enables probes. */
+  private _bakingMode = false;
+
+  private device: GPUDevice | null = null;
+  private probeSetBuffer: GPUBuffer | null = null;
+  private probeSetData = new Float32Array(HEADER_FLOATS + MAX_ACTIVE * PROBE_FLOATS);
+  private probeSetU32 = new Uint32Array(this.probeSetData.buffer);
+
+  private envSize = 0;
+  private envMips = 1;
+  private envCapacity = 0; // cubes
+  private envArray: GPUTexture | null = null;
+  private envArrayView: GPUTextureView | null = null;
+  private cubeIndex = new Map<ReflectionProbeComponent, number>();
+  /** Captured faces per probe, to prefilter again if the cube resolution changes. */
+  private faces = new Map<ReflectionProbeComponent, ProbeFaces>();
+  private freeCubes: number[] = [];
+
+  private prefilterPipeline: GPUComputePipeline | null = null;
+  private downsamplePipeline: GPUComputePipeline | null = null;
+  private pipelinePromise: Promise<void> | null = null;
 
   private constructor() {}
 
@@ -42,70 +64,293 @@ export class ProbeManager {
   public unregister(probe: ReflectionProbeComponent): void {
     const idx = this._probes.indexOf(probe);
     if (idx !== -1) this._probes.splice(idx, 1);
+    this.faces.delete(probe);
+    const cube = this.cubeIndex.get(probe);
+    if (cube !== undefined) {
+      this.cubeIndex.delete(probe);
+      this.freeCubes.push(cube);
+    }
   }
 
-  /** Set during probe baking so irradiance from existing probes doesn't contaminate the capture. */
+  public getProbes(): ReadonlyArray<ReflectionProbeComponent> {
+    return this._probes;
+  }
+
+  /** While baking, probes are hidden from the lighting (the sky alone lights bounce 1). */
   public setBakingMode(enabled: boolean): void {
     this._bakingMode = enabled;
   }
 
-  /**
-   * Returns the two probes with the highest box-intersection weights for the
-   * current player position, plus the blend factor between them.
-   *
-   * Weight = how "inside" the probe box the player is (0 = outside, 1 = centre).
-   * Only probes whose box volume contains the player contribute.
-   */
-  public getBlendedProbes(): BlendedProbes {
-    if (this._bakingMode || this._probes.length === 0) {
-      return { probeA: null, probeB: null, blendWeight: 0 };
+  // ── GPU resources ────────────────────────────────────────────────────────────
+
+  private ensureResources(): void {
+    if (this.probeSetBuffer) return;
+    this.device = GPUUtils.getDevice();
+    this.probeSetBuffer = this.device.createBuffer({
+      label: 'probe_set',
+      size: this.probeSetData.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    // 1×1 placeholder so the bind groups are valid before any probe has a cubemap.
+    this.allocateEnvArray(1, 1);
+  }
+
+  /** ProbeSet storage buffer (read by ambient.fs, ambient_specular.fs and ssr.cs). */
+  public getProbeSetBuffer(): GPUBuffer {
+    this.ensureResources();
+    return this.probeSetBuffer!;
+  }
+
+  /** Cube-array view of every probe's prefiltered radiance. Changes when it grows. */
+  public getEnvArrayView(): GPUTextureView {
+    this.ensureResources();
+    return this.envArrayView!;
+  }
+
+  private allocateEnvArray(size: number, capacity: number): void {
+    const device = this.device!;
+    const mips = Math.floor(Math.log2(size)) + 1;
+    const texture = device.createTexture({
+      label: 'probe_env_array',
+      size: [size, size, 6 * capacity],
+      format: 'rgba16float',
+      mipLevelCount: mips,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.COPY_SRC,
+    });
+    const keep = this.envArray !== null && this.envSize === size;
+    if (keep) {
+      // Growing: keep the cubes already prefiltered.
+      const encoder = device.createCommandEncoder({ label: 'probe_env_array_grow' });
+      for (let mip = 0; mip < mips; mip++) {
+        const s = Math.max(1, size >> mip);
+        encoder.copyTextureToTexture(
+          { texture: this.envArray!, mipLevel: mip },
+          { texture, mipLevel: mip },
+          [s, s, 6 * this.envCapacity],
+        );
+      }
+      device.queue.submit([encoder.finish()]);
+    } else {
+      // New resolution: every cube has to be prefiltered again (setProbeEnv does it).
+      this.cubeIndex.clear();
+      this.freeCubes = [];
+      this.envCapacity = 0;
     }
-
-    const playerPos = this._getPlayerPosition();
-    if (!playerPos) return { probeA: null, probeB: null, blendWeight: 0 };
-
-    // Compute weight for every probe
-    const weighted = this._probes
-      .map((probe) => ({ probe, weight: this._boxWeight(probe, playerPos) }))
-      .filter((p) => p.weight > 0)
-      .sort((a, b) => b.weight - a.weight);
-
-    if (weighted.length === 0) return { probeA: null, probeB: null, blendWeight: 0 };
-
-    const probeA = weighted[0]!.probe;
-    const probeB = weighted[1]?.probe ?? null;
-
-    // blendWeight = how much of probeB we see relative to probeA
-    const blendWeight =
-      probeB && weighted[0]!.weight > 0
-        ? Math.min(1, weighted[1]!.weight / weighted[0]!.weight)
-        : 0;
-
-    return { probeA, probeB, blendWeight };
+    this.envArray?.destroy();
+    this.envArray = texture;
+    this.envSize = size;
+    this.envMips = mips;
+    for (let c = this.envCapacity; c < capacity; c++) this.freeCubes.push(c);
+    this.freeCubes.sort((x, y) => y - x); // pop() hands out the lowest index
+    this.envCapacity = capacity;
+    this.envArrayView = texture.createView({
+      label: 'probe_env_array_view',
+      dimension: 'cube-array',
+      arrayLayerCount: 6 * capacity,
+    });
   }
-
-  // ── Private helpers ─────────────────────────────────────────────────────────
 
   /**
-   * Returns a [0,1] weight representing how deep inside the probe's box
-   * volume the player is. 0 = outside or at the edge, 1 = at the centre.
+   * Resolution of the probe cubes: 128 when the scene has few probes, 64 for big grids
+   * (memory: 6 · size² · 8 bytes · 1.33 per probe). Sharp reflections come from SSR.
    */
-  private _boxWeight(probe: ReflectionProbeComponent, pos: vec3): number {
-    const probePos = probe.getPosition();
-    const extents = probe.getExtents();
-
-    const fx = 1.0 - Math.abs(pos[0] - probePos[0]) / extents[0];
-    const fy = 1.0 - Math.abs(pos[1] - probePos[1]) / extents[1];
-    const fz = 1.0 - Math.abs(pos[2] - probePos[2]) / extents[2];
-
-    if (fx <= 0 || fy <= 0 || fz <= 0) return 0; // outside the box
-    return Math.min(fx, fy, fz);
+  private desiredEnvSize(): number {
+    return this._probes.length <= 48 ? 128 : 64;
   }
 
-  private _getPlayerPosition(): vec3 | null {
-    const player = Engine.getEntities().getEntityByName('Player');
-    if (!player) return null;
-    const tc = player.getComponent('transform') as TransformComponent | null;
-    return tc?.getTransform().getWorldPosition() ?? null;
+  private cubeFor(probe: ReflectionProbeComponent): number {
+    const existing = this.cubeIndex.get(probe);
+    if (existing !== undefined) return existing;
+    const size = this.desiredEnvSize();
+    if (this.envSize !== size) {
+      this.allocateEnvArray(size, Math.max(1, this._probes.length));
+      for (const [other, faces] of this.faces) {
+        if (other !== probe) void this.setProbeEnv(other, faces);
+      }
+    } else if (this.freeCubes.length === 0) {
+      this.allocateEnvArray(size, Math.max(this.envCapacity * 2, this._probes.length));
+    }
+    const cube = this.freeCubes.pop()!;
+    this.cubeIndex.set(probe, cube);
+    return cube;
+  }
+
+  private async ensurePipelines(): Promise<void> {
+    if (this.prefilterPipeline) return;
+    this.pipelinePromise ??= (async () => {
+      const device = this.device!;
+      const code = await ResourceManager.loadShader('utility/probe_prefilter.cs');
+      const module = device.createShaderModule({ label: 'probe_prefilter', code });
+      [this.prefilterPipeline, this.downsamplePipeline] = await Promise.all([
+        device.createComputePipelineAsync({
+          label: 'probe_prefilter',
+          layout: 'auto',
+          compute: { module, entryPoint: 'prefilter' },
+        }),
+        device.createComputePipelineAsync({
+          label: 'probe_downsample',
+          layout: 'auto',
+          compute: { module, entryPoint: 'downsample' },
+        }),
+      ]);
+    })();
+    await this.pipelinePromise;
+  }
+
+  /**
+   * Uploads a probe's captured radiance and GGX-prefilters it into its cube of the array.
+   * Any capture size works (the prefilter resamples by direction).
+   */
+  public async setProbeEnv(probe: ReflectionProbeComponent, faces: ProbeFaces): Promise<void> {
+    this.ensureResources();
+    await this.ensurePipelines();
+    if (!this._probes.includes(probe)) return; // disposed while loading
+    this.faces.set(probe, faces);
+    const device = this.device!;
+    const cube = this.cubeFor(probe);
+
+    // Source cube with its own box mip chain (filtered importance sampling reads it).
+    const srcMips = Math.floor(Math.log2(faces.size)) + 1;
+    const src = device.createTexture({
+      label: 'probe_capture',
+      size: [faces.size, faces.size, 6],
+      format: 'rgba16float',
+      mipLevelCount: srcMips,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+      { texture: src },
+      faces.data,
+      { bytesPerRow: faces.size * 8, rowsPerImage: faces.size },
+      [faces.size, faces.size, 6],
+    );
+
+    const encoder = device.createCommandEncoder({ label: 'probe_prefilter' });
+    const params: GPUBuffer[] = [];
+    {
+      const pass = encoder.beginComputePass({ label: 'probe_downsample' });
+      pass.setPipeline(this.downsamplePipeline!);
+      for (let mip = 1; mip < srcMips; mip++) {
+        const s = Math.max(1, faces.size >> mip);
+        pass.setBindGroup(
+          1,
+          device.createBindGroup({
+            layout: this.downsamplePipeline!.getBindGroupLayout(1),
+            entries: [
+              { binding: 0, resource: src.createView({ dimension: '2d-array', baseMipLevel: mip - 1, mipLevelCount: 1 }) },
+              { binding: 1, resource: src.createView({ dimension: '2d-array', baseMipLevel: mip, mipLevelCount: 1 }) },
+            ],
+          }),
+        );
+        pass.dispatchWorkgroups(Math.ceil(s / 8), Math.ceil(s / 8), 6);
+      }
+      pass.end();
+    }
+    {
+      const pass = encoder.beginComputePass({ label: 'probe_ggx' });
+      pass.setPipeline(this.prefilterPipeline!);
+      const srcView = src.createView({ dimension: 'cube' });
+      for (let mip = 0; mip < this.envMips; mip++) {
+        const s = Math.max(1, this.envSize >> mip);
+        const buf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const u = new ArrayBuffer(32);
+        new Uint32Array(u, 0, 3).set([s, faces.size, GGX_SAMPLES]);
+        new Float32Array(u, 16, 1)[0] = this.envMips > 1 ? mip / (this.envMips - 1) : 0;
+        device.queue.writeBuffer(buf, 0, u);
+        params.push(buf);
+        pass.setBindGroup(
+          0,
+          device.createBindGroup({
+            layout: this.prefilterPipeline!.getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: srcView },
+              { binding: 1, resource: SamplerLibrary.environmentCubemap },
+              {
+                binding: 2,
+                resource: this.envArray!.createView({
+                  dimension: '2d-array',
+                  baseMipLevel: mip,
+                  mipLevelCount: 1,
+                  baseArrayLayer: cube * 6,
+                  arrayLayerCount: 6,
+                }),
+              },
+              { binding: 3, resource: { buffer: buf } },
+            ],
+          }),
+        );
+        pass.dispatchWorkgroups(Math.ceil(s / 8), Math.ceil(s / 8), 6);
+      }
+      pass.end();
+    }
+    device.queue.submit([encoder.finish()]);
+    await device.queue.onSubmittedWorkDone();
+    src.destroy();
+    for (const b of params) b.destroy();
+  }
+
+  /** Cube index of a probe's prefiltered radiance, or -1 while it has none. */
+  public getCubeIndex(probe: ReflectionProbeComponent): number {
+    return this.cubeIndex.get(probe) ?? -1;
+  }
+
+  // ── Per frame ────────────────────────────────────────────────────────────────
+
+  /** Uploads the probes closest to `viewPos` (MAX_ACTIVE) and the global sky SH. */
+  public update(viewPos: vec3): void {
+    this.ensureResources();
+    const data = this.probeSetData;
+    const u32 = this.probeSetU32;
+    data.fill(0);
+
+    const globalSH = Engine.getEnvironmentManager().getEnvironmentSH();
+    u32[1] = globalSH ? 1 : 0;
+    data[2] = this.envMips - 1;
+    if (globalSH) this.writeSH(globalSH, 4);
+
+    let count = 0;
+    if (!this._bakingMode) {
+      const candidates = this._probes
+        .filter((p) => p.getSHCoefficients() !== null)
+        .map((p) => ({ p, d: this.distanceToBox(p, viewPos) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, MAX_ACTIVE);
+      for (const { p } of candidates) {
+        const base = HEADER_FLOATS + count * PROBE_FLOATS;
+        const pos = p.getPosition();
+        const c = p.getBoxCenter();
+        const ext = p.getExtents();
+        data.set([pos[0], pos[1], pos[2], p.getProbeTypeFlag()], base);
+        const fade = p.getFade();
+        data.set([c[0] - ext[0], c[1] - ext[1], c[2] - ext[2], 0], base + 4);
+        data.set([c[0] + ext[0], c[1] + ext[1], c[2] + ext[2], this.getCubeIndex(p)], base + 8);
+        data.set([fade[0], fade[1], fade[2], 0], base + 12);
+        this.writeSH(p.getSHCoefficients()!, base + 16);
+        count++;
+      }
+    }
+    u32[0] = count;
+    GPUUtils.writeBuffer(this.probeSetBuffer!, 0, data.subarray(0, HEADER_FLOATS + Math.max(count, 1) * PROBE_FLOATS));
+  }
+
+  private writeSH(coefs: Float32Array, base: number): void {
+    for (let k = 0; k < 9; k++) {
+      this.probeSetData[base + k * 4] = coefs[k * 3]!;
+      this.probeSetData[base + k * 4 + 1] = coefs[k * 3 + 1]!;
+      this.probeSetData[base + k * 4 + 2] = coefs[k * 3 + 2]!;
+    }
+  }
+
+  private distanceToBox(probe: ReflectionProbeComponent, p: vec3): number {
+    const c = probe.getBoxCenter();
+    const e = probe.getExtents();
+    const dx = Math.max(Math.abs(p[0] - c[0]) - e[0], 0);
+    const dy = Math.max(Math.abs(p[1] - c[1]) - e[1], 0);
+    const dz = Math.max(Math.abs(p[2] - c[2]) - e[2], 0);
+    return dx * dx + dy * dy + dz * dz;
   }
 }

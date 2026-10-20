@@ -43,6 +43,11 @@ export class RenderManagerV2 {
   private camera: Camera | null = null;
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private techniqueOverride: Technique | null = null;
+  /**
+   * Probe capture: draw only the static scene. Characters (skinned) and transparent effects
+   * (particles, silhouettes) would be frozen into the bake's lighting and reflections.
+   */
+  public staticOnly = false;
   private techniqueOverrideInstanced: Technique | null = null;
   private techniqueOverrideMask: Technique | null = null;
   private techniqueOverrideMaskInstanced: Technique | null = null;
@@ -262,6 +267,8 @@ export class RenderManagerV2 {
    * Using this.camera (set by setCamera() before DeferredRenderer.render() is called).
    */
   public dispatchHZBCulling(encoder: GPUCommandEncoder): void {
+    // Probe capture: the pyramid is the main camera's, it would cull the probe's view.
+    if (this.staticOnly) return;
     if (!this.hzbEnabled || !this.hzbCullingPass || !this.hzbBuilder?.isReady()) return;
     if (!this.camera || !this.gpuCuller?.isInitialized()) return;
 
@@ -543,6 +550,13 @@ export class RenderManagerV2 {
 
     for (const key of keys) {
       if (!this.validateRenderKey(key)) {
+        continue;
+      }
+      if (
+        this.staticOnly &&
+        (key.material.getTechnique()?.getIsSkinned() ||
+          key.material.getCategory() === RenderCategory.TRANSPARENT)
+      ) {
         continue;
       }
 

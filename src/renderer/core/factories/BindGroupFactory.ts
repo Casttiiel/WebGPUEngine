@@ -381,23 +381,17 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },
-      // Parallax Corrected Cubemap probe data (PCCSpecularUniforms)
+      // ProbeSet (common/probes.wgsl): per-pixel reflection probes
       {
         binding: 8,
         visibility: GPUShaderStage.FRAGMENT,
-        buffer: { type: 'uniform' },
+        buffer: { type: 'read-only-storage' },
       },
-      // Per-probe prefiltered env cubemap A
+      // Every probe's GGX-prefiltered cubemap
       {
         binding: 9,
         visibility: GPUShaderStage.FRAGMENT,
-        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
-      },
-      // Per-probe prefiltered env cubemap B
-      {
-        binding: 10,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
+        texture: { viewDimension: 'cube-array', sampleType: 'float', multisampled: false },
       },
     ]);
   }
@@ -573,10 +567,10 @@ export class BindGroupFactory {
         texture: { sampleType: 'float' },
       },
       {
-        // SH L2 irradiance coefficients: probeA(9×vec4) + probeB(9×vec4) = 288 bytes
+        // ProbeSet (common/probes.wgsl): per-pixel irradiance probes
         binding: 4,
         visibility: GPUShaderStage.FRAGMENT,
-        buffer: { type: 'uniform' },
+        buffer: { type: 'read-only-storage' },
       },
     ]);
   }

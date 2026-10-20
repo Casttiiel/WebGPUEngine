@@ -48,7 +48,6 @@ import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComp
 import { ShockwavePostProcessComponent } from '../../components/render/ShockwavePostProcessComponent';
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
-import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
 import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 import { CombatDirectorComponent } from '../../components/game/CombatDirectorComponent';
@@ -200,7 +199,6 @@ export class Engine {
     // Triggers / Física — TRIGGER_ENTER / TRIGGER_EXIT
     ImpulsePadComponent.registerMsgs();
     SwingBarComponent.registerMsgs();
-    ReflectionProbeComponent.registerMsgs();
     GrappleTargetComponent.registerMsgs();
     ChargeTargetComponent.registerMsgs();
     EnemyControllerComponent.registerMsgs();

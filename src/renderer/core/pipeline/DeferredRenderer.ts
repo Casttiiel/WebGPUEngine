@@ -111,7 +111,13 @@ export class DeferredRenderer {
   /** First-person view-model pass (dedicated depth, bypasses world frustum culling) */
   private viewModelPass: ViewModelPass = new ViewModelPass();
 
-  constructor() {}
+  /**
+   * @param publishTextures register this renderer's outputs (linear depth, env cubemap) in
+   *   EngineTextureRegistry for the materials that read them. False for offscreen renderers
+   *   (probe capture): they're destroyed afterwards and would leave the materials bound to
+   *   dead textures.
+   */
+  constructor(private readonly publishTextures = true) {}
 
   public create(width: number, height: number) {
     if (!this.isLoaded) return;
@@ -334,10 +340,12 @@ export class DeferredRenderer {
 
     // Register linear depth for custom material slots (e.g. water, SSR composite).
     // Re-registered on every resize so materials rebuild their bind groups automatically.
-    EngineTextureRegistry.register(
-      ENGINE_TEXTURES.LINEAR_DEPTH,
-      gBufferRenderTargets.linearDepth.getView()!,
-    );
+    if (this.publishTextures) {
+      EngineTextureRegistry.register(
+        ENGINE_TEXTURES.LINEAR_DEPTH,
+        gBufferRenderTargets.linearDepth.getView()!,
+      );
+    }
 
     // Initialize lighting passes after gBufferBindGroup is created
     // Use depth from prepass for all lighting effects
@@ -611,7 +619,6 @@ export class DeferredRenderer {
       this.gBufferComputeBindGroup,
       gBufferRTs.normals,
       gBufferRTs.linearDepth,
-      this.ambientLight,
     );
     this.ambientLight.setSSRActive(this.ssr.isActive());
     this.ambientLight.renderSpecular(
@@ -901,6 +908,7 @@ export class DeferredRenderer {
    * (e.g. after a light probe update) to avoid redundant rebuild callbacks.
    */
   private ensureEngineTextureRegistrations(): void {
+    if (!this.publishTextures) return;
     const envTex = Engine.getEnvironmentManager().getSSREnvironmentTexture();
     if (!envTex) return;
     const view = envTex.getTextureView();

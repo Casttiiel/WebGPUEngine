@@ -4,17 +4,13 @@
 #include "common/octahedral"
 #include "common/gbuffer"
 
+#include "common/probes"
+
 struct AmbientUniforms {
     globalAmbientBoost: f32,
     diffuseBoost:       f32,
-    isBaking:           f32,  // 1.0 during probe bake — uses white irradiance to avoid feedback
-    probeBlendWeight:   f32,
-    hasProbeA:          f32,  // 1.0 = SH coefficients are ready; 0.0 = no diffuse IBL
-}
-
-struct SHProbeUniforms {
-    coefA: array<vec4<f32>, 9>,  // probe A: 9 × (R, G, B, pad) = 144 bytes
-    coefB: array<vec4<f32>, 9>,  // probe B: 9 × (R, G, B, pad) = 144 bytes
+    _pad0:              f32,
+    _pad1:              f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -28,45 +24,23 @@ struct SHProbeUniforms {
 @group(2) @binding(1) var samplerAO:        sampler;
 @group(2) @binding(2) var<uniform> ambient: AmbientUniforms;
 @group(2) @binding(3) var brdfLUT:          texture_2d<f32>;
-@group(2) @binding(4) var<uniform> sh:      SHProbeUniforms;
-
-// Evaluates SH L2 irradiance at direction N.
-// Coefficients are stored with the cosine-lobe convolution factors pre-baked:
-//   E(N) = Σ_k coef_k · Y_k(N)
-fn evalSH(c: array<vec4<f32>, 9>, N: vec3<f32>) -> vec3<f32> {
-    let x = N.x; let y = N.y; let z = N.z;
-    var r = c[0].rgb * 0.282095;
-    r += c[1].rgb * (0.488603 * y);
-    r += c[2].rgb * (0.488603 * z);
-    r += c[3].rgb * (0.488603 * x);
-    r += c[4].rgb * (1.092548 * x * y);
-    r += c[5].rgb * (1.092548 * y * z);
-    r += c[6].rgb * (0.315392 * (3.0 * z * z - 1.0));
-    r += c[7].rgb * (1.092548 * x * z);
-    r += c[8].rgb * (0.546274 * (x * x - y * y));
-    return max(r, vec3<f32>(0.0));
-}
+@group(2) @binding(4) var<storage, read> probeSet: ProbeSet;
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let N   = normalize(g.normal);
     let V   = normalize(g.viewDir);
     let NdV = clamp(dot(N, V), 0.001, 1.0);
 
-    var irradiance: vec3<f32>;
-    if (ambient.isBaking > 0.5) {
-        irradiance = vec3<f32>(1.0);
-    } else if (ambient.hasProbeA > 0.5) {
-        let irrA = evalSH(sh.coefA, N);
-        let irrB = evalSH(sh.coefB, N);
-        irradiance = mix(irrA, irrB, ambient.probeBlendWeight);
-    } else {
-        // Hemisphere ambient fallback when no probe is active.
-        // Sky colour overhead, darker ground colour below — gives soft directional
-        // ambient without needing any baked data.
-        let hemi = dot(N, vec3<f32>(0.0, 1.0, 0.0)) * 0.5 + 0.5; // 0=ground, 1=sky
+    // Per pixel: the probes whose box holds this point, the sky SH for the rest.
+    let probes = probeIrradiance(g.worldPos, N);
+    var irradiance = probes.irradiance;
+    if (probes.coverage < 1.0) {
+        // Nothing loaded yet: hemisphere ambient (sky above, ground below) so the
+        // first frames aren't black.
+        let hemi = dot(N, vec3<f32>(0.0, 1.0, 0.0)) * 0.5 + 0.5;
         let skyColour    = vec3<f32>(0.38, 0.50, 0.65);
         let groundColour = vec3<f32>(0.10, 0.07, 0.04);
-        irradiance = mix(groundColour, skyColour, hemi);
+        irradiance += mix(groundColour, skyColour, hemi) * (1.0 - probes.coverage);
     }
 
     // Use LUT-integrated directional albedo for kD — keeps energy conservation

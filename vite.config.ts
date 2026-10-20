@@ -125,9 +125,57 @@ function no404FallbackPlugin(): Plugin {
   };
 }
 
+/**
+ * Dev-only endpoint for editor bakes (ProbeBaker.save): POST /__bake/save?folder=probes&file=x
+ * writes the request body to public/assets/{folder}/{file}. Folders are whitelisted and the
+ * file name can't leave them.
+ */
+function bakeSavePlugin(): Plugin {
+  const folders = new Set(['probes', 'scenes']);
+  return {
+    name: 'bake-save',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = new URL(req.url ?? '', 'http://localhost');
+        // Bake outputs are written while the server runs and the folder is out of Vite's
+        // watcher (no reload mid-bake), so Vite's public file list doesn't know them: serve
+        // them straight from disk.
+        const probeFile = /\/assets\/probes\/([^/]+)$/.exec(url.pathname);
+        if (req.method === 'GET' && probeFile) {
+          const target = path.join(server.config.root, 'public', 'assets', 'probes', path.basename(decodeURIComponent(probeFile[1]!)));
+          if (!fs.existsSync(target)) return next();
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader(
+            'Content-Type',
+            target.endsWith('.json') ? 'application/json' : target.endsWith('.png') ? 'image/png' : 'application/octet-stream',
+          );
+          res.end(fs.readFileSync(target));
+          return;
+        }
+        if (req.method !== 'POST' || !url.pathname.endsWith('/__bake/save')) return next();
+        const folder = url.searchParams.get('folder') ?? '';
+        const file = path.basename(url.searchParams.get('file') ?? '');
+        if (!folders.has(folder) || !file || file.startsWith('.')) {
+          res.statusCode = 400;
+          res.end('bad folder/file');
+          return;
+        }
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', () => {
+          const target = path.join(server.config.root, 'public', 'assets', folder, file);
+          fs.writeFileSync(target, Buffer.concat(chunks));
+          res.statusCode = 200;
+          res.end('ok');
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/WebGPUEngine/', // Ajusta esto si cambias el nombre del repo
-  plugins: [wgslIncludePlugin(), no404FallbackPlugin(), wasm(), topLevelAwait()],
+  plugins: [bakeSavePlugin(), wgslIncludePlugin(), no404FallbackPlugin(), wasm(), topLevelAwait()],
   worker: {
     // ES module workers: the default 'iife' format makes vite-plugin-top-level-await
     // re-bundle the worker and crash on an undefined assetsDir. Every WebGPU-capable
@@ -144,6 +192,8 @@ export default defineConfig({
     fs: {
       strict: true, // Modo estricto para acceso a archivos
     },
+    // Probe bakes write here (bake-save): don't reload the page in the middle of a bake.
+    watch: { ignored: ['**/public/assets/probes/**'] },
   },
   appType: 'spa', // Especificar que es una SPA, pero sin fallback agresivo
 });

@@ -2,38 +2,38 @@ import { Component } from '../../core/ecs/Component';
 import { Camera } from '../../core/math/Camera';
 import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
-import { Engine } from '../../core/engine/Engine';
-import { Cubemap } from '../../renderer/resources/Cubemap';
 import { SHData } from '../../renderer/resources/SHData';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
+import { loadProbeFaces } from '../../renderer/resources/ProbeFile';
 import { ReflectionProbeComponentData } from '../../types/ReflectionProbeComponentData.type';
-import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
-import { MsgType } from '../../types/MsgType.enum';
-import type { IMsg, TMsgTriggerEnter, TMsgTriggerExit } from '../../core/ecs/Msg';
 
+/**
+ * A baked light/reflection probe: SH L2 irradiance (`{name}_sh.json`) and HDR radiance
+ * (`{name}_env.bin`), captured from the entity's position by the F8 bake. Both apply per
+ * pixel inside its influence box (`extents`, half sizes) and fade `fade` metres either side
+ * of the box faces (ProbeManager / common/probes.wgsl).
+ */
 export class ReflectionProbeComponent extends Component {
-  private radius: number = 10.0; // Radio de influencia
-  private resolution: number = 256; // Resolución del cubemap (512x512 por cara)
+  private radius: number = 10.0;
+  /** Capture resolution per cube face (the runtime cube array resamples it). */
+  private resolution: number = 128;
   private captureCamera: Camera | null = null;
 
   /** Half-extents of the probe influence box (x, y, z). Defaults to (radius, radius, radius). */
   private extents: vec3 = vec3.fromValues(10, 10, 10);
+  /** Cross-fade distance at the box faces, per axis (metres). */
+  private fade: vec3 = vec3.fromValues(1, 1, 1);
+  /** Influence box centre relative to the capture point (auto-placement keeps boxes on a grid). */
+  private boxOffset: vec3 = vec3.create();
 
   /**
    * 'indoor'  — AABB is a real room boundary: apply PCC to align reflections with geometry.
    * 'outdoor' — environment is effectively infinite: skip PCC, just use the probe's env cubemap.
-   * Default: 'indoor'
    */
   private probeType: 'indoor' | 'outdoor' = 'indoor';
 
-  /** SH L2 irradiance data loaded from assets/probes/{name}_sh.json. */
-  private shData: SHData | null = null;
-
-  /** Own pre-baked prefiltered env cubemap for per-probe specular PCC. */
-  private envCubemap: Cubemap | null = null;
-
-  // Tracking de entidades dentro del trigger
-  private entitiesInside: Set<number> = new Set();
+  /** SH L2 irradiance; replaced in place by a bake (setSH). */
+  private shCoefficients: Float32Array | null = null;
 
   constructor() {
     super();
@@ -41,7 +41,7 @@ export class ReflectionProbeComponent extends Component {
 
   public load(probeData: ReflectionProbeComponentData): void {
     this.radius = probeData?.radius ?? 10.0;
-    this.resolution = probeData?.resolution ?? 512;
+    this.resolution = probeData?.resolution ?? 128;
     this.probeType = probeData?.type ?? 'indoor';
 
     if (probeData?.extents) {
@@ -49,57 +49,38 @@ export class ReflectionProbeComponent extends Component {
     } else {
       vec3.set(this.extents, this.radius, this.radius, this.radius);
     }
+    if (probeData?.boxOffset) vec3.set(this.boxOffset, ...probeData.boxOffset);
+    // Default: a quarter of the box per axis, at most 2 m.
+    const fade = probeData?.fade;
+    for (let a = 0; a < 3; a++) {
+      this.fade[a] = Array.isArray(fade) ? fade[a]! : (fade ?? Math.min(2, 0.25 * 2 * this.extents[a]!));
+    }
 
-    // Crear cámara de captura con FOV 90° para cubemap
+    // 90° square camera per cube face.
     this.captureCamera = new Camera();
-    this.captureCamera.setFov(90); // FOV 90° para cubemap
-    this.captureCamera.setViewport(this.resolution, this.resolution); // Aspect 1:1
+    this.captureCamera.setFov(90);
+    this.captureCamera.setViewport(this.resolution, this.resolution);
     this.captureCamera.setNearPlane(0.1);
-    this.captureCamera.setFarPlane(1000.0); // Far plane extendido para capturar más escena
+    this.captureCamera.setFarPlane(1000.0);
   }
 
   public override async onAttach(): Promise<void> {
-    const baseName = this.getOwner().getName();
-
-    // SH is small (~1 KB) and contributes to ambient even from a distance — load eagerly.
-    this.shData = SHData.get(`${baseName}_sh.json`);
-
-    // Specular cubemap is large and only needed when the player is inside this probe.
-    // Loaded lazily on first onEntityEnter — see below.
-
+    const name = this.getOwner().getName();
     ProbeManager.getInstance().register(this);
+
+    // Not baked yet → no files: the probe stays out of the lighting until F8.
+    SHData.getAsync(`${name}_sh.json`)
+      .then((sh) => {
+        this.shCoefficients ??= sh.getCoefficients();
+      })
+      .catch(() => {});
+    const faces = await loadProbeFaces(name);
+    if (faces) await ProbeManager.getInstance().setProbeEnv(this, faces);
   }
 
-  public static registerMsgs(): void {
-    MsgDispatcher.register(MsgType.TRIGGER_ENTER, 'reflection_probe', (comp, msg) => {
-      const { otherEntityId } = (msg as IMsg<TMsgTriggerEnter>).payload;
-      (comp as ReflectionProbeComponent).onEntityEnter(otherEntityId);
-    });
-    MsgDispatcher.register(MsgType.TRIGGER_EXIT, 'reflection_probe', (comp, msg) => {
-      const { otherEntityId } = (msg as IMsg<TMsgTriggerExit>).payload;
-      (comp as ReflectionProbeComponent).onEntityExit(otherEntityId);
-    });
-  }
-
-  private onEntityEnter(entityId: number): void {
-    const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('player_controller')) {
-      this.entitiesInside.add(entityId);
-      this.ensureEnvCubemapLoaded();
-    }
-  }
-
-  private ensureEnvCubemapLoaded(): void {
-    if (this.envCubemap) return;
-    const baseName = this.getOwner().getName();
-    this.envCubemap = Cubemap.get(`${baseName}_cubemap_T.png`, { baseFolder: 'assets/probes' });
-  }
-
-  private onEntityExit(entityId: number): void {
-    const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('player_controller')) {
-      this.entitiesInside.delete(entityId);
-    }
+  /** Installs freshly baked irradiance (the bake also saves it to disk). */
+  public setSH(coefficients: Float32Array): void {
+    this.shCoefficients = coefficients;
   }
 
   public update(): void {}
@@ -114,6 +95,15 @@ export class ReflectionProbeComponent extends Component {
 
   public setExtents(e: vec3): void {
     vec3.copy(this.extents, e);
+  }
+
+  /** World centre of the influence box (capture point + boxOffset). */
+  public getBoxCenter(): vec3 {
+    return vec3.add(vec3.create(), this.getPosition(), this.boxOffset);
+  }
+
+  public getFade(): vec3 {
+    return this.fade;
   }
 
   public getRadius(): number {
@@ -136,30 +126,16 @@ export class ReflectionProbeComponent extends Component {
     return (transform as TransformComponent).getTransform().getWorldPosition();
   }
 
-  public getEntitiesInside(): Set<number> {
-    return this.entitiesInside;
-  }
-
-  /** Returns the 27-float SH L2 irradiance coefficients, or null if not yet loaded. */
+  /** The 27-float SH L2 irradiance coefficients, or null while not loaded/baked. */
   public getSHCoefficients(): Float32Array | null {
-    return this.shData?.getCoefficients() ?? null;
+    return this.shCoefficients;
   }
 
-  /** Returns the GPU view for this probe's prefiltered env cubemap (specular PCC), or null if not loaded. */
-  public getEnvView(): GPUTextureView | null {
-    return this.envCubemap?.getTextureView() ?? null;
-  }
-
-  /**
-   * Returns the probe mode as a float packed into the w component of probePos uniforms:
-   *   0.0 = no probe (handled by caller)
-   *   1.0 = outdoor — use probe env, no PCC correction
-   *   2.0 = indoor  — use probe env + PCC AABB correction
-   */
   public getProbeType(): 'indoor' | 'outdoor' {
     return this.probeType;
   }
 
+  /** Packed in ProbeGPU.pos.w: 1 = outdoor (no PCC), 2 = indoor (PCC). */
   public getProbeTypeFlag(): number {
     return this.probeType === 'indoor' ? 2.0 : 1.0;
   }

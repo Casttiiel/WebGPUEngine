@@ -21,38 +21,20 @@ export class AmbientLight {
   private ambientSpecularBindGroup!: GPUBindGroup;
   private ambientSpecularUniformBuffer!: GPUBuffer;
 
-  // Diffuse uniform: 5 scalars (+ padding to 8) = 32 bytes.
-  // Layout: [0] globalBoost  [1] diffuseBoost  [2] isBaking
-  //         [3] probeBlendWeight  [4] hasProbeA  [5..7] padding
+  // Diffuse uniform: [0] globalBoost  [1] diffuseBoost  [2..7] padding.
+  // Irradiance comes per pixel from ProbeManager's ProbeSet (common/probes.wgsl).
   private ambientDiffuseUniformArray = new Float32Array(8);
   private ambientSpecularUniformArray = new Float32Array(12);
   /** When true, ambient_specular.fs takes the specular radiance from SSR instead of the IBL. */
   private ssrActive = false;
 
-  // SH L2 irradiance: probeA(9×vec4) + probeB(9×vec4) = 72 floats / 288 bytes.
-  // Each vec4 = (R, G, B, 0_padding). Layout: coefA[0..8] then coefB[0..8].
-  private shUniformBuffer!: GPUBuffer;
-  private shUniformArray = new Float32Array(72);
-
-  // PCC specular uniform: 7 × vec4 = 28 floats / 112 bytes.
-  // Layout: probeAPos(xyz,hasA) + probeAMin(xyz,_) + probeAMax(xyz,_)
-  //       + probeBPos(xyz,hasB) + probeBMin(xyz,_) + probeBMax(xyz,_)
-  //       + blendWeight(_,_,_,_)
-  private pccSpecularUniformBuffer!: GPUBuffer;
-  private pccSpecularUniformArray = new Float32Array(28);
-
-  /** Cached probe env views for specular bind-group invalidation. */
-  private lastProbeEnvAView: GPUTextureView | null = null;
-  /** Specular bind groups keyed by SSR view (cleared when probes change / on destroy). */
+  /** Specular bind groups keyed by SSR view; cleared when the probe resources change. */
   private specularBindGroupCache = new Map<GPUTextureView, GPUBindGroup>();
-  private lastProbeEnvBView: GPUTextureView | null = null;
+  private lastProbeEnv: GPUTextureView | null = null;
+  private lastProbeBuffer: GPUBuffer | null = null;
 
-  /** When true, the ambient diffuse shader uses white irradiance instead of sampled cubemaps. */
-  private static _bakingMode: boolean = false;
-
-  public static setBakingMode(enabled: boolean): void {
-    AmbientLight._bakingMode = enabled;
-  }
+  /** No-op kept for the bake code: the bake now hides probes through ProbeManager. */
+  public static setBakingMode(_enabled: boolean): void {}
 
   private brdfLUT!: Texture;
 
@@ -65,13 +47,7 @@ export class AmbientLight {
 
       this.ambientDiffuseUniformBuffer = GPUUtils.createBuffer(
         'ambient diffuse uniform buffer',
-        32, // 8 floats: globalBoost, diffuseBoost, isBaking, blendWeight, hasProbeA + 3 pad
-        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      );
-
-      this.shUniformBuffer = GPUUtils.createBuffer(
-        'ambient SH uniform buffer',
-        288, // 72 floats: probeA(9×vec4) + probeB(9×vec4)
+        32,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
@@ -81,12 +57,6 @@ export class AmbientLight {
       this.ambientSpecularUniformBuffer = GPUUtils.createBuffer(
         'ambient specular uniform buffer',
         48,
-        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      );
-
-      this.pccSpecularUniformBuffer = GPUUtils.createBuffer(
-        'ambient specular PCC uniform buffer',
-        112, // 28 floats: probeA(pos/min/max) + probeB(pos/min/max) + blendWeight
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
     } catch (e) {
@@ -99,7 +69,7 @@ export class AmbientLight {
     gBufferBindGroup: GPUBindGroup,
     aoResult: GPUTextureView,
   ): void {
-    // SH data is in a uniform buffer written every frame — bind group is stable per aoResult.
+    // The probe buffer is rewritten in place every frame — bind group is stable per aoResult.
     let diffuseBG = this.ambientDiffuseBindGroupCache.get(aoResult);
     if (!diffuseBG) {
       diffuseBG = this.createAmbientDiffuseBindGroup(aoResult);
@@ -143,20 +113,19 @@ export class AmbientLight {
     ao: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
   ): void {
-    if (!this.pccSpecularUniformBuffer || !this.ambientSpecularUniformBuffer) return;
-    const envViews = this._getProbeEnvViews();
-    if (
-      envViews.envA !== this.lastProbeEnvAView ||
-      envViews.envB !== this.lastProbeEnvBView
-    ) {
+    if (!this.ambientSpecularUniformBuffer) return;
+    const probes = ProbeManager.getInstance();
+    const probeEnv = probes.getEnvArrayView();
+    const probeBuffer = probes.getProbeSetBuffer();
+    if (probeEnv !== this.lastProbeEnv || probeBuffer !== this.lastProbeBuffer) {
       this.specularBindGroupCache.clear();
-      this.lastProbeEnvAView = envViews.envA;
-      this.lastProbeEnvBView = envViews.envB;
+      this.lastProbeEnv = probeEnv;
+      this.lastProbeBuffer = probeBuffer;
     }
     // SSR ping-pongs its output between two textures: keep one bind group per SSR view.
     let specularBG = this.specularBindGroupCache.get(ssr);
     if (!specularBG) {
-      this.createAmbientSpecularBindGroup(ssr, ao, envViews.envA, envViews.envB);
+      this.createAmbientSpecularBindGroup(ssr, ao, probeEnv, probeBuffer);
       specularBG = this.ambientSpecularBindGroup;
       this.specularBindGroupCache.set(ssr, specularBG);
     }
@@ -201,7 +170,7 @@ export class AmbientLight {
         { binding: 1, resource: SamplerLibrary.simpleSampler! },
         { binding: 2, resource: { buffer: this.ambientDiffuseUniformBuffer } },
         { binding: 3, resource: this.brdfLUT.getTextureView()! },
-        { binding: 4, resource: { buffer: this.shUniformBuffer } },
+        { binding: 4, resource: { buffer: ProbeManager.getInstance().getProbeSetBuffer() } },
       ],
     );
   }
@@ -209,8 +178,8 @@ export class AmbientLight {
   private createAmbientSpecularBindGroup(
     ssr: GPUTextureView,
     ao: GPUTextureView,
-    probeEnvAView: GPUTextureView,
-    probeEnvBView: GPUTextureView,
+    probeEnv: GPUTextureView,
+    probeBuffer: GPUBuffer,
   ) {
     this.ambientSpecularBindGroup = BindGroupFactory.createBindGroup(
       'ambient_specular_bindgroup',
@@ -250,36 +219,25 @@ export class AmbientLight {
         },
         {
           binding: 8,
-          resource: { buffer: this.pccSpecularUniformBuffer },
+          resource: { buffer: probeBuffer },
         },
         {
           binding: 9,
-          resource: probeEnvAView,
-        },
-        {
-          binding: 10,
-          resource: probeEnvBView,
+          resource: probeEnv,
         },
       ],
     );
   }
 
   public update(_dt: number): void {
-    if (!this.pccSpecularUniformBuffer || !this.ambientDiffuseUniformBuffer || !this.ambientSpecularUniformBuffer || !this.shUniformBuffer) return;
+    if (!this.ambientDiffuseUniformBuffer || !this.ambientSpecularUniformBuffer) return;
 
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
-    const blend = ProbeManager.getInstance().getBlendedProbes();
-    // hasProbeA is 1 only when SH coefficients are available (probe, else the HDR environment's)
-    // — otherwise the shader uses its hemisphere fallback so there's no black frame during load.
-    const shCoefA = this._getSHA(blend);
-    const hasProbeA = shCoefA !== null ? 1.0 : 0.0;
+    // Probes near the rendering camera (the probe's own camera while baking).
+    ProbeManager.getInstance().update(Engine.getRender().getMainCamera().getPosition());
 
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
     this.ambientDiffuseUniformArray[1] = ambientData.diffuseFactor;
-    this.ambientDiffuseUniformArray[2] = AmbientLight._bakingMode ? 1.0 : 0.0;
-    this.ambientDiffuseUniformArray[3] = blend.probeB !== null ? blend.blendWeight : 0.0;
-    this.ambientDiffuseUniformArray[4] = hasProbeA;
-    // [5..7] = padding
     GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
 
     this.ambientSpecularUniformArray[0] = ambientData.globalFactor;
@@ -295,91 +253,14 @@ export class AmbientLight {
     this.ambientSpecularUniformArray[10] = 0.0;
     this.ambientSpecularUniformArray[11] = 0.0;
     GPUUtils.writeBuffer(this.ambientSpecularUniformBuffer, 0, this.ambientSpecularUniformArray);
-
-    this._writePCCSpecularUniforms();
-    this._writeSHUniforms(blend);
-  }
-
-  /**
-   * Writes probe A and B AABB data + blendWeight into the PCC specular uniform buffer.
-   * hasProbeA/B (w component) = 1.0 when active; 0.0 = raw reflection direction.
-   */
-  private _writePCCSpecularUniforms(): void {
-    const blend = ProbeManager.getInstance().getBlendedProbes();
-
-    const writeProbeSpec = (probe: typeof blend.probeA, offset: number): void => {
-      if (probe) {
-        const pos = probe.getPosition();
-        const ext = probe.getExtents();
-        this.pccSpecularUniformArray[offset + 0] = pos[0];
-        this.pccSpecularUniformArray[offset + 1] = pos[1];
-        this.pccSpecularUniformArray[offset + 2] = pos[2];
-        this.pccSpecularUniformArray[offset + 3] = probe.getProbeTypeFlag(); // 1=outdoor, 2=indoor+PCC
-        this.pccSpecularUniformArray[offset + 4] = pos[0] - ext[0];
-        this.pccSpecularUniformArray[offset + 5] = pos[1] - ext[1];
-        this.pccSpecularUniformArray[offset + 6] = pos[2] - ext[2];
-        this.pccSpecularUniformArray[offset + 7] = 0.0;
-        this.pccSpecularUniformArray[offset + 8] = pos[0] + ext[0];
-        this.pccSpecularUniformArray[offset + 9] = pos[1] + ext[1];
-        this.pccSpecularUniformArray[offset + 10] = pos[2] + ext[2];
-        this.pccSpecularUniformArray[offset + 11] = 0.0;
-      } else {
-        this.pccSpecularUniformArray[offset + 3] = 0.0; // clear hasProbe
-      }
-    };
-
-    writeProbeSpec(blend.probeA, 0); // probeAPos at index 0
-    writeProbeSpec(blend.probeB, 12); // probeBPos at index 12
-    // blendWeight at index 24
-    this.pccSpecularUniformArray[24] = blend.probeB !== null ? blend.blendWeight : 0.0;
-    GPUUtils.writeBuffer(this.pccSpecularUniformBuffer, 0, this.pccSpecularUniformArray);
-  }
-
-  /**
-   * Packs SH L2 coefficients for probe A and probe B into the SH uniform buffer.
-   * Each coefficient is stored as vec4(R, G, B, 0). Layout: coefA[0..8] coefB[0..8].
-   * When no probe is active, writes zeros so hasProbeA=0 causes the shader to fall back
-   * to the global irradiance cubemap.
-   */
-  private _getSHA(blend: ReturnType<typeof ProbeManager.prototype.getBlendedProbes>): Float32Array | null {
-    return blend.probeA?.getSHCoefficients() ?? Engine.getEnvironmentManager().getEnvironmentSH();
-  }
-
-  private _writeSHUniforms(blend: ReturnType<typeof ProbeManager.prototype.getBlendedProbes>): void {
-    const shA = this._getSHA(blend);
-    const shB = blend.probeB?.getSHCoefficients() ?? shA; // fall back to A when no B
-
-    const writeSH = (coefs: Float32Array | null, base: number): void => {
-      for (let k = 0; k < 9; k++) {
-        const o = base + k * 4;
-        this.shUniformArray[o]     = coefs ? coefs[k * 3]!     : 0;
-        this.shUniformArray[o + 1] = coefs ? coefs[k * 3 + 1]! : 0;
-        this.shUniformArray[o + 2] = coefs ? coefs[k * 3 + 2]! : 0;
-        this.shUniformArray[o + 3] = 0; // padding
-      }
-    };
-
-    writeSH(shA, 0);   // probeA at floats 0–35
-    writeSH(shB, 36);  // probeB at floats 36–71
-    GPUUtils.writeBuffer(this.shUniformBuffer, 0, this.shUniformArray);
   }
 
   public destroy(): void {
     this.ambientDiffuseBindGroupCache.clear();
     this.ambientSpecularBindGroup = null!;
     this.specularBindGroupCache.clear();
-    this.lastProbeEnvAView = null;
-    this.lastProbeEnvBView = null;
-  }
-
-  /** PCC data of the two dominant probes (also read by the SSR trace for env fallbacks). */
-  public getPCCSpecularBuffer(): GPUBuffer {
-    return this.pccSpecularUniformBuffer;
-  }
-
-  /** Env cubemap views of the two dominant probes (global env when none). */
-  public getProbeEnvViews(): { envA: GPUTextureView; envB: GPUTextureView } {
-    return this._getProbeEnvViews();
+    this.lastProbeEnv = null;
+    this.lastProbeBuffer = null;
   }
 
   /**
@@ -395,19 +276,4 @@ export class AmbientLight {
     this.ambientSpecularUniformArray[5] = active ? 1.0 : 0.0;
     GPUUtils.writeBuffer(this.ambientSpecularUniformBuffer, 0, this.ambientSpecularUniformArray);
   }
-
-  /**
-   * Returns env cubemap views for the two dominant probes.
-   * Falls back to the global SSR env cubemap when no probe covers the player.
-   */
-  private _getProbeEnvViews(): { envA: GPUTextureView; envB: GPUTextureView } {
-    const globalEnvView = Engine.getEnvironmentManager()
-      .getSSREnvironmentTexture()
-      .getTextureView()!;
-    const blend = ProbeManager.getInstance().getBlendedProbes();
-    const envA = blend.probeA?.getEnvView() ?? globalEnvView;
-    const envB = blend.probeB?.getEnvView() ?? envA;
-    return { envA, envB };
-  }
-
 }

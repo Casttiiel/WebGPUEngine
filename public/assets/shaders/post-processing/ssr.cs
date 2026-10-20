@@ -9,7 +9,7 @@
 //
 // Environment: instead of three.js' importance-sampled equirect HDR, misses and edge
 // fades use the same prefiltered cubemaps as ambient_specular.fs (global env + the two
-// dominant PCC reflection probes), so SSR on/off stays energy-consistent with the IBL.
+// per-pixel reflection probes, common/probes.wgsl), so SSR on/off stays energy-consistent.
 //
 // Output (rgba16float): rgb = incoming radiance along the reflection,
 //                       a   = world-space ray length (ENV_RAY_LENGTH on misses).
@@ -19,7 +19,7 @@
 
 #include "common/uniforms"
 #include "common/octahedral"
-#include "common/pcc"
+#include "common/probes_specular"
 #include "post-processing/ssr_common"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -29,23 +29,12 @@
 @group(1) @binding(2) var gLinearDepth:   texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
 
-struct PCCSpecularUniforms {
-    probeAPos: vec4<f32>,   // xyz = world pos, w: 0 = none, 1 = outdoor, 2 = indoor (PCC)
-    probeAMin: vec4<f32>,
-    probeAMax: vec4<f32>,
-    probeBPos: vec4<f32>,
-    probeBMin: vec4<f32>,
-    probeBMax: vec4<f32>,
-    blendWeight: f32, _pad0: f32, _pad1: f32, _pad2: f32,
-}
-
 @group(2) @binding(0) var accLight:            texture_2d<f32>;
 @group(2) @binding(1) var<uniform> params:     SSRTraceParams;
 @group(2) @binding(2) var txEnvironment:       texture_cube<f32>;
-@group(2) @binding(3) var probeEnvA:           texture_cube<f32>;
-@group(2) @binding(4) var probeEnvB:           texture_cube<f32>;
+@group(2) @binding(3) var probeEnvArray:       texture_cube_array<f32>;
 @group(2) @binding(5) var envSampler:          sampler;
-@group(2) @binding(6) var<uniform> pccData:    PCCSpecularUniforms;
+@group(2) @binding(6) var<storage, read> probeSet: ProbeSet;
 @group(2) @binding(7) var historyTex:          texture_2d<f32>; // last frame's denoised SSR
 @group(2) @binding(8) var brdfLUT:             texture_2d<f32>;
 @group(2) @binding(9) var linearSampler:       sampler;
@@ -57,20 +46,9 @@ const MAX_STEPS: f32 = 64.0;
 // Prefiltered environment radiance along the mirror direction — identical to the IBL
 // lookup in ambient_specular.fs (probe blend + parallax correction).
 fn sampleEnvironment(worldPos: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let R_a = select(R, parallaxCorrectDir(worldPos, R, pccData.probeAPos.xyz,
-                                           pccData.probeAMin.xyz, pccData.probeAMax.xyz),
-                     pccData.probeAPos.w > 1.5);
-    let R_b = select(R, parallaxCorrectDir(worldPos, R, pccData.probeBPos.xyz,
-                                           pccData.probeBMin.xyz, pccData.probeBMax.xyz),
-                     pccData.probeBPos.w > 1.5);
-    let mip = roughness * params.envMaxMip;
-    let envGlobal = textureSampleLevel(txEnvironment, envSampler, R,   mip).rgb;
-    let envA      = textureSampleLevel(probeEnvA,     envSampler, R_a, mip).rgb;
-    let envB      = textureSampleLevel(probeEnvB,     envSampler, R_b, mip).rgb;
-    let hasA = pccData.probeAPos.w > 0.5;
-    let hasB = pccData.probeBPos.w > 0.5;
-    let envBlended = mix(envA, envB, pccData.blendWeight);
-    return select(select(envGlobal, envA, hasA), envBlended, hasA && hasB) * params.environmentIntensity;
+    let envGlobal = textureSampleLevel(txEnvironment, envSampler, R, roughness * params.envMaxMip).rgb;
+    return probeSpecular(worldPos, R, roughness * probeSet.envMaxMip, envSampler, envGlobal)
+         * params.environmentIntensity;
 }
 
 // Indirect specular the hit surface reflects toward the ray origin, from last frame's
