@@ -14,7 +14,8 @@
 //   • disocclusion from the previous frame's depth, reprojected into this frame
 //   • Salvi variance clipping in compressed YCoCg, γ ∈ [0.5, 1] with motion
 //   • "lock": thin features (1 px wires, cracks) keep their unclipped history so they
-//     don't flicker; stored in the history alpha and decayed every frame
+//     don't flicker; stored in the history alpha and decayed every frame. Only while the
+//     history agrees with the current frame and the pixel is still (else it ghosts)
 //   • current weight 0.025 + motion, inverse-luminance blend
 //
 // Output alpha = lock (history only; downstream passes ignore it).
@@ -106,9 +107,20 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let thinFeature = smoothstep(0.0, 0.2, abs(temporalLuminance(currentColor) - meanLuma) / meanLuma);
     let isDepthChanged = abs(depth.closestDepth - previousDepth) > params.depthThreshold * depth.closestDepth;
     let canLock = isValidUV && !isDepthChanged;
-    let previousLock = textureSampleLevel(txHistory, linearSampler, uv, 0.0).a;
+    // The lock travels with the surface: read it where this pixel was last frame.
+    let previousLock = textureSampleLevel(txHistory, linearSampler, historyUV, 0.0).a;
     let decay = select(0.5, 0.0, isDisocclusion);
-    let lock  = saturate(max(select(0.0, thinFeature, canLock), previousLock * decay));
+    // A lock only protects a feature that is in BOTH frames. Particles and silhouettes
+    // write no depth/velocity, so the depth test above can't see them move: without this,
+    // a spark that left the pixel kept its unclipped history → trails.
+    let historyLuma = temporalLuminance(historyColor.rgb);
+    let currentLuma = temporalLuminance(currentColor);
+    let lumaDiff  = abs(historyLuma - currentLuma) / max(max(historyLuma, currentLuma), 1e-4);
+    let agreement = 1.0 - smoothstep(0.25, 0.6, lumaDiff);
+    // Motion already hides the flicker the lock is for, and moving edges are where it ghosts.
+    let motionPx  = length((uv - historyUV) * inputSize);
+    let stillness = 1.0 - smoothstep(0.5, 2.0, motionPx);
+    let lock = saturate(max(select(0.0, thinFeature, canLock), previousLock * decay)) * agreement * stillness;
     let lockedHistory = mix(clippedHistory, historyColor.rgb, lock);
 
     // ── Blend ────────────────────────────────────────────────────────────────
