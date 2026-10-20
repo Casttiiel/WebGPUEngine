@@ -1,5 +1,55 @@
 [
   {
+    "prefab": "tactical/enemy.prefab",
+    "components": {
+      "name": "DockThug1",
+      "transform": {
+        "position": [
+          -17,
+          -3.0,
+          -28.5
+        ]
+      },
+      "unit": {
+        "encounterGroup": "docks",
+        "displayName": "Matón"
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy.prefab",
+    "components": {
+      "name": "DockThug2",
+      "transform": {
+        "position": [
+          -3,
+          -3.0,
+          -30.5
+        ]
+      },
+      "unit": {
+        "encounterGroup": "docks",
+        "displayName": "Matón"
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy_archer.prefab",
+    "components": {
+      "name": "DockArcher",
+      "transform": {
+        "position": [
+          -9,
+          0,
+          -22.4
+        ]
+      },
+      "unit": {
+        "encounterGroup": "docks"
+      }
+    }
+  },
+  {
     "prefab": "tactical/enemy_brute.prefab",
     "components": {
       "name": "PlazaBrute",

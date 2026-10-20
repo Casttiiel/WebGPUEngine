@@ -13,7 +13,7 @@
         "bounds": {
           "min": [
             -24.5,
-            -16.5
+            -39.5
           ],
           "max": [
             24.5,
@@ -39,18 +39,18 @@
       "transform": {
         "position": [
           0,
-          6,
-          0
+          5,
+          -11
         ]
       },
       "particle_system": {
         "spawnRadius": [
           26,
-          5,
-          18
+          6,
+          30
         ],
-        "emissionRate": 1150,
-        "maxParticles": 13500
+        "emissionRate": 1500,
+        "maxParticles": 17500
       }
     }
   },
@@ -79,6 +79,64 @@
         "noiseAmount": 0.85,
         "noiseScale": 0.22,
         "noiseSpeed": 0.12,
+        "edgeBreakup": 0.6
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "MistDocks",
+      "transform": {
+        "position": [
+          -10,
+          -2.65,
+          -29
+        ]
+      },
+      "fog_volume": {
+        "shape": "box",
+        "size": [
+          30,
+          0.8,
+          10
+        ],
+        "density": 0.06,
+        "scatteringCoeff": 1.0,
+        "absorptionCoeff": 0.05,
+        "falloff": 1.0,
+        "blendMode": "add",
+        "noiseAmount": 0.85,
+        "noiseScale": 0.22,
+        "noiseSpeed": 0.12,
+        "edgeBreakup": 0.6
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "MistCanal",
+      "transform": {
+        "position": [
+          -10,
+          -4.0,
+          -37.5
+        ]
+      },
+      "fog_volume": {
+        "shape": "box",
+        "size": [
+          34,
+          1.4,
+          7
+        ],
+        "density": 0.05,
+        "scatteringCoeff": 1.0,
+        "absorptionCoeff": 0.05,
+        "falloff": 1.0,
+        "blendMode": "add",
+        "noiseAmount": 0.9,
+        "noiseScale": 0.18,
+        "noiseSpeed": 0.1,
         "edgeBreakup": 0.6
       }
     }
@@ -204,10 +262,10 @@
   },
   {
     "components": {
-      "name": "BldSouth",
+      "name": "BldSouthW",
       "transform": {
         "position": [
-          0,
+          -25,
           1.75,
           -18
         ],
@@ -217,7 +275,50 @@
           0
         ],
         "scale": [
-          54,
+          4,
+          3.5,
+          2
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wall.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "BldSouthE",
+      "transform": {
+        "position": [
+          5,
+          1.75,
+          -18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          44,
           3.5,
           2
         ]
@@ -2654,14 +2755,1503 @@
     }
   },
   {
+    "components": {
+      "name": "DockWallW",
+      "transform": {
+        "position": [
+          -26,
+          -0.75,
+          -30
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2,
+          8.5,
+          22
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wall.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "DockWallE",
+      "transform": {
+        "position": [
+          6,
+          -0.75,
+          -30
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2,
+          8.5,
+          22
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wall.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Warehouse",
+      "transform": {
+        "position": [
+          2,
+          0.25,
+          -25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          6,
+          6.5,
+          12
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wall.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Walkway",
+      "transform": {
+        "position": [
+          -13,
+          -1.5,
+          -21.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          24,
+          3,
+          5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "WalkwayParapet1",
+      "transform": {
+        "position": [
+          -18.5,
+          0.45,
+          -23.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          5,
+          0.9,
+          0.4
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "WalkwayParapet2",
+      "transform": {
+        "position": [
+          -9,
+          0.45,
+          -23.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          6,
+          0.9,
+          0.4
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Quay",
+      "transform": {
+        "position": [
+          -10,
+          -4,
+          -29
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          30,
+          2,
+          10
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_ground.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock01",
+      "transform": {
+        "position": [
+          -3,
+          -2.85,
+          -28.75
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          0.3,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock02",
+      "transform": {
+        "position": [
+          -3,
+          -2.7,
+          -28.25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          0.6,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock03",
+      "transform": {
+        "position": [
+          -3,
+          -2.55,
+          -27.75
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          0.9,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock04",
+      "transform": {
+        "position": [
+          -3,
+          -2.4,
+          -27.25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          1.2,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock05",
+      "transform": {
+        "position": [
+          -3,
+          -2.25,
+          -26.75
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          1.5,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock06",
+      "transform": {
+        "position": [
+          -3,
+          -2.1,
+          -26.25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          1.8,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock07",
+      "transform": {
+        "position": [
+          -3,
+          -1.95,
+          -25.75
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          2.1,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock08",
+      "transform": {
+        "position": [
+          -3,
+          -1.8,
+          -25.25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          2.4,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock09",
+      "transform": {
+        "position": [
+          -3,
+          -1.65,
+          -24.75
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          2.7,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "StairDock10",
+      "transform": {
+        "position": [
+          -3,
+          -1.5,
+          -24.25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          3,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CanalBed",
+      "transform": {
+        "position": [
+          -10,
+          -6.5,
+          -37.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          34,
+          1,
+          7
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wall.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CanalWater",
+      "transform": {
+        "position": [
+          -10,
+          -4.5,
+          -37.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          34,
+          0.2,
+          7
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "blockout_water.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "FarBank",
+      "transform": {
+        "position": [
+          -10,
+          -4.75,
+          -43
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          34,
+          4.5,
+          4
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wall.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Pier",
+      "transform": {
+        "position": [
+          -12,
+          -4.5,
+          -37
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          3,
+          6
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wood.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_wood.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Barge",
+      "transform": {
+        "position": [
+          -17.25,
+          -4.25,
+          -37.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4.5,
+          1.3,
+          5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wood.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_wood.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "QuayCurbW",
+      "transform": {
+        "position": [
+          -19.5,
+          -2.7,
+          -33.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          11,
+          0.6,
+          0.4
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "QuayCurbE",
+      "transform": {
+        "position": [
+          -2.5,
+          -2.7,
+          -33.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          15,
+          0.6,
+          0.4
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "PierCurbW",
+      "transform": {
+        "position": [
+          -13.85,
+          -2.7,
+          -37
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.3,
+          0.6,
+          6
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "PierCurbE",
+      "transform": {
+        "position": [
+          -10.15,
+          -2.7,
+          -37
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.3,
+          0.6,
+          6
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "PierCurbS",
+      "transform": {
+        "position": [
+          -12,
+          -2.7,
+          -39.85
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          0.6,
+          0.3
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CranePost",
+      "transform": {
+        "position": [
+          -19.5,
+          0.75,
+          -30.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          7.5,
+          1
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CraneArm",
+      "transform": {
+        "position": [
+          -19.5,
+          4.25,
+          -33.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          0.5,
+          7
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wood.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_wood.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CargoA",
+      "transform": {
+        "position": [
+          -20.75,
+          -2.3,
+          -27.25
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.5,
+          1.4,
+          1.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wood.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_wood.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CargoB",
+      "transform": {
+        "position": [
+          -7.5,
+          -2.4,
+          -27.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3,
+          1.2,
+          1
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_wood.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_wood.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Bollard1",
+      "transform": {
+        "position": [
+          -21,
+          -2.7,
+          -32.55
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.5,
+          0.6,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Bollard2",
+      "transform": {
+        "position": [
+          -7,
+          -2.7,
+          -32.55
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.5,
+          0.6,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Bollard3",
+      "transform": {
+        "position": [
+          1,
+          -2.7,
+          -32.55
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.5,
+          0.6,
+          0.5
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "DockRamp",
+      "transform": {
+        "position": [
+          -23,
+          -1.634,
+          -26.933
+        ],
+        "rotation": [
+          -26.565,
+          0,
+          0
+        ],
+        "scale": [
+          4,
+          0.3,
+          7.108
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "mistborn_column.mat"
+          }
+        ]
+      },
+      "edge_decals": {
+        "material": "edge_wear_stone.mat"
+      }
+    }
+  },
+  {
     "prefab": "tactical/coinshot.prefab",
     "components": {
       "name": "Lanzamonedas",
       "transform": {
         "position": [
-          -20.5,
-          0,
-          -11.5
+          -12,
+          -3.0,
+          -38.8
         ]
       }
     }
@@ -2672,9 +4262,9 @@
       "name": "Deslizador",
       "transform": {
         "position": [
-          -22,
-          0,
-          -13
+          -11,
+          -3.0,
+          -37.8
         ]
       }
     }
@@ -2685,9 +4275,9 @@
       "name": "Voz",
       "transform": {
         "position": [
-          -19.5,
-          0,
-          -13.5
+          -12.8,
+          -3.0,
+          -37.4
         ]
       }
     }
@@ -2698,9 +4288,9 @@
       "name": "Artificiera",
       "transform": {
         "position": [
-          -22.5,
-          0,
-          -11
+          -11.6,
+          -3.0,
+          -36.4
         ]
       }
     }

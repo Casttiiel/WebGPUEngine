@@ -1,5 +1,83 @@
 [
   {
+    "prefab": "tactical/crate_metal.prefab",
+    "components": {
+      "name": "DockMetalCrate1",
+      "transform": {
+        "position": [
+          -15,
+          -3.0,
+          -30
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_metal.prefab",
+    "components": {
+      "name": "DockMetalCrate2",
+      "transform": {
+        "position": [
+          -4,
+          -3.0,
+          -32.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_stack.prefab",
+    "components": {
+      "name": "DockCrateStack",
+      "transform": {
+        "position": [
+          -23,
+          -3.0,
+          -32
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/barrel_explosive.prefab",
+    "components": {
+      "name": "DockBarrel",
+      "transform": {
+        "position": [
+          -7.5,
+          0,
+          -21.2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/cart.prefab",
+    "components": {
+      "name": "WalkwayCart",
+      "transform": {
+        "position": [
+          -19,
+          0,
+          -21
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/knives.prefab",
+    "components": {
+      "name": "DockKnives",
+      "transform": {
+        "position": [
+          -7.5,
+          -1.74,
+          -27.5
+        ]
+      }
+    }
+  },
+  {
     "prefab": "tactical/cart.prefab",
     "components": {
       "name": "PlazaCart",
