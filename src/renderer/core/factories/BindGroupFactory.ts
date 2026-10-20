@@ -73,7 +73,8 @@ export class BindGroupFactory {
     return this.getLayout('object_uniforms', [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX,
+        // FRAGMENT: la silueta de personajes usa el origen del modelo (ver silhouette.fs).
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },
     ]);

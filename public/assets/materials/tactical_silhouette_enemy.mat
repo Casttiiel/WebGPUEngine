@@ -6,5 +6,7 @@
   "shadows": false,
   "baseColorFactor": [1.0, 0.25, 0.2, 0.85],
   "uvXScale": 0.3,
-  "uvYScale": 0.35
+  "uvYScale": 0.35,
+  "surfaceBlend": 0.45,
+  "pomScale": 2.0
 }
