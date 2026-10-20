@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Engine } from '../../../core/engine/Engine';
 import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { GPUUtils } from '../utils/GPUUtils';
@@ -11,9 +11,14 @@ export interface ProbeFaces {
   data: Uint16Array; // 6 · size · size · 4
 }
 
-/** Probes uploaded per frame (the closest to the camera); common/probes.wgsl loops them. */
+/** Probes uploaded per frame (the closest to the camera). Must stay 32: one bit per probe in the grid masks. */
 const MAX_ACTIVE = 32;
-const HEADER_FLOATS = 4 + 9 * 4; // count, hasGlobalSH, envMaxMip, ambientScale + globalSH[9]
+/** XZ grid over the active probes' boxes: per cell, a bitmask of the probes touching it. */
+const GRID_DIM = 32;
+const GRID_OFFSET = 4 + 9 * 4; // after count, hasGlobalSH, envMaxMip, ambientScale + globalSH[9]
+const GRID_HEADER_FLOATS = 4; // gridMin.xy, gridInvCell.xy
+// + cellMask[GRID_DIM²]
+const HEADER_FLOATS = GRID_OFFSET + GRID_HEADER_FLOATS + GRID_DIM * GRID_DIM;
 const PROBE_FLOATS = 13 * 4; // pos, boxMin, boxMax, fade + sh[9]
 const GGX_SAMPLES = 96;
 
@@ -52,6 +57,7 @@ export class ProbeManager {
 
   private readonly candidates: ReflectionProbeComponent[] = [];
   private readonly distances = new Map<ReflectionProbeComponent, number>();
+  private readonly frustumPlanes = new Float32Array(24);
   private readonly byDistance = (a: ReflectionProbeComponent, b: ReflectionProbeComponent) =>
     this.distances.get(a)! - this.distances.get(b)!;
 
@@ -306,8 +312,12 @@ export class ProbeManager {
 
   // ── Per frame ────────────────────────────────────────────────────────────────
 
-  /** Uploads the probes closest to `viewPos` (MAX_ACTIVE) and the global sky SH. */
-  public update(viewPos: vec3): void {
+  /**
+   * Uploads the probes closest to `viewPos` (MAX_ACTIVE) and the global sky SH. With
+   * `viewProj`, probes whose box (+ fade) is off screen are skipped: the shaders loop every
+   * uploaded probe per pixel, so each one costs in ambient, ambient specular and SSR.
+   */
+  public update(viewPos: vec3, viewProj?: mat4): void {
     this.ensureResources();
     const data = this.probeSetData;
     const u32 = this.probeSetU32;
@@ -326,8 +336,11 @@ export class ProbeManager {
       // Reused scratch (this runs every frame): baked probes by distance to the viewer.
       const candidates = this.candidates;
       candidates.length = 0;
+      if (viewProj) this.extractFrustumPlanes(viewProj);
       for (const p of this._probes) {
-        if (p.getSHCoefficients() !== null) candidates.push(p);
+        if (p.getSHCoefficients() === null) continue;
+        if (viewProj && !this.isProbeInFrustum(p)) continue;
+        candidates.push(p);
       }
       for (const p of candidates) this.distances.set(p, this.distanceToBox(p, viewPos));
       candidates.sort(this.byDistance);
@@ -345,6 +358,7 @@ export class ProbeManager {
         this.writeSH(p.getSHCoefficients()!, base + 16);
         count++;
       }
+      this.buildGrid(candidates);
     }
     u32[0] = count;
     GPUUtils.writeBuffer(this.probeSetBuffer!, 0, data.subarray(0, HEADER_FLOATS + Math.max(count, 1) * PROBE_FLOATS));
@@ -356,6 +370,87 @@ export class ProbeManager {
       this.probeSetData[base + k * 4 + 1] = coefs[k * 3 + 1]!;
       this.probeSetData[base + k * 4 + 2] = coefs[k * 3 + 2]!;
     }
+  }
+
+  /**
+   * Fills the XZ grid (common/probes.wgsl probeMask): the bounds of every uploaded box grown
+   * by its fade, split in GRID_DIM² cells, each holding the bits of the probes that overlap
+   * it. A pixel then loops only the 1–4 probes around it instead of every active one.
+   * Left zeroed (count 0) when nothing is uploaded: every mask is 0.
+   */
+  private buildGrid(probes: ReadonlyArray<ReflectionProbeComponent>): void {
+    if (probes.length === 0) return;
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    for (const p of probes) {
+      const c = p.getBoxCenter();
+      const e = p.getExtents();
+      const f = p.getFade();
+      minX = Math.min(minX, c[0] - e[0] - f[0]);
+      maxX = Math.max(maxX, c[0] + e[0] + f[0]);
+      minZ = Math.min(minZ, c[2] - e[2] - f[2]);
+      maxZ = Math.max(maxZ, c[2] + e[2] + f[2]);
+    }
+    const invX = GRID_DIM / Math.max(maxX - minX, 1e-3);
+    const invZ = GRID_DIM / Math.max(maxZ - minZ, 1e-3);
+    const data = this.probeSetData;
+    data[GRID_OFFSET] = minX;
+    data[GRID_OFFSET + 1] = minZ;
+    data[GRID_OFFSET + 2] = invX;
+    data[GRID_OFFSET + 3] = invZ;
+    const masks = this.probeSetU32;
+    const cells = GRID_OFFSET + GRID_HEADER_FLOATS;
+    const last = GRID_DIM - 1;
+    for (let i = 0; i < probes.length; i++) {
+      const p = probes[i]!;
+      const c = p.getBoxCenter();
+      const e = p.getExtents();
+      const f = p.getFade();
+      const x0 = Math.max(Math.floor((c[0] - e[0] - f[0] - minX) * invX), 0);
+      const x1 = Math.min(Math.floor((c[0] + e[0] + f[0] - minX) * invX), last);
+      const z0 = Math.max(Math.floor((c[2] - e[2] - f[2] - minZ) * invZ), 0);
+      const z1 = Math.min(Math.floor((c[2] + e[2] + f[2] - minZ) * invZ), last);
+      const bit = (1 << i) >>> 0;
+      for (let z = z0; z <= z1; z++) {
+        for (let x = x0; x <= x1; x++) masks[cells + z * GRID_DIM + x] = (masks[cells + z * GRID_DIM + x]! | bit) >>> 0;
+      }
+    }
+  }
+
+  /** Frustum planes (Gribb–Hartmann, normalized) of a column-major view-projection. */
+  private extractFrustumPlanes(m: mat4): void {
+    const planes = this.frustumPlanes;
+    for (let i = 0; i < 6; i++) {
+      const row = i >> 1;
+      const sign = i & 1 ? -1 : 1;
+      const a = m[3]! + sign * m[row]!;
+      const b = m[7]! + sign * m[4 + row]!;
+      const c = m[11]! + sign * m[8 + row]!;
+      const d = m[15]! + sign * m[12 + row]!;
+      const inv = 1 / (Math.hypot(a, b, c) || 1);
+      planes[i * 4] = a * inv;
+      planes[i * 4 + 1] = b * inv;
+      planes[i * 4 + 2] = c * inv;
+      planes[i * 4 + 3] = d * inv;
+    }
+  }
+
+  /** The box grown by the fade: pixels up to `fade` outside it still get some weight. */
+  private isProbeInFrustum(probe: ReflectionProbeComponent): boolean {
+    const c = probe.getBoxCenter();
+    const e = probe.getExtents();
+    const f = probe.getFade();
+    const hx = e[0] + f[0];
+    const hy = e[1] + f[1];
+    const hz = e[2] + f[2];
+    const planes = this.frustumPlanes;
+    for (let i = 0; i < 24; i += 4) {
+      const px = planes[i]!;
+      const py = planes[i + 1]!;
+      const pz = planes[i + 2]!;
+      const r = Math.abs(px) * hx + Math.abs(py) * hy + Math.abs(pz) * hz;
+      if (px * c[0] + py * c[1] + pz * c[2] + planes[i + 3]! < -r) return false;
+    }
+    return true;
   }
 
   private distanceToBox(probe: ReflectionProbeComponent, p: vec3): number {

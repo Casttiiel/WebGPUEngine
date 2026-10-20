@@ -26,7 +26,20 @@ struct ProbeSet {
     envMaxMip:   f32,
     ambientScale: f32,                  // ambient boosts (global × diffuse), for forward shading
     globalSH:    array<vec4<f32>, 9>,   // sky / HDR environment irradiance
+    gridMin:     vec2<f32>,             // XZ origin of the probe grid
+    gridInvCell: vec2<f32>,             // cells per metre
+    cellMask:    array<u32, 1024>,      // PROBE_GRID_DIM², bit i = probes[i] overlaps the cell
     probes:      array<ProbeGPU>,
+}
+
+const PROBE_GRID_DIM = 32;
+
+// Bitmask of the probes that may weigh at `worldPos` (ProbeManager.buildGrid). Loop it with
+//   while (mask != 0u) { let i = firstTrailingBit(mask); mask &= mask - 1u; … }
+fn probeMask(worldPos: vec3<f32>) -> u32 {
+    let cell = vec2<i32>(floor((worldPos.xz - probeSet.gridMin) * probeSet.gridInvCell));
+    if (any(cell < vec2<i32>(0)) || any(cell >= vec2<i32>(PROBE_GRID_DIM))) { return 0u; }
+    return probeSet.cellMask[cell.y * PROBE_GRID_DIM + cell.x];
 }
 
 fn evalSHProbe(c: array<vec4<f32>, 9>, N: vec3<f32>) -> vec3<f32> {
@@ -45,9 +58,12 @@ fn evalSHProbe(c: array<vec4<f32>, 9>, N: vec3<f32>) -> vec3<f32> {
 
 // Per axis: 0 beyond box + fade, 0.5 on the box face, 1 once `fade` inside it. Separate
 // fades let grid cells cross-fade wide horizontally while staying sharp at floor level.
-fn probeWeight(p: ProbeGPU, worldPos: vec3<f32>) -> f32 {
-    let inside = min(worldPos - p.boxMin.xyz, p.boxMax.xyz - worldPos);
-    let fade = max(p.fade.xyz, vec3<f32>(1e-3));
+// Takes the index, not a ProbeGPU: copying the struct out of the storage buffer loads all
+// 13 vec4 (SH included) per probe per pixel, and this runs for every active probe.
+fn probeWeight(i: u32, worldPos: vec3<f32>) -> f32 {
+    let inside = min(worldPos - probeSet.probes[i].boxMin.xyz, probeSet.probes[i].boxMax.xyz - worldPos);
+    let fade = max(probeSet.probes[i].fade.xyz, vec3<f32>(1e-3));
+    if (any(inside <= -fade)) { return 0.0; }
     let w = smoothstep(-fade, fade, inside);
     return min(w.x, min(w.y, w.z));
 }
@@ -60,8 +76,11 @@ struct ProbeIrradiance {
 fn probeIrradiance(worldPos: vec3<f32>, N: vec3<f32>) -> ProbeIrradiance {
     var acc  = vec3<f32>(0.0);
     var wsum = 0.0;
-    for (var i = 0u; i < probeSet.count; i++) {
-        let w = probeWeight(probeSet.probes[i], worldPos);
+    var mask = probeMask(worldPos);
+    while (mask != 0u) {
+        let i = firstTrailingBit(mask);
+        mask &= mask - 1u;
+        let w = probeWeight(i, worldPos);
         if (w > 0.0) {
             acc  += evalSHProbe(probeSet.probes[i].sh, N) * w;
             wsum += w;

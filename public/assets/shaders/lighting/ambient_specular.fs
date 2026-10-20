@@ -60,6 +60,20 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let Fms  = FssEss * Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
     let splitSum = FssEss + Fms;
 
+    // ── SSR: reflected radiance × same split-sum BRDF (same energy space as IBL) ─
+    // The stochastic SSR resolves screen misses and edge fades to this same prefiltered
+    // environment, so when enabled it fully replaces the IBL radiance. Its alpha holds the
+    // temporal accumulation speed, not a hit mask. Uniform branch: the probe blend below
+    // is skipped entirely, not computed and thrown away.
+    // Specular occlusion only stands in for the local geometry the cubemap can't see; SSR
+    // traces that geometry (its hits are already occluded), so it isn't darkened twice.
+    // The BRDF is already in the colour — weighting alpha by it again would apply it twice.
+    // With additive_by_src_alpha: dst += colour * alpha.
+    if (ssrParams.enabled > 0.5) {
+        let ssrColor = textureSampleLevel(ssrTexture, ssrSampler, uv, 0.0);
+        return vec4<f32>(ssrColor.rgb * splitSum * ssrParams.specularBoost, 1.0);
+    }
+
     // ── IBL: per-pixel probe blend (PCC indoors), global env where none covers ──
     let maxMipLevel = 7.0;
     let mipLevel    = g.roughness * maxMipLevel;
@@ -69,20 +83,5 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let envRadiance = probeSpecular(g.worldPos, R, g.roughness * probeSet.envMaxMip, envSampler, envGlobal);
 
     let iblSpecular = envRadiance * ssrParams.environmentIntensity * splitSum;
-
-    // ── SSR: reflected radiance × same split-sum BRDF (same energy space as IBL) ─
-    // The stochastic SSR resolves screen misses and edge fades to this same prefiltered
-    // environment, so when enabled it fully replaces the IBL radiance. Its alpha holds the
-    // temporal accumulation speed, not a hit mask.
-    let ssrColor    = textureSample(ssrTexture, ssrSampler, uv);
-    let ssrSpecular = ssrColor.rgb * splitSum;
-
-    let finalSpecular = select(iblSpecular, ssrSpecular, ssrParams.enabled > 0.5) * ssrParams.specularBoost;
-
-    // The BRDF is already in finalSpecular — weighting alpha by it again would apply it twice.
-    // With additive_by_src_alpha: dst += finalSpecular * alpha.
-    // Specular occlusion only stands in for the local geometry the cubemap can't see; SSR
-    // traces that geometry (its hits are already occluded), so it isn't darkened twice.
-    let occlusion = select(so, 1.0, ssrParams.enabled > 0.5);
-    return vec4<f32>(finalSpecular, occlusion);
+    return vec4<f32>(iblSpecular * ssrParams.specularBoost, so);
 }

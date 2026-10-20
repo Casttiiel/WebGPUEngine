@@ -234,7 +234,8 @@ export class AmbientLight {
 
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
     // Probes near the rendering camera (the probe's own camera while baking).
-    ProbeManager.getInstance().update(Engine.getRender().getMainCamera().getPosition());
+    const camera = Engine.getRender().getMainCamera();
+    ProbeManager.getInstance().update(camera.getPosition(), camera.getViewProjection());
 
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
     this.ambientDiffuseUniformArray[1] = ambientData.diffuseFactor;

@@ -156,8 +156,13 @@ fn fbm3(p: vec3<f32>) -> f32 {
 }
 
 // ── Height field (base, anti-tiling, layer) ──────────────────────────────────
+// ANTI_TILE: most pixels lie wholly in one copy (gTileBlend exactly 0 or 1) and only the
+// seams need both. The blend comes from a low-frequency noise, so neighbouring pixels take
+// the same branch; fetching both copies everywhere cost ~1.8 ms of G-buffer at 4K.
 fn baseHeightAt(uv: vec2<f32>, lod: f32) -> f32 {
 #ifdef ANTI_TILE
+    if (gTileBlend <= 0.0) { return textureSampleLevel(txHeight, samplerState, uv + gTileOffA, lod).r; }
+    if (gTileBlend >= 1.0) { return textureSampleLevel(txHeight, samplerState, uv + gTileOffB, lod).r; }
     let a = textureSampleLevel(txHeight, samplerState, uv + gTileOffA, lod).r;
     let b = textureSampleLevel(txHeight, samplerState, uv + gTileOffB, lod).r;
     return mix(a, b, gTileBlend);
@@ -190,6 +195,8 @@ fn heightAt(uv: vec2<f32>, lod: f32) -> f32 {
 
 fn sampleBase(tex: texture_2d<f32>, uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec4<f32> {
 #ifdef ANTI_TILE
+    if (gTileBlend <= 0.0) { return textureSampleGrad(tex, samplerState, uv + gTileOffA, gx, gy); }
+    if (gTileBlend >= 1.0) { return textureSampleGrad(tex, samplerState, uv + gTileOffB, gx, gy); }
     let a = textureSampleGrad(tex, samplerState, uv + gTileOffA, gx, gy);
     let b = textureSampleGrad(tex, samplerState, uv + gTileOffB, gx, gy);
     return mix(a, b, gTileBlend);

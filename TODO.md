@@ -1,6 +1,3 @@
-Probes/Reflejos mal?
-Rendimiento
-
 # TODO — Roadmap de implementación del GDD
 
 Todo lo necesario para llegar a lo que describe [GDD.md](GDD.md), ordenado por dependencias y
