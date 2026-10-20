@@ -43,4 +43,12 @@ struct PomFactors {
     layerTintG: f32,
     layerTintB: f32,
     layerHeightOffset: f32,
+    ashAmount: f32,
+    ashNoiseScale: f32,
+    ashSharpness: f32,
+    ashColorR: f32,
+    ashColorG: f32,
+    ashColorB: f32,
+    _extrasPad0: f32,
+    _extrasPad1: f32,
 }

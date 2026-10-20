@@ -1,6 +1,7 @@
 {
     "vs": "particles/particle_worldspace.vs",
     "fs": "particles/particle.fs",
+    "defines": ["LIT"],
     "writesOn": "texture",
     "z": "greater_no_write",
     "blend": "combinative",
@@ -8,7 +9,7 @@
         "CameraUniforms",
         "MaterialTextures",
         "ObjectUniforms",
-        "ParticleWorldSpaceUniforms"
+        "ParticleLitUniforms"
     ],
     "instanced": true
 }

@@ -22,6 +22,8 @@ export enum PipelineBindGroupLayouts {
   FROXEL_RAYMARCH_SLICE = 'FroxelRaymarchSlice',
   PARTICLE_UNIFORMS = 'ParticleUniforms',
   PARTICLE_WORLDSPACE_UNIFORMS = 'ParticleWorldSpaceUniforms',
+  /** World-space particles lit by the sun (CSM), the probes and the froxel fog. */
+  PARTICLE_LIT_UNIFORMS = 'ParticleLitUniforms',
   INSTANCE_STORAGE = 'InstanceStorage',
   DOF_PARAMS = 'DOFParams',
   DOF_BLUR_TEXTURES = 'DOFBlurTextures',

@@ -114,7 +114,7 @@ export class RenderKeyManager {
    * Sorts render keys for optimal rendering
    */
   public sortKeys(keys: RenderKey[], category: RenderCategory, camera?: Camera): void {
-    if (category === RenderCategory.TRANSPARENT && camera) {
+    if ((category === RenderCategory.TRANSPARENT || category === RenderCategory.PARTICLES) && camera) {
       this.sortTransparentsByDepth(keys, camera);
       return;
     }

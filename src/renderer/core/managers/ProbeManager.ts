@@ -13,7 +13,7 @@ export interface ProbeFaces {
 
 /** Probes uploaded per frame (the closest to the camera); common/probes.wgsl loops them. */
 const MAX_ACTIVE = 32;
-const HEADER_FLOATS = 4 + 9 * 4; // count, hasGlobalSH, envMaxMip, pad + globalSH[9]
+const HEADER_FLOATS = 4 + 9 * 4; // count, hasGlobalSH, envMaxMip, ambientScale + globalSH[9]
 const PROBE_FLOATS = 13 * 4; // pos, boxMin, boxMax, fade + sh[9]
 const GGX_SAMPLES = 96;
 
@@ -50,6 +50,11 @@ export class ProbeManager {
   private downsamplePipeline: GPUComputePipeline | null = null;
   private pipelinePromise: Promise<void> | null = null;
 
+  private readonly candidates: ReflectionProbeComponent[] = [];
+  private readonly distances = new Map<ReflectionProbeComponent, number>();
+  private readonly byDistance = (a: ReflectionProbeComponent, b: ReflectionProbeComponent) =>
+    this.distances.get(a)! - this.distances.get(b)!;
+
   private constructor() {}
 
   public static getInstance(): ProbeManager {
@@ -64,6 +69,7 @@ export class ProbeManager {
   public unregister(probe: ReflectionProbeComponent): void {
     const idx = this._probes.indexOf(probe);
     if (idx !== -1) this._probes.splice(idx, 1);
+    this.distances.delete(probe);
     this.faces.delete(probe);
     const cube = this.cubeIndex.get(probe);
     if (cube !== undefined) {
@@ -310,16 +316,23 @@ export class ProbeManager {
     const globalSH = Engine.getEnvironmentManager().getEnvironmentSH();
     u32[1] = globalSH ? 1 : 0;
     data[2] = this.envMips - 1;
+    // Same ambient energy as ambient.fs for forward-shaded things (lit particles).
+    const ambient = Engine.getEnvironmentManager().getAmbientLightData();
+    data[3] = ambient.globalFactor * ambient.diffuseFactor;
     if (globalSH) this.writeSH(globalSH, 4);
 
     let count = 0;
     if (!this._bakingMode) {
-      const candidates = this._probes
-        .filter((p) => p.getSHCoefficients() !== null)
-        .map((p) => ({ p, d: this.distanceToBox(p, viewPos) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, MAX_ACTIVE);
-      for (const { p } of candidates) {
+      // Reused scratch (this runs every frame): baked probes by distance to the viewer.
+      const candidates = this.candidates;
+      candidates.length = 0;
+      for (const p of this._probes) {
+        if (p.getSHCoefficients() !== null) candidates.push(p);
+      }
+      for (const p of candidates) this.distances.set(p, this.distanceToBox(p, viewPos));
+      candidates.sort(this.byDistance);
+      if (candidates.length > MAX_ACTIVE) candidates.length = MAX_ACTIVE;
+      for (const p of candidates) {
         const base = HEADER_FLOATS + count * PROBE_FLOATS;
         const pos = p.getPosition();
         const c = p.getBoxCenter();

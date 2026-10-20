@@ -368,7 +368,7 @@
       }
     },
     {
-      "log": "10.6: unos cuchillos (Pequeño) atraídos golpean al que está en medio: 6 + POT 6 = 12, sin estado"
+      "log": "10.6: unos cuchillos (Pequeño) atraídos golpean al que está en medio: 6 + POT 6 = 12, sin estado; se rompen al usarlos"
     },
     {
       "eval": "__fresh(); __unit('Enemy1').clearStatuses(); __tp('Lanzamonedas', -12, -15); __tp('Enemy1', -9, -15); __tp('Knives1', -6, -15)"
@@ -398,7 +398,7 @@
     {
       "assert": {
         "expr": "[__dmg('Enemy1').slice(-1), __st('Enemy1'), __unit('Knives1').isAlive()]",
-        "value": [[12], [], true]
+        "value": [[12], [], false]
       }
     },
     {

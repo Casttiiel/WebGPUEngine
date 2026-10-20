@@ -555,7 +555,8 @@ export class RenderManagerV2 {
       if (
         this.staticOnly &&
         (key.material.getTechnique()?.getIsSkinned() ||
-          key.material.getCategory() === RenderCategory.TRANSPARENT)
+          key.material.getCategory() === RenderCategory.TRANSPARENT ||
+          key.material.getCategory() === RenderCategory.PARTICLES)
       ) {
         continue;
       }

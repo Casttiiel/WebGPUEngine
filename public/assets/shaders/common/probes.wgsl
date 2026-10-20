@@ -24,7 +24,7 @@ struct ProbeSet {
     count:       u32,
     hasGlobalSH: u32,
     envMaxMip:   f32,
-    _pad:        f32,
+    ambientScale: f32,                  // ambient boosts (global × diffuse), for forward shading
     globalSH:    array<vec4<f32>, 9>,   // sky / HDR environment irradiance
     probes:      array<ProbeGPU>,
 }

@@ -1206,8 +1206,9 @@ export class EncounterComponent extends Component {
   /**
    * Algo empujado, atraído o lanzado ha llegado (GDD §5): golpea a quien pilla (que sale
    * despedido; un objeto Grande lo deja Aturdido, una unidad lo deja Derribado) y se golpea
-   * él. Un objeto de los que se rompen al chocar con alguien se rompe (y si cae al suelo
-   * lanzado, recibe el golpe); los que no (cuchillos) ni se dañan; una unidad llega
+   * él. Un objeto Pequeño se rompe siempre (se ha usado); uno Grande de los que se rompen al
+   * chocar con alguien se rompe (y si cae al suelo lanzado, recibe el golpe); los que no ni se
+   * dañan; una unidad llega
    * Derribada y, si ha chocado, recibe el golpe (+50 % contra una pared).
    */
   private applyImpact(impact: PendingImpact): void {
@@ -1240,7 +1241,12 @@ export class EncounterComponent extends Component {
       if (body.isAlive()) this.applyStatus(body, 'prone', impact.source);
       return;
     }
-    // Los que no se rompen al chocar (cuchillos, clavos) son munición: tampoco se dañan.
+    // Los Pequeños (cuchillos, clavos, monedas) se rompen siempre al usarlos, choquen o no.
+    if (prop?.isSmall()) {
+      this.onUnitDown(body, impact.source);
+      return;
+    }
+    // Los que no se rompen al chocar (un carro) tampoco se dañan.
     if (!prop?.breaksOnImpact()) return;
     if (hit) this.onUnitDown(body, impact.source);
     else if (impact.always) this.applyHit(impact.source, body, true, amount(body), 'impact');

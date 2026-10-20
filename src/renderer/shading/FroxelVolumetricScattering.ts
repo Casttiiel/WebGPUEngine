@@ -1389,6 +1389,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (s.ambientIntensity !== undefined) this.ambientVolumetricIntensity = s.ambientIntensity;
   }
 
+  /** Integrated in-scattering (rgb) and transmittance (a) from the camera, per froxel. */
+  public getIntegratedView(): GPUTextureView | null {
+    return this.loaded ? this.froxelIntegratedTextureView : null;
+  }
+
+  /** FroxelUniforms (grid size and depth distribution). */
+  public getFroxelUniformBuffer(): GPUBuffer | null {
+    return this.froxelUniformBuffer ?? null;
+  }
+
   public isVolumetricEnabled(): boolean {
     return (
       this.isEnabled && this.loaded && (this.fogDensity > 0.0 || this.getFogVolumeCount() > 0)

@@ -1,8 +1,6 @@
-Props pequeños deben romperse cuando se usan
+Props pequeños deben romperse cuando se usan/lanzan, no los pongas en el suelo, sino encima de lugares estaticos de media altura
 Probes/Reflejos mal?
-Ceniza acumulándose sobre las superficies (la capa que comentamos) y partículas con sombra y luz (ceniza iluminada por el sol y la niebla).
-Sombras de mejor calidad: filtrado PCSS (penumbras más suaves cuanto más lejos está el objeto que hace sombra), sombras por pantalla en personajes y sombras de las nubes.
-Grading de color con LUT y una cadena de post coherente. Esto es lo que más "look de juego" da con menos trabajo.
+Rendimiento
 
 # TODO — Roadmap de implementación del GDD
 

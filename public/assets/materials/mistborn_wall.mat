@@ -6,7 +6,8 @@
     "POM_SHADOW",
     "LAYER",
     "ANTI_TILE",
-    "DIRT"
+    "DIRT",
+    "ASH"
   ],
   "category": "solids",
   "textures": {
@@ -47,5 +48,12 @@
   "antiTileScale": 0.35,
   "cavityDirt": 0.35,
   "baseDirtHeight": 0.6,
-  "layerHeightOffset": 0.35
+  "layerHeightOffset": 0.35,
+  "ashAmount": 0.95,
+  "ashNoiseScale": 0.5,
+  "ashColor": [
+    0.17,
+    0.165,
+    0.16
+  ]
 }

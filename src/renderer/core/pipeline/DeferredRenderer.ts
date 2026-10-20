@@ -634,6 +634,12 @@ export class DeferredRenderer {
       this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
     }
 
+    // After the fog: these particles fog themselves at their own depth (froxel volume) —
+    // the composite above fogs a pixel by the depth of the ground behind it.
+    if (renderManager.hasKeysForCategory(RenderCategory.PARTICLES)) {
+      this.renderPassManager.executePass('particles', RenderCategory.PARTICLES);
+    }
+
     return this.rtAccLight.getView();
   }
 
@@ -979,6 +985,11 @@ export class DeferredRenderer {
   }
 
   /** Returns the HZB pyramid builder for registration with RenderManagerV2. */
+  /** Froxel fog volume (lit particles read its integrated scattering). */
+  public getFroxelVolumetrics(): FroxelVolumetricScattering {
+    return this.froxelVolumetrics;
+  }
+
   public getHZBBuilder(): HZBBuilder {
     return this.hzbBuilder;
   }

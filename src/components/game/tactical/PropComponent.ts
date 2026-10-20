@@ -20,7 +20,8 @@ export interface PropExplosion {
 
 /**
  * Tamaño (GDD §5). Pequeño: cuchillos, clavos, monedas (munición del tirón y el empuje; se
- * lanzan a mano). Grande: cajas, barriles, carros (solo con alomancia o la fuerza del peltre).
+ * lanzan a mano; se rompen al usarlos, y se colocan encima de cajas y muretes, no en el suelo).
+ * Grande: cajas, barriles, carros (solo con alomancia o la fuerza del peltre).
  */
 export type PropSize = 'small' | 'large';
 
@@ -32,7 +33,8 @@ export type PropComponentDataType = Readonly<{
   size?: PropSize;
   /** De metal: se puede empujar y atraer con alomancia. Default false. */
   metallic?: boolean;
-  /** Se rompe al golpear a una unidad, tenga la vida que tenga. Default true. */
+  /** Se rompe al golpear a una unidad, tenga la vida que tenga. Default true. Los Pequeños se
+   *  rompen siempre al usarlos. */
   breakOnImpact?: boolean;
   /** Explota al destruirse (vida a 0: un ataque, el fuego, otra explosión). */
   explosive?: PropExplosion;

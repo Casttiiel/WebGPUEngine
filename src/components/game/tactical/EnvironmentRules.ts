@@ -1,4 +1,5 @@
 import { vec3 } from 'gl-matrix';
+import { PropComponent } from './PropComponent';
 import { UnitComponent } from './UnitComponent';
 import { groundHeightAt, hasLineOfSight, isOnNavMesh } from './TacticalQueries';
 
@@ -141,8 +142,8 @@ export function pushDistance(prop: UnitComponent, dir: vec3, maxDistance: number
 /**
  * Como pushDistance, y además la unidad u objeto contra el que choca (null si se para contra
  * una pared, un desnivel o simplemente llega al final): el que recibe el impacto. `blocked`: se
- * ha parado contra una pared o un desnivel. `ignore`: quien empuja (se pondrá detrás; donde está
- * ahora no estorba).
+ * ha parado contra una pared o un desnivel (los Pequeños vuelan: no se paran en los desniveles).
+ * `ignore`: quien empuja (se pondrá detrás; donde está ahora no estorba).
  */
 export function pushPath(
   prop: UnitComponent,
@@ -152,6 +153,7 @@ export function pushPath(
 ): { length: number; hit: UnitComponent | null; blocked: boolean } {
   const start = prop.getFeetPosition(vec3.create());
   const radius = prop.getCapsuleRadius();
+  const small = PropComponent.of(prop.getOwner())?.isSmall() === true;
   const others = UnitComponent.getAll().filter((u) => u !== prop && u !== ignore && u.isAlive());
   const from = vec3.fromValues(start[0]!, start[1]! + PUSH_HEIGHT, start[2]!);
   const probe = vec3.create();
@@ -163,10 +165,13 @@ export function pushPath(
     // Paredes, cajas estáticas…: rayo desde el centro hasta el borde del objeto ya movido.
     vec3.scaleAndAdd(probe, from, dir, s + radius);
     if (!hasLineOfSight(from, probe)) return { length: reached, hit: null, blocked: true };
-    // El suelo sigue al mismo nivel (ni bordillos ni caídas).
-    const ground = groundHeightAt(p[0]!, p[2]!, start[1]! + 0.5);
-    if (ground === null || Math.abs(ground - start[1]!) > 0.15) {
-      return { length: reached, hit: null, blocked: true };
+    // El suelo sigue al mismo nivel (ni bordillos ni caídas). Un Pequeño vuela: sale de lo
+    // alto de una caja o un murete (y se rompe al acabar).
+    if (!small) {
+      const ground = groundHeightAt(p[0]!, p[2]!, start[1]! + 0.5);
+      if (ground === null || Math.abs(ground - start[1]!) > 0.15) {
+        return { length: reached, hit: null, blocked: true };
+      }
     }
     // Otras unidades y objetos.
     const blocker = others.find((u) => {

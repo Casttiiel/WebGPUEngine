@@ -41,8 +41,7 @@
     },
     "tactical_prop": {
       "size": "small",
-      "metallic": true,
-      "breakOnImpact": false
+      "metallic": true
     }
   }
 }

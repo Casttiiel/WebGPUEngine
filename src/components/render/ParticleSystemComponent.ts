@@ -8,6 +8,12 @@ import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { ParticleSystemComponentData } from '../../types/ParticleSystemComponentData.type';
+import { Engine } from '../../core/engine/Engine';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { DirectionalLightComponent } from './DirectionalLightComponent';
 
 /**
  * ParticleSystemComponent - GPU-driven particle system using indirect draw
@@ -80,7 +86,13 @@ export class ParticleSystemComponent extends Component {
   private counterDataArray = new Uint32Array(1);
   // 64 bytes: startSize, endSize, spinSpeed, tumbleSpeed + startColor + endColor
   //           + atlasCols, atlasRows, flutter, nearFade
-  private particleRenderParamsArray = new Float32Array(16);
+  private particleRenderParamsArray = new Float32Array(20);
+  /** LIT techniques (particle_ash.tech): sun + shadows + probes + fog per particle. */
+  private lit = false;
+  /** LIT: sunlight that goes through a flake seen against the sun (0 = none). */
+  private translucency = 0.6;
+  /** LIT: resources the bind group was built with — rebuilt when any changes. */
+  private litDeps: unknown[] = [];
   // Aspecto de cada partícula (copos, hojas, ceniza): giro, volteo, variantes, aleteo.
   private spinSpeed = 0;
   private tumbleSpeed = 0;
@@ -114,6 +126,8 @@ export class ParticleSystemComponent extends Component {
     a[13] = this.atlas[1];
     a[14] = this.flutter;
     a[15] = this.nearFade;
+    a[16] = Engine.getRender()?.getDeferredRenderer()?.getFroxelVolumetrics()?.isVolumetricEnabled() ? 1 : 0;
+    a[17] = this.translucency;
     device.queue.writeBuffer(this.particleRenderParamsBuffer, 0, a);
   }
 
@@ -162,6 +176,7 @@ export class ParticleSystemComponent extends Component {
       this.atlas = data?.atlas ? [data.atlas[0] ?? 1, data.atlas[1] ?? 1] : [1, 1];
       this.flutter = data?.flutter ?? 0;
       this.nearFade = data?.nearFade ?? 0;
+      this.translucency = data?.translucency ?? 0.6;
       this.startSize = data?.startSize ?? 0.1;
       this.endSize = data?.endSize ?? 0.1;
       this.startColor = data?.startColor ?? [1, 1, 1, 1];
@@ -256,10 +271,10 @@ export class ParticleSystemComponent extends Component {
       });
       device.queue.writeBuffer(this.freeListCountBuffer, 0, freeListCount);
 
-      // 5. Crear ParticleRenderParams buffer (64 bytes; ver particleRenderParamsArray)
+      // 5. Crear ParticleRenderParams buffer (80 bytes; ver particleRenderParamsArray)
       this.particleRenderParamsBuffer = device.createBuffer({
         label: 'particle_render_params_buffer',
-        size: 64,
+        size: 80,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
@@ -304,23 +319,77 @@ export class ParticleSystemComponent extends Component {
         return;
       }
 
-      // 8. Registrar la key instanciada en el RenderManagerV2
-      this.renderComponent = new RenderComponent();
-      this.renderComponent.setOwner(this.getOwner());
-      RenderManagerV2.getInstance().addKey(
-        this.renderComponent,
-        this.quadMesh,
-        this.particleMaterial,
-        this.transform,
-        true, // Skip CPU frustum culling
-        this.maxParticles,
-        undefined, // instanceBindGroup no se usa
-        this.renderBindGroup, // renderBindGroup para @group(2) del sistema de partículas
-        this.indirectDrawBuffer,
-      );
+      // 8. Registrar la key instanciada en el RenderManagerV2. Las iluminadas esperan a que
+      //    existan el sol, sus sombras y la niebla (update → ensureLitBindGroup).
+      this.lit =
+        this.particleMaterial.getTechnique()?.usesLayout(PipelineBindGroupLayouts.PARTICLE_LIT_UNIFORMS) ??
+        false;
+      if (!this.lit) this.registerRenderKey();
     } catch (error: any) {
       throw error;
     }
+  }
+
+  private registerRenderKey(): void {
+    if (this.renderComponent) RenderManagerV2.getInstance().delKeys(this.renderComponent);
+    this.renderComponent = new RenderComponent();
+    this.renderComponent.setOwner(this.getOwner());
+    RenderManagerV2.getInstance().addKey(
+      this.renderComponent,
+      this.quadMesh,
+      this.particleMaterial,
+      this.transform,
+      true, // Skip CPU frustum culling
+      this.maxParticles,
+      undefined, // instanceBindGroup no se usa
+      this.renderBindGroup, // @group(3) del sistema de partículas
+      this.indirectDrawBuffer,
+    );
+  }
+
+  /**
+   * LIT: builds the particle bind group with the lighting inputs (sun, shadow cascades,
+   * probes, froxel fog) and registers the key; rebuilds both when one of them is
+   * recreated (shadow resolution, resize). Not drawn until they all exist.
+   */
+  private ensureLitBindGroup(): void {
+    const sun = (Engine.getEntities().getObjectManagerByName('directional_light')?.getList() ?? [])[0] as
+      | DirectionalLightComponent
+      | undefined;
+    const fog = Engine.getRender().getDeferredRenderer()?.getFroxelVolumetrics();
+    const fogView = fog?.getIntegratedView();
+    const fogParams = fog?.getFroxelUniformBuffer();
+    if (!sun || !fogView || !fogParams) return;
+    const probes = ProbeManager.getInstance();
+    const deps: unknown[] = [
+      sun.getUniformBuffer(),
+      sun.getShadowDepthView(0),
+      sun.getShadowDepthView(1),
+      sun.getShadowDepthView(2),
+      probes.getProbeSetBuffer(),
+      fogView,
+      fogParams,
+    ];
+    if (deps.every((d, i) => d === this.litDeps[i])) return;
+    this.litDeps = deps;
+    this.renderBindGroup = GPUUtils.getDevice().createBindGroup({
+      label: 'particle_lit_bindgroup',
+      layout: BindGroupFactory.getParticleLitUniformsLayout(),
+      entries: [
+        { binding: 0, resource: { buffer: this.particleBuffer } },
+        { binding: 1, resource: { buffer: this.particleRenderParamsBuffer } },
+        { binding: 2, resource: { buffer: sun.getUniformBuffer() } },
+        { binding: 3, resource: sun.getShadowDepthView(0) },
+        { binding: 4, resource: sun.getShadowDepthView(1) },
+        { binding: 5, resource: sun.getShadowDepthView(2) },
+        { binding: 6, resource: SamplerLibrary.shadows },
+        { binding: 7, resource: { buffer: probes.getProbeSetBuffer() } },
+        { binding: 8, resource: fogView },
+        { binding: 9, resource: { buffer: fogParams } },
+        { binding: 10, resource: SamplerLibrary.simpleSampler },
+      ],
+    });
+    this.registerRenderKey();
   }
 
   private async createComputePipeline(): Promise<void> {
@@ -513,6 +582,10 @@ export class ParticleSystemComponent extends Component {
 
   public override update(deltaTime: number): void {
     const device = GPUUtils.getDevice();
+    if (this.lit && this.particleRenderParamsBuffer) {
+      this.ensureLitBindGroup();
+      this.writeRenderParamsBuffer(device); // fog on/off can change at runtime
+    }
 
     // OneShot: dispara una sola vez en el primer update
     if (this.oneShot && !this.oneShotFired) {

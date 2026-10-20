@@ -5,7 +5,8 @@
     "SILHOUETTE",
     "POM_SHADOW",
     "LAYER",
-    "DIRT"
+    "DIRT",
+    "ASH"
   ],
   "category": "solids",
   "textures": {
@@ -45,5 +46,12 @@
   ],
   "cavityDirt": 0.3,
   "baseDirtHeight": 0.5,
-  "layerHeightOffset": 0.4
+  "layerHeightOffset": 0.4,
+  "ashAmount": 0.95,
+  "ashNoiseScale": 0.5,
+  "ashColor": [
+    0.17,
+    0.165,
+    0.16
+  ]
 }

@@ -1,4 +1,11 @@
 #include "common/uniforms"
+#ifdef LIT
+#include "common/core/constants"
+#include "common/lighting/csm"
+#include "common/probes"
+#include "common/volumetric/structs"
+#include "common/volumetric/froxel"
+#endif
 
 // Estructura de la partícula (alineada para storage buffer)
 struct Particle {
@@ -25,7 +32,11 @@ struct ParticleRenderParams {
     atlasRows:   f32,          // offset 52
     flutter:     f32,          // offset 56  — vaivén lateral (m)
     nearFade:    f32,          // offset 60  — desvanecer cerca de la cámara (m; 0 = no)
-    // total: 64 bytes
+    fogEnabled:  f32,          // offset 64  — LIT: 1 = la niebla volumétrica está activa
+    translucency: f32,         // offset 68  — LIT: luz del sol que atraviesa el copo (contraluz)
+    _pad0:       f32,
+    _pad1:       f32,
+    // total: 80 bytes
 };
 
 /// Azar estable por partícula en [0, 1): mezcla el hueco y la vida (que cambia en cada
@@ -42,6 +53,62 @@ fn particleRand(index: u32, lifetime: f32, salt: u32) -> f32 {
 @group(3) @binding(0) var<storage, read> particles: array<Particle>;
 @group(3) @binding(1) var<uniform>  renderParams: ParticleRenderParams;
 
+#ifdef LIT
+// ── Iluminación por partícula (BindGroupFactory.getParticleLitUniformsLayout) ──
+@group(3) @binding(2)  var<uniform> directionalLight: DirectionalLightCSMUniforms;
+@group(3) @binding(3)  var shadowMap0: texture_depth_2d;
+@group(3) @binding(4)  var shadowMap1: texture_depth_2d;
+@group(3) @binding(5)  var shadowMap2: texture_depth_2d;
+@group(3) @binding(6)  var shadowSampler: sampler_comparison;
+@group(3) @binding(7)  var<storage, read> probeSet: ProbeSet;
+@group(3) @binding(8)  var fogVolume: texture_3d<f32>;
+@group(3) @binding(9)  var<uniform> froxelParams: FroxelUniforms;
+@group(3) @binding(10) var fogSampler: sampler;
+
+fn sunShadow(worldPos: vec3<f32>, viewDepth: f32) -> f32 {
+    if (directionalLight.hasShadows < 0.5) { return 1.0; }
+    let cascade = selectCascadeCSM(viewDepth, directionalLight.cascadeSplits);
+    if (cascade == 0) {
+        return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
+            directionalLight.shadowParams.x, shadowMap0, shadowSampler);
+    } else if (cascade == 1) {
+        return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset1,
+            directionalLight.shadowParams.y, shadowMap1, shadowSampler);
+    }
+    return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset2,
+        directionalLight.shadowParams.z, shadowMap2, shadowSampler);
+}
+
+// Color iluminado de un copo (albedo = color de la partícula) en `center`: sol con su
+// sombra (CSM) — difuso de un copo de orientación al azar (½) más el contraluz que lo
+// atraviesa (fase HG hacia delante) — y el ambiente de los probes / el cielo.
+fn litColor(albedo: vec3<f32>, center: vec3<f32>, viewDepth: f32) -> vec3<f32> {
+    let V = normalize(camera.cameraPosition.xyz - center);
+    let sunRadiance = directionalLight.color * directionalLight.intensity;
+    let cosTheta = dot(V, normalize(-directionalLight.position));
+    let forward = phaseHG(cosTheta, 0.6) * 4.0 * PI; // 1 = isótropo
+    let sun = sunRadiance * sunShadow(center, viewDepth) * (0.5 + renderParams.translucency * forward);
+    // Copo de dos caras: irradiancia hacia la cámara y hacia arriba, promediadas.
+    let ambient = (probeIrradiance(center, V).irradiance + probeIrradiance(center, vec3<f32>(0.0, 1.0, 0.0)).irradiance)
+                * 0.5 * probeSet.ambientScale;
+    return albedo * (sun + ambient) / PI;
+}
+
+// Niebla a la profundidad de la partícula: rgb = luz dispersada hasta ella, a = transmitancia.
+fn fogAt(clip: vec4<f32>, viewDepth: f32) -> vec4<f32> {
+    if (renderParams.fogEnabled < 0.5) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); }
+    let ndc = clip.xy / clip.w;
+    let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    let dims = froxelParams.dimensions.xyz;
+    let s = froxelDepthToSlice(viewDepth, froxelParams.depthDistScale, froxelParams.depthDistB);
+    if (s >= dims.z) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); } // más allá de la rejilla
+    // El texel k integra hasta el borde lejano del slice k: profundidad d → s(d) − 1.
+    let texelZ = clamp(s - 1.0, 0.0, dims.z - 1.0);
+    let f = textureSampleLevel(fogVolume, fogSampler, vec3<f32>(uv, (texelZ + 0.5) / dims.z), 0.0);
+    return mix(vec4<f32>(0.0, 0.0, 0.0, 1.0), f, saturate(s));
+}
+#endif
+
 // Vertex attributes del quad mesh
 struct VertexInput {
     @location(0) position: vec3<f32>, // posición del vértice del quad
@@ -55,6 +122,9 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) particleColor: vec4<f32>, // Color interpolado (startColor → endColor)
+#ifdef LIT
+    @location(2) fog: vec4<f32>,           // rgb = dispersión de la niebla, a = transmitancia
+#endif
 };
 
 @vertex
@@ -68,6 +138,9 @@ fn vs(input: VertexInput) -> VertexOutput {
         output.position = vec4<f32>(0.0, 0.0, 0.0, 0.0); // Degenerate triangle (w=0)
         output.uv = vec2<f32>(0.0, 0.0);
         output.particleColor = vec4<f32>(0.0);
+#ifdef LIT
+        output.fog = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+#endif
         return output;
     }
 
@@ -140,6 +213,12 @@ fn vs(input: VertexInput) -> VertexOutput {
     }
 
     var output: VertexOutput;
+#ifdef LIT
+    // Una evaluación por partícula (las 4 esquinas dan lo mismo): en su centro.
+    let viewDepth = -(camera.viewMatrix * vec4<f32>(particle.position, 1.0)).z;
+    finalColor = vec4<f32>(litColor(finalColor.rgb, particle.position, viewDepth), finalColor.a);
+    output.fog = fogAt(camera.projectionMatrix * camera.viewMatrix * vec4<f32>(particle.position, 1.0), viewDepth);
+#endif
     output.position    = clipPos;
     output.uv          = uv;
     output.particleColor = finalColor;

@@ -625,6 +625,11 @@ export class Technique extends GPUResource {
     return this._skipDepthPrepass;
   }
 
+  /** Whether the pipeline layout includes this bind group layout. */
+  public usesLayout(layout: PipelineBindGroupLayouts): boolean {
+    return this.uniformsLayout.includes(layout);
+  }
+
   /** Shader #defines of this permutation. */
   public getDefines(): ReadonlyArray<string> {
     return this.defines;

@@ -80,6 +80,10 @@ export class RenderPassManager {
     );
     const transparentPass = new TransparentRenderPass(transparentConfig);
     this.renderPasses.set('transparent', transparentPass);
+
+    // Lit particles: same targets, drawn after the volumetric fog composite.
+    const particlesConfig = RenderPassFactory.createTransparentPassConfig(accLight, prepassDepthView);
+    this.renderPasses.set('particles', new TransparentRenderPass({ ...particlesConfig, label: 'Particles Pass' }));
   }
 
   public executePass(passName: string, category?: RenderCategory, renderKeys?: RenderKey[]): void {

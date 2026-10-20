@@ -28,6 +28,10 @@
 //               the transition following the height so it reads as part of the surface.
 //   DIRT        Grime: cavityDirt in the low parts of the relief, and (BOX) a noisy band
 //               baseDirtHeight metres high at the bottom of the box's sides.
+//   ASH         Ash settled on whatever faces up: a per-pixel ash level (ashAmount × how
+//               horizontal the face is × drift noise) fills the relief from the bottom —
+//               joints and cracks first, the whole top buried when it's deep — and the
+//               POM marches the filled surface, so the ash is flat where it lies.
 //
 // Height maps: R, 1 = surface (the mesh), 0 = deepest. The relief is carved INTO the
 // mesh, so the geometric depth written below is the top of the relief.
@@ -62,6 +66,7 @@ var<private> gTileBlend:  f32;       // …and how much of B
 var<private> gLayerRatio: f32;       // LAYER: layer uv = base uv × ratio
 var<private> gLayerLod:   f32;       // layer mip − base mip
 var<private> gLayerBias:  f32;       // mask: added to the layer's height
+var<private> gAshLevel:   f32;       // ASH: height the ash fills the relief up to (≤ 0: none)
 
 // Texture-space frame of the shaded point.
 struct Surface {
@@ -176,7 +181,11 @@ fn surfaceHeight(uv: vec2<f32>, lod: f32) -> vec2<f32> {
 }
 
 fn heightAt(uv: vec2<f32>, lod: f32) -> f32 {
+#ifdef ASH
+    return max(surfaceHeight(uv, lod).x, min(gAshLevel, 1.0));
+#else
     return surfaceHeight(uv, lod).x;
+#endif
 }
 
 fn sampleBase(tex: texture_2d<f32>, uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec4<f32> {
@@ -313,6 +322,17 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     }
 #endif
 
+    gAshLevel = 0.0;
+#ifdef ASH
+    {
+        // Only what faces up holds ash; drifts vary it across the world.
+        let upness = smoothstep(0.3, 0.9, surf.N.y);
+        let drift  = 0.55 + 0.9 * fbm3(input.WorldPos * factors.ashNoiseScale);
+        // Above 1 the drift buries the surface completely (the relief keeps max 1).
+        gAshLevel  = clamp(factors.ashAmount * upness * drift, 0.0, 1.3);
+    }
+#endif
+
     // Relief thinner than ~half a pixel is invisible: fade the depth (not the uv), skip.
     let reliefPx = factors.pomScale * surf.scale * texelsPerUv;
     let depthScale = factors.pomScale * smoothstep(0.35, 1.5, reliefPx);
@@ -395,6 +415,22 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
         albedo   = mix(albedo, dirtColor * (0.7 + 0.6 * albedo), dirt);
         roughRaw = mix(roughRaw, 1.0, dirt * 0.6);
         metallic = mix(metallic, 0.0, dirt);
+    }
+#endif
+
+#ifdef ASH
+    {
+        // Ash where its level is above the surface (with a soft rim), plus a thin dusting
+        // on the exposed tops. The ash surface is flat: its normal is the face's.
+        let s = max(factors.ashSharpness, 1e-3);
+        let filled  = smoothstep(-s, s, gAshLevel - heightHit.x);
+        let dusting = min(gAshLevel, 1.0) * 0.45;
+        let ash     = max(filled, dusting);
+        let ashColor = vec3<f32>(factors.ashColorR, factors.ashColorG, factors.ashColorB);
+        albedo   = mix(albedo, ashColor, ash);
+        roughRaw = mix(roughRaw, 1.0, ash);
+        metallic = mix(metallic, 0.0, ash);
+        N_ts     = mix(N_ts, vec3<f32>(0.0, 0.0, 1.0), filled);
     }
 #endif
 

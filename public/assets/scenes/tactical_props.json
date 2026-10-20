@@ -58,7 +58,7 @@
     "components": {
       "name": "Knives1",
       "transform": {
-        "position": [2.6, 0, -2.2]
+        "position": [-8, 1.26, -2]
       }
     }
   },
@@ -67,7 +67,7 @@
     "components": {
       "name": "Knives2",
       "transform": {
-        "position": [-0.6, 0, 2.4]
+        "position": [-4, 1.26, 2]
       }
     }
   },

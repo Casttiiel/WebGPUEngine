@@ -4,6 +4,6 @@
     "txAlbedo": "tactical/ash_flakes.png"
   },
   "casts_shadows": false,
-  "category": "transparent",
+  "category": "particles",
   "shadows": false
 }

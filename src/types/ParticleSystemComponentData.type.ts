@@ -35,4 +35,9 @@ export interface ParticleSystemComponentData {
   flutter?: number;
   /** Se desvanece al acercarse a la cámara: transparente a la mitad de esta distancia (m). Default 0 (no). */
   nearFade?: number;
+  /**
+   * Solo técnicas LIT (particle_ash.tech): luz del sol que atraviesa el copo cuando se ve a
+   * contraluz (0 = ninguna). Default 0.6.
+   */
+  translucency?: number;
 }

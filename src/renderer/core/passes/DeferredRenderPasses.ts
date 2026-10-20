@@ -104,7 +104,7 @@ export class TransparentRenderPass extends BaseRenderPass {
 
   protected render(
     pass: GPURenderPassEncoder,
-    _category?: RenderCategory,
+    category?: RenderCategory,
     _renderKeys?: RenderKey[],
   ): void {
     // Configure viewport for transparent objects
@@ -115,8 +115,8 @@ export class TransparentRenderPass extends BaseRenderPass {
       GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
     }
 
-    // Render transparent objects
-    RenderManager.getInstance().render(RenderCategory.TRANSPARENT, pass);
+    // Render transparent objects (or the post-fog particles, same targets)
+    RenderManager.getInstance().render(category ?? RenderCategory.TRANSPARENT, pass);
   }
 }
 

@@ -1519,6 +1519,28 @@ export class BindGroupFactory {
   }
 
   /**
+   * Lit particles (particles/particle_lit.vs): the particle data plus everything the per-
+   * particle lighting reads — sun + its 3 shadow cascades, the probe set (ambient) and the
+   * froxel fog volume. All read in the vertex stage (one evaluation per particle).
+   */
+  public static getParticleLitUniformsLayout(): GPUBindGroupLayout {
+    const V = GPUShaderStage.VERTEX;
+    return this.getLayout('particle_lit_uniforms', [
+      { binding: 0, visibility: V, buffer: { type: 'read-only-storage' } }, // particles
+      { binding: 1, visibility: V, buffer: { type: 'uniform' } }, // ParticleRenderParams
+      { binding: 2, visibility: V, buffer: { type: 'uniform' } }, // DirectionalLightCSMUniforms
+      { binding: 3, visibility: V, texture: { sampleType: 'depth' } }, // cascade 0
+      { binding: 4, visibility: V, texture: { sampleType: 'depth' } }, // cascade 1
+      { binding: 5, visibility: V, texture: { sampleType: 'depth' } }, // cascade 2
+      { binding: 6, visibility: V, sampler: { type: 'comparison' } },
+      { binding: 7, visibility: V, buffer: { type: 'read-only-storage' } }, // ProbeSet
+      { binding: 8, visibility: V, texture: { sampleType: 'float', viewDimension: '3d' } }, // froxel integrated
+      { binding: 9, visibility: V, buffer: { type: 'uniform' } }, // FroxelUniforms
+      { binding: 10, visibility: V, sampler: { type: 'filtering' } },
+    ]);
+  }
+
+  /**
    * Creates a storage buffer layout for instancing
    */
   public static getInstanceStorageLayout(): GPUBindGroupLayout {
@@ -2014,6 +2036,8 @@ export class BindGroupFactory {
         return this.getParticleUniformsLayout();
       case PipelineBindGroupLayouts.PARTICLE_WORLDSPACE_UNIFORMS:
         return this.getParticleUniformsLayout();
+      case PipelineBindGroupLayouts.PARTICLE_LIT_UNIFORMS:
+        return this.getParticleLitUniformsLayout();
       case PipelineBindGroupLayouts.INSTANCE_STORAGE:
         return this.getInstanceStorageLayout();
       case PipelineBindGroupLayouts.DOF_PARAMS:

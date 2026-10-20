@@ -20,12 +20,18 @@ export const MATERIAL_EXTRAS = [
   { key: 'baseDirtStrength', default: [0.75] },
   { key: 'layerTint', default: [1, 1, 1] }, // multiplies the layer's albedo
   { key: 'layerHeightOffset', default: [0] }, // raises (+) / sinks (−) the layer's height
+  // ASH: ash settled on the up-facing surfaces, filling the relief from the bottom
+  { key: 'ashAmount', default: [0] }, // 0 = none, 1 = buries the relief on flat tops
+  { key: 'ashNoiseScale', default: [0.5] }, // drift variation (cycles per metre)
+  { key: 'ashSharpness', default: [0.05] }, // edge of the ash against the surface (0–1 height)
+  { key: 'ashColor', default: [0.17, 0.165, 0.16] }, // ash albedo (linear; Luthadel ash is dark)
+  { key: '_extrasPad', default: [0, 0] },
 ] as const;
 
 export type MaterialExtrasData = Record<string, number | number[]>;
 
-/** 16 floats = 64 bytes. */
-export const MATERIAL_EXTRAS_FLOATS = 16;
+/** 24 floats = 96 bytes. */
+export const MATERIAL_EXTRAS_FLOATS = 24;
 
 /** Known extra keys present in `source` (a .mat's data or another material's extras). */
 export function pickExtras(source: Record<string, unknown> | undefined): MaterialExtrasData {
