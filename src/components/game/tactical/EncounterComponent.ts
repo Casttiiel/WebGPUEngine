@@ -48,6 +48,8 @@ import {
 } from './CombatRules';
 import { IMPACT_BASE, PropComponent, type PropExplosion } from './PropComponent';
 import { Surfaces } from './Surfaces';
+import { BloodFX } from './BloodFX';
+import { CameraTrauma } from './CameraTrauma';
 import {
   MAX_JUMP,
   THROW_RANGE,
@@ -447,6 +449,7 @@ export class EncounterComponent extends Component {
   /** Enemigos de combates terminados por comando (end_combat): no vuelven a detectar. */
   private disengaged = new Set<UnitComponent>();
   private surfaces = new Surfaces();
+  private blood = new BloodFX();
   /** Unidades que estaban dentro de un fuego el frame anterior (quemar solo al entrar). */
   private inFire = new Set<UnitComponent>();
   private initialized = false;
@@ -470,6 +473,7 @@ export class EncounterComponent extends Component {
       this.registerDevCommands();
     }
     this.surfaces.init();
+    this.blood.init();
     Cover.newFrame();
 
     this.updateAttacks(dt);
@@ -495,6 +499,7 @@ export class EncounterComponent extends Component {
     }
 
     this.surfaces.update(dt, this.state === 'combat');
+    this.blood.update(dt);
     this.updateFire();
     this.updateBubbles();
     SpiritZones.syncRelics();
@@ -2301,6 +2306,8 @@ export class EncounterComponent extends Component {
       this.getAI(unit)?.clearPlan();
     }
     this.surfaces.reset();
+    this.blood.reset();
+    CameraTrauma.clear();
     Zones.clear();
     SpiritZones.clear((z) => !z.relic);
     this.inFire.clear();
@@ -2577,6 +2584,7 @@ export class EncounterComponent extends Component {
       crit: hit && crit,
       cause,
     });
+    if (hit) this.hitFeedback(attacker, target, dealt, crit, cause, (health?.getHp() ?? 1) <= 0);
 
     if (health && health.getHp() <= 0) {
       // Ver caer al objetivo antes de volver a la cámara de juego.
@@ -2592,6 +2600,40 @@ export class EncounterComponent extends Component {
     ) {
       this.startCombat(target.isAlive() ? target.getOwner() : null);
     }
+  }
+
+  /**
+   * Lo que se siente al golpear o ser golpeado: sangre (no en objetos ni con fuego) y una
+   * sacudida de cámara hacia donde va el golpe, más fuerte cuanto más daño, en críticos, al
+   * matar y si el golpeado es de la party.
+   */
+  private hitFeedback(
+    attacker: UnitComponent | null,
+    target: UnitComponent,
+    dealt: number,
+    crit: boolean,
+    cause: DamageCause,
+    kill: boolean,
+  ): void {
+    if (dealt <= 0) return;
+    const maxHp = Math.max(1, target.getHealth()?.getMaxHp() ?? 1);
+    // Medio de su vida de un golpe ya es lo máximo.
+    const severity = Math.min(1, (dealt / maxHp) * 2);
+    const prop = PropComponent.of(target.getOwner()) !== null;
+    if (!prop && cause !== 'fire') {
+      this.blood.hit({ target, source: attacker, severity, crit, kill });
+    }
+    if (cause === 'fire') return;
+    const party = target.getFaction() === 'party';
+    const trauma =
+      (prop ? 0.2 : 0.25 + 0.3 * severity) + (crit ? 0.2 : 0) + (kill ? 0.15 : 0) + (party ? 0.1 : 0);
+    let direction: vec3 | undefined;
+    if (attacker && attacker !== target) {
+      target.getPosition(this.tmpA);
+      attacker.getPosition(this.tmpB);
+      direction = vec3.set(this.tmpA, this.tmpA[0]! - this.tmpB[0]!, 0, this.tmpA[2]! - this.tmpB[2]!);
+    }
+    CameraTrauma.add(trauma, direction, 2 + 2 * severity);
   }
 
   /**

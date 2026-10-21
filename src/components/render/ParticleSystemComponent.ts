@@ -15,6 +15,27 @@ import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { DirectionalLightComponent } from './DirectionalLightComponent';
 
+/** Ráfaga de partículas (burst). Lo que no se indica sale de la configuración del emisor. */
+export interface ParticleBurstOptions {
+  /** Velocidad base de esta ráfaga (en vez de baseVelocity): p.ej. la dirección de un golpe. */
+  velocity?: vec3;
+  /** Las partículas mueren al bajar de esta altura (el suelo donde caen). */
+  floorY?: number;
+  /** Escala del tamaño de las partículas de esta ráfaga. Default 1. */
+  sizeScale?: number;
+}
+
+interface QueuedBurst {
+  count: number;
+  position: vec3 | null;
+  velocity: vec3 | null;
+  floorY: number;
+  sizeScale: number;
+}
+
+/** floorY de las partículas sin suelo. */
+const NO_FLOOR = -1e9;
+
 /**
  * ParticleSystemComponent - GPU-driven particle system using indirect draw
  * for efficient rendering of dynamic particle counts
@@ -58,7 +79,8 @@ export class ParticleSystemComponent extends Component {
   private particlesPerSpawn: number = 5;
 
   // ── Burst / oneShot ───────────────────────────────────────────────────────────
-  private pendingBurst: number = 0;
+  /** Una por frame: comparten el uniform de spawn (cada una con su posición y velocidad). */
+  private burstQueue: QueuedBurst[] = [];
   private emitting: boolean = true;
   private oneShot: boolean = false;
   private oneShotBurstCount: number = 0;
@@ -77,16 +99,19 @@ export class ParticleSystemComponent extends Component {
   private particleLifeVarMin: number = 0.0;
   private particleLifeVarMax: number = 0.0;
   private velocitySpread: number = 0.5;
+  private speedVariance: number = 0;
+  private drag: number = 0;
 
   // ── Reuse buffers CPU para evitar allocations ────────────────────────────────
   private simParamsArray = new Float32Array(8); // 32 bytes: deltaTime + padding*3 + gravity(vec3) + padding
-  private spawnParamsArray = new ArrayBuffer(96); // 96 bytes: ver SpawnParams en shader
+  private spawnParamsArray = new ArrayBuffer(112); // 112 bytes: ver SpawnParams en shader
   private spawnParamsFloat32View!: Float32Array;
   private spawnParamsUint32View!: Uint32Array;
   private counterDataArray = new Uint32Array(1);
-  // 64 bytes: startSize, endSize, spinSpeed, tumbleSpeed + startColor + endColor
-  //           + atlasCols, atlasRows, flutter, nearFade
-  private particleRenderParamsArray = new Float32Array(20);
+  // 96 bytes: startSize, endSize, spinSpeed, tumbleSpeed + startColor + endColor
+  //           + atlasCols, atlasRows, flutter, nearFade + fog, translucency, shape, stretch
+  //           + sizeVariance (ver ParticleRenderParams en particle_worldspace.vs)
+  private particleRenderParamsArray = new Float32Array(24);
   /** LIT techniques (particle_ash.tech): sun + shadows + probes + fog per particle. */
   private lit = false;
   /** LIT: sunlight that goes through a flake seen against the sun (0 = none). */
@@ -99,6 +124,9 @@ export class ParticleSystemComponent extends Component {
   private atlas: [number, number] = [1, 1];
   private flutter = 0;
   private nearFade = 0;
+  private shape = 0;
+  private stretch = 0;
+  private sizeVariance = 0;
 
   constructor() {
     super();
@@ -128,12 +156,16 @@ export class ParticleSystemComponent extends Component {
     a[15] = this.nearFade;
     a[16] = Engine.getRender()?.getDeferredRenderer()?.getFroxelVolumetrics()?.isVolumetricEnabled() ? 1 : 0;
     a[17] = this.translucency;
+    a[18] = this.shape;
+    a[19] = this.stretch;
+    a[20] = this.sizeVariance;
     device.queue.writeBuffer(this.particleRenderParamsBuffer, 0, a);
   }
 
   /** Escribe la gravedad (y el padding) al buffer de simulación */
   private writeGravityToSimBuffer(device: GPUDevice): void {
     // gravity va en offset 16 → indices 4,5,6 del Float32Array de 8 floats
+    this.simParamsArray[1] = this.drag;
     this.simParamsArray[4] = this.gravity[0];
     this.simParamsArray[5] = this.gravity[1];
     this.simParamsArray[6] = this.gravity[2];
@@ -177,6 +209,9 @@ export class ParticleSystemComponent extends Component {
       this.flutter = data?.flutter ?? 0;
       this.nearFade = data?.nearFade ?? 0;
       this.translucency = data?.translucency ?? 0.6;
+      this.shape = data?.shape === 'mist' ? 1 : 0;
+      this.stretch = data?.stretch ?? 0;
+      this.sizeVariance = data?.sizeVariance ?? 0;
       this.startSize = data?.startSize ?? 0.1;
       this.endSize = data?.endSize ?? 0.1;
       this.startColor = data?.startColor ?? [1, 1, 1, 1];
@@ -186,6 +221,8 @@ export class ParticleSystemComponent extends Component {
       this.baseVelocity = data?.baseVelocity ?? [0, 1, 0];
       this.gravity = data?.gravity ?? [0, -9.81, 0];
       this.velocitySpread = data?.velocitySpread ?? 0.5;
+      this.speedVariance = data?.speedVariance ?? 0;
+      this.drag = data?.drag ?? 0;
 
       // Vida de partícula
       this.particleLife = data?.particleLife ?? 3.0;
@@ -271,10 +308,10 @@ export class ParticleSystemComponent extends Component {
       });
       device.queue.writeBuffer(this.freeListCountBuffer, 0, freeListCount);
 
-      // 5. Crear ParticleRenderParams buffer (80 bytes; ver particleRenderParamsArray)
+      // 5. Crear ParticleRenderParams buffer (96 bytes; ver particleRenderParamsArray)
       this.particleRenderParamsBuffer = device.createBuffer({
         label: 'particle_render_params_buffer',
-        size: 80,
+        size: 96,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
@@ -404,7 +441,7 @@ export class ParticleSystemComponent extends Component {
 
     this.spawnParamsBuffer = device.createBuffer({
       label: 'spawn_params_buffer',
-      size: 96, // SpawnParams struct: ver comentario de layout en particle_spawn_compact.cs
+      size: 112, // SpawnParams struct: ver comentario de layout en particle_spawn_compact.cs
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -561,15 +598,22 @@ export class ParticleSystemComponent extends Component {
   }
 
   /**
-   * Emite `count` partículas inmediatamente en la siguiente GPU frame.
-   * Si se proporciona `worldPos`, el emitter se teletransporta a esa posición antes
-   * de emitir — ideal para efectos de impacto en world-space.
+   * Emite `count` partículas en la siguiente GPU frame (si hay varias ráfagas en cola, una
+   * por frame). Si se proporciona `worldPos`, el emitter se teletransporta a esa posición
+   * antes de emitir — ideal para efectos de impacto en world-space. `options`: velocidad,
+   * suelo y tamaño propios de esta ráfaga (p.ej. la sangre de un golpe, hacia donde va).
    */
-  public burst(count: number, worldPos?: vec3): void {
+  public burst(count: number, worldPos?: vec3, options?: ParticleBurstOptions): void {
     if (worldPos && this.transform) {
       this.transform.getTransform().setLocalPosition(worldPos);
     }
-    this.pendingBurst += count;
+    this.burstQueue.push({
+      count,
+      position: worldPos ? vec3.clone(worldPos) : null,
+      velocity: options?.velocity ? vec3.clone(options.velocity) : null,
+      floorY: options?.floorY ?? NO_FLOOR,
+      sizeScale: options?.sizeScale ?? 1,
+    });
   }
 
   public startEmitting(): void {
@@ -590,7 +634,7 @@ export class ParticleSystemComponent extends Component {
     // OneShot: dispara una sola vez en el primer update
     if (this.oneShot && !this.oneShotFired) {
       this.oneShotFired = true;
-      this.pendingBurst += this.oneShotBurstCount;
+      this.burst(this.oneShotBurstCount);
     }
 
     // 1. Actualizar timer de spawn
@@ -600,24 +644,24 @@ export class ParticleSystemComponent extends Component {
     this.simParamsArray[0] = deltaTime;
     device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray, 0, 1);
 
-    // Determinar cuántas partículas spawnar este frame
-    const regularSpawn = this.emitting && this.spawnTimer >= this.spawnInterval;
-    const regularCount = regularSpawn ? this.particlesPerSpawn : 0;
-    const totalSpawnCount = regularCount + this.pendingBurst;
+    // Determinar cuántas partículas spawnar este frame: una ráfaga en cola o, si no hay,
+    // la emisión continua (que espera a que se vacíe la cola).
+    const batch = this.burstQueue.shift() ?? null;
+    const regularSpawn = !batch && this.emitting && this.spawnTimer >= this.spawnInterval;
+    const totalSpawnCount = batch ? batch.count : regularSpawn ? this.particlesPerSpawn : 0;
 
     if (regularSpawn) this.spawnTimer = 0;
-    this.pendingBurst = 0;
 
     const shouldRunSpawnPass = totalSpawnCount > 0;
 
     if (shouldRunSpawnPass) {
-      // Preparar parámetros de spawn según SpawnParams en particle_spawn_compact.cs (80 bytes)
+      // Preparar parámetros de spawn según SpawnParams en particle_spawn_compact.cs (112 bytes)
       this.spawnParamsUint32View[0] = totalSpawnCount; // [0]  spawnCount
       this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // [1]  randomSeed
       this.spawnParamsUint32View[2] = this.worldSpace ? 1 : 0; // [2]  worldSpace
       this.spawnParamsFloat32View[3] = 0; // [3]  padding1
 
-      const worldPos = this.transform.getTransform().getWorldPosition();
+      const worldPos = batch?.position ?? this.transform.getTransform().getWorldPosition();
       this.spawnParamsFloat32View[4] = worldPos[0]; // [4]  emitterWorldPos.x
       this.spawnParamsFloat32View[5] = worldPos[1]; // [5]  emitterWorldPos.y
       this.spawnParamsFloat32View[6] = worldPos[2]; // [6]  emitterWorldPos.z
@@ -636,12 +680,16 @@ export class ParticleSystemComponent extends Component {
       this.spawnParamsFloat32View[15] = this.velocitySpread; // [15] velocitySpread (offset 60)
 
       // baseVelocity (vec3) at offset 64 → float index 16,17,18 (auto-aligned to 16 ✓)
-      this.spawnParamsFloat32View[16] = this.baseVelocity[0]; // [16] baseVelocity.x
-      this.spawnParamsFloat32View[17] = this.baseVelocity[1]; // [17] baseVelocity.y
-      this.spawnParamsFloat32View[18] = this.baseVelocity[2]; // [18] baseVelocity.z
+      const velocity = batch?.velocity ?? this.baseVelocity;
+      this.spawnParamsFloat32View[16] = velocity[0]!; // [16] baseVelocity.x
+      this.spawnParamsFloat32View[17] = velocity[1]!; // [17] baseVelocity.y
+      this.spawnParamsFloat32View[18] = velocity[2]!; // [18] baseVelocity.z
       this.spawnParamsFloat32View[19] = this.particleLife; // [19] particleLife (offset 76)
       this.spawnParamsFloat32View[20] = this.particleLifeVarMin; // [20] particleLifeVarMin (offset 80)
       this.spawnParamsFloat32View[21] = this.particleLifeVarMax; // [21] particleLifeVarMax (offset 84)
+      this.spawnParamsFloat32View[22] = batch?.floorY ?? NO_FLOOR; // [22] floorY (offset 88)
+      this.spawnParamsFloat32View[23] = batch?.sizeScale ?? 1; // [23] sizeMul (offset 92)
+      this.spawnParamsFloat32View[24] = this.speedVariance; // [24] speedVariance (offset 96)
 
       device.queue.writeBuffer(this.spawnParamsBuffer, 0, this.spawnParamsArray);
 

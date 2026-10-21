@@ -10,6 +10,7 @@ import { PhysicsDebugDrawer } from '../../../renderer/debug/PhysicsDebugDrawer';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { UnitComponent } from './UnitComponent';
 import { groundHeightAt } from './TacticalQueries';
+import { CameraTrauma } from './CameraTrauma';
 
 export type TacticalCameraControllerData = Readonly<{
   /** Pivot inicial (punto del suelo al que mira la cámara). Default [0,0,0]. */
@@ -56,7 +57,6 @@ export type TacticalCameraControllerData = Readonly<{
 }>;
 
 const DEG = Math.PI / 180;
-const UP = vec3.fromValues(0, 1, 0);
 
 /**
  * TacticalCameraControllerComponent — controller de cámara estilo BG3.
@@ -121,6 +121,7 @@ export class TacticalCameraControllerComponent extends Component {
   private readonly tmpRight = vec3.create();
   private readonly tmpEye = vec3.create();
   private readonly tmpLook = vec3.create();
+  private readonly tmpUp = vec3.create();
   private readonly tmpUnitPos = vec3.create();
 
   public load(data: TacticalCameraControllerData): void {
@@ -173,6 +174,8 @@ export class TacticalCameraControllerComponent extends Component {
 
     this.userInput = false;
     if (this.active) this.handleInput(dt);
+    // La sacudida la comparten la cámara de acción y esta; aquí se avanza (una vez por frame).
+    CameraTrauma.update(dt);
 
     // Seguimiento: el pivot objetivo va pegado a la unidad mientras esté activo.
     if (this.followEnabled && this.followTarget) {
@@ -425,8 +428,10 @@ export class TacticalCameraControllerComponent extends Component {
       this.tmpEye[1] = groundUnderEye + this.minEyeClearance;
     }
 
+    const roll = CameraTrauma.apply(this.tmpEye, this.tmpLook);
+    const up = CameraTrauma.rolledUp(this.tmpEye, this.tmpLook, roll, this.tmpUp);
     const camera = (this.cameraEntity!.getComponent('camera') as CameraComponent).getCamera();
-    camera.lookAt(this.tmpEye, this.tmpLook, UP);
+    camera.lookAt(this.tmpEye, this.tmpLook, up);
   }
 
   private clampToBounds(p: vec3): void {

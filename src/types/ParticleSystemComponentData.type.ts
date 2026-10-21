@@ -40,4 +40,14 @@ export interface ParticleSystemComponentData {
    * contraluz (0 = ninguna). Default 0.6.
    */
   translucency?: number;
+  /** Frenado del aire: la velocidad se multiplica por exp(-drag·dt). Default 0. */
+  drag?: number;
+  /** Cada partícula sale entre (1 - speedVariance) y 1 veces su velocidad. Default 0. */
+  speedVariance?: number;
+  /** Tamaño de cada partícula entre (1 - v) y (1 + v) veces, la mayoría pequeñas. Default 0. */
+  sizeVariance?: number;
+  /** Se alarga en su dirección de movimiento lo que recorre en estos segundos (gotas, chispas). Default 0. */
+  stretch?: number;
+  /** Solo particle_blood.tech: 'drop' (gota) o 'mist' (neblina). Default 'drop'. */
+  shape?: 'drop' | 'mist';
 }

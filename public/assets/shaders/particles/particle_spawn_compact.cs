@@ -4,12 +4,12 @@
 
 struct Particle {
     position: vec3<f32>,
-    padding1: f32,
+    floorY: f32,
     velocity: vec3<f32>,
     lifetime: f32,
     age: f32,
     alive: u32,
-    padding2: u32,
+    sizeMul: f32,
     padding3: u32,
 };
 
@@ -36,9 +36,13 @@ struct SpawnParams {
     particleLife: f32,            // offset 76: Vida base de la partícula en segundos
     particleLifeVarMin: f32,      // offset 80: Varianza mínima de vida
     particleLifeVarMax: f32,      // offset 84: Varianza máxima de vida
-    padding4: f32,                // offset 88
-    padding5: f32,                // offset 92
-    // total: 96 bytes
+    floorY: f32,                  // offset 88: Las partículas mueren al bajar de aquí (-1e9: sin suelo)
+    sizeMul: f32,                 // offset 92: Escala del tamaño de esta ráfaga
+    speedVariance: f32,           // offset 96: Cada partícula sale a (1 - speedVariance·rand) de su velocidad
+    padding4: f32,                // offset 100
+    padding5: f32,                // offset 104
+    padding6: f32,                // offset 108
+    // total: 112 bytes
 };
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
@@ -142,7 +146,9 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let randVX = (randomFloat(seedBase + 4000u) - 0.5) * 2.0 * spawnParams.velocitySpread;
     let randVY = (randomFloat(seedBase + 5000u) - 0.5) * 2.0 * spawnParams.velocitySpread;
     let randVZ = (randomFloat(seedBase + 6000u) - 0.5) * 2.0 * spawnParams.velocitySpread;
-    let velocity = spawnParams.baseVelocity + vec3<f32>(randVX, randVY, randVZ);
+    let speedRand = randomFloat(seedBase + 7000u);
+    let velocity = (spawnParams.baseVelocity + vec3<f32>(randVX, randVY, randVZ))
+                 * (1.0 - spawnParams.speedVariance * speedRand);
     
     // Calcular posición de spawn (local o world space)
     var spawnPosition: vec3<f32>;
@@ -161,4 +167,6 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     particles[particleIndex].lifetime = randomLifetime;
     particles[particleIndex].age = 0.0;
     particles[particleIndex].alive = 1u;
+    particles[particleIndex].floorY = spawnParams.floorY;
+    particles[particleIndex].sizeMul = spawnParams.sizeMul;
 }

@@ -10,12 +10,12 @@
 // Estructura de la partícula (alineada para storage buffer)
 struct Particle {
     position: vec3<f32>,
-    padding1: f32,    // Alineamiento
+    floorY: f32,      // Altura a la que muere (la usa el compute)
     velocity: vec3<f32>,
     lifetime: f32,    // Tiempo total de vida
     age: f32,         // Edad actual
     alive: u32,      // 1 = viva, 0 = muerta
-    padding2: u32,    // Alineamiento
+    sizeMul: f32,     // Escala del tamaño de su ráfaga
     padding3: u32,    // Alineamiento (total: 48 bytes)
 };
 
@@ -34,9 +34,13 @@ struct ParticleRenderParams {
     nearFade:    f32,          // offset 60  — desvanecer cerca de la cámara (m; 0 = no)
     fogEnabled:  f32,          // offset 64  — LIT: 1 = la niebla volumétrica está activa
     translucency: f32,         // offset 68  — LIT: luz del sol que atraviesa el copo (contraluz)
+    shape:       f32,          // offset 72  — BLOOD: 0 = gota, 1 = neblina
+    stretch:     f32,          // offset 76  — se alarga en su dirección de movimiento (s de velocidad)
+    sizeVariance: f32,         // offset 80  — tamaño entre (1 - v) y (1 + v); la mayoría pequeñas
     _pad0:       f32,
     _pad1:       f32,
-    // total: 80 bytes
+    _pad2:       f32,
+    // total: 96 bytes
 };
 
 /// Azar estable por partícula en [0, 1): mezcla el hueco y la vida (que cambia en cada
@@ -125,6 +129,11 @@ struct VertexOutput {
 #ifdef LIT
     @location(2) fog: vec4<f32>,           // rgb = dispersión de la niebla, a = transmitancia
 #endif
+#ifdef BLOOD
+    @location(3) sunLocal: vec3<f32>,      // dirección al sol en la base del quad (x, y, hacia la cámara)
+    @location(4) sunLight: vec3<f32>,      // radiancia del sol con su sombra
+    @location(5) misc: vec4<f32>,          // azar, fracción de vida, forma, largo / ancho
+#endif
 };
 
 @vertex
@@ -141,14 +150,22 @@ fn vs(input: VertexInput) -> VertexOutput {
 #ifdef LIT
         output.fog = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 #endif
+#ifdef BLOOD
+        output.sunLocal = vec3<f32>(0.0);
+        output.sunLight = vec3<f32>(0.0);
+        output.misc = vec4<f32>(0.0);
+#endif
         return output;
     }
 
     // t: fracción de vida [0 = recién nacida, 1 = a punto de morir]
     let t = clamp(particle.age / max(particle.lifetime, 0.0001), 0.0, 1.0);
 
-    // Tamaño interpolado
-    let size = mix(renderParams.startSize, renderParams.endSize, t);
+    // Tamaño interpolado (por la escala de su ráfaga y su variación propia)
+    let sizeRand = particleRand(input.instanceIndex, particle.lifetime, 5u);
+    let sv = renderParams.sizeVariance;
+    let size = mix(renderParams.startSize, renderParams.endSize, t) * particle.sizeMul
+             * ((1.0 - sv) + 2.0 * sv * sizeRand * sizeRand);
 
     // Color interpolado
     let color = mix(renderParams.startColor, renderParams.endColor, t);
@@ -178,13 +195,32 @@ fn vs(input: VertexInput) -> VertexOutput {
     }
     let ca = cos(angle);
     let sa = sin(angle);
-    corner = vec2<f32>(corner.x * ca - corner.y * sa, corner.x * sa + corner.y * ca);
+    // Ejes del quad en el mundo: los de la cámara girados `angle`.
+    var axisX = cameraRight * ca + cameraUp * sa;
+    var axisY = cameraUp * ca - cameraRight * sa;
+    var center = particle.position;
+    var lengthY = size;
+
+    // Estirada por la velocidad (gotas, chispas): el eje Y sigue el movimiento visto desde
+    // la cámara y se alarga lo que recorre en `stretch` s; la estela queda detrás.
+    let toCamera = normalize(camera.cameraPosition.xyz - particle.position);
+    if (renderParams.stretch > 0.0) {
+        let onScreen = particle.velocity - toCamera * dot(particle.velocity, toCamera);
+        let speed = length(onScreen);
+        if (speed > 1e-3) {
+            axisY = onScreen / speed;
+            axisX = normalize(cross(axisY, toCamera));
+            let extra = speed * renderParams.stretch;
+            lengthY = size + extra;
+            center -= axisY * extra * 0.5;
+        }
+    }
 
     // Calcular offset del vértice del quad en espacio mundo usando billboarding + tamaño
-    let quadOffset = (cameraRight * corner.x + cameraUp * corner.y) * size;
+    let quadOffset = axisX * corner.x * size + axisY * corner.y * lengthY;
 
     // WORLD SPACE MODE: Las partículas ya están en coordenadas mundiales
-    var worldPos = particle.position + quadOffset;
+    var worldPos = center + quadOffset;
 
     // Vaivén lateral al caer (horizontal, en una dirección al azar).
     if (renderParams.flutter > 0.0) {
@@ -218,6 +254,13 @@ fn vs(input: VertexInput) -> VertexOutput {
     let viewDepth = -(camera.viewMatrix * vec4<f32>(particle.position, 1.0)).z;
     finalColor = vec4<f32>(litColor(finalColor.rgb, particle.position, viewDepth), finalColor.a);
     output.fog = fogAt(camera.projectionMatrix * camera.viewMatrix * vec4<f32>(particle.position, 1.0), viewDepth);
+#endif
+#ifdef BLOOD
+    // Para el brillo húmedo del FS: el sol en la base del quad y cuánto llega (con sombra).
+    let toSun = normalize(directionalLight.position);
+    output.sunLocal = vec3<f32>(dot(toSun, axisX), dot(toSun, axisY), dot(toSun, toCamera));
+    output.sunLight = directionalLight.color * directionalLight.intensity * sunShadow(particle.position, viewDepth);
+    output.misc = vec4<f32>(r0, t, renderParams.shape, lengthY / max(size, 1e-4));
 #endif
     output.position    = clipPos;
     output.uv          = uv;

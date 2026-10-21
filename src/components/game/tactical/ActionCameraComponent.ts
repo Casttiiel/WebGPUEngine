@@ -9,6 +9,7 @@ import { CameraComponent } from '../../render/CameraComponent';
 import { UnitComponent, type UnitFaction } from './UnitComponent';
 import type { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { groundHeightAt, hasLineOfSight } from './TacticalQueries';
+import { CameraTrauma } from './CameraTrauma';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 
 /** Qué se está encuadrando: decide qué planos pueden salir. */
@@ -154,16 +155,14 @@ export const DEFAULT_SHOTS: readonly ShotDef[] = [
 const DEFAULT_MOVE: ShotMove = { type: 'push', amount: 0.12 };
 
 const DEG = Math.PI / 180;
-const UP = vec3.fromValues(0, 1, 0);
 /** Suavizado del encuadre mientras las unidades se mueven (1/s). */
 const TRACK_SMOOTHING = 5;
 /** Distancia mínima del ojo al suelo que tiene debajo. */
 const MIN_EYE_CLEARANCE = 0.75;
 /** Altura (sobre el centro de la cápsula) a la que se comprueba que se ve a cada unidad. */
 const AIM_HEIGHT = 0.5;
-/** Temblor: frecuencia de la sacudida (Hz) y segundos que dura. */
-const SHAKE_FREQUENCY = 22;
-const SHAKE_TIME = 0.35;
+/** Temblor: amplitud (m) de shake() que equivale a trauma 1 (CameraTrauma). */
+const SHAKE_FULL_TRAUMA = 0.3;
 /** Penalización de los planos recientes (el último, el penúltimo…). */
 const RECENT_PENALTY = [0.2, 0.5, 0.8];
 /** Preferencia por seguir con el mismo plano al reencuadrar (acciones encadenadas). */
@@ -226,9 +225,6 @@ export class ActionCameraComponent extends Component {
   private baseFov: number | null = null;
 
   private shot: Shot | null = null;
-  private shakeAmount = 0;
-  private shakeTime = 0;
-  private shakePhase = 0;
   // Valores actuales (suavizados al reencuadrar) y los del encuadre al que se va.
   private yaw = 0;
   private targetYaw = 0;
@@ -246,7 +242,6 @@ export class ActionCameraComponent extends Component {
   private readonly tmpTestEye = vec3.create();
   private readonly tmpTestLook = vec3.create();
   private readonly tmpAim = vec3.create();
-  private readonly tmpForward = vec3.create();
   private readonly tmpUp = vec3.create();
 
   public load(data: ActionCameraComponentDataType): void {
@@ -288,7 +283,6 @@ export class ActionCameraComponent extends Component {
       vec3.lerp(this.center, this.center, this.targetCenter, k);
       this.distance += (this.targetDistance - this.distance) * k;
     }
-    if (this.shakeTime > 0) this.shakeTime = Math.max(0, this.shakeTime - dt);
     this.apply(shot.aiming ? 0 : shot.elapsed / shot.hold);
   }
 
@@ -353,9 +347,7 @@ export class ActionCameraComponent extends Component {
   /** Sacude la cámara (impactos). `amount`: amplitud en m. Solo durante un plano. */
   public shake(amount: number): void {
     if (!this.shot) return;
-    this.shakeAmount = Math.max(amount, this.shakeTime > 0 ? this.shakeAmount : 0);
-    this.shakeTime = SHAKE_TIME;
-    this.shakePhase = Math.random() * 100;
+    CameraTrauma.add(amount / SHAKE_FULL_TRAUMA);
   }
 
   /** Alarga el plano en curso hasta `seconds` desde ahora (p.ej. para ver caer al objetivo). */
@@ -390,7 +382,6 @@ export class ActionCameraComponent extends Component {
   public end(): void {
     if (!this.shot) return;
     this.shot = null;
-    this.shakeTime = 0;
     const gameplay = Engine.getEntities().getEntityByName(this.gameplayCamera);
     if (gameplay && Engine.getModules().getCurrentGamestate() === 'gs_gameplay') {
       Engine.getCameraMixer().blendCamera(gameplay, this.blendOut, new SmoothStepInterpolator());
@@ -660,32 +651,12 @@ export class ActionCameraComponent extends Component {
     }
     vec3.set(this.tmpLook, this.center[0]!, this.center[1]! + this.look, this.center[2]!);
     this.eyeFor(this.center, distance, yaw, pitch, this.look, this.tmpEye);
-    if (this.shakeTime > 0) {
-      // Sacudida que se apaga: senos desfasados en cada eje (ojo y punto de mira juntos).
-      const k = this.shakeTime / SHAKE_TIME;
-      const a = this.shakeAmount * k * k;
-      const w = (SHAKE_TIME - this.shakeTime) * SHAKE_FREQUENCY * Math.PI * 2 + this.shakePhase;
-      const ox = Math.sin(w) * a;
-      const oy = Math.sin(w * 1.31 + 1.7) * a * 0.8;
-      const oz = Math.sin(w * 0.87 + 4.1) * a;
-      vec3.add(this.tmpEye, this.tmpEye, vec3.set(this.tmpAim, ox, oy, oz));
-      vec3.add(this.tmpLook, this.tmpLook, this.tmpAim);
-    }
+    // Sacudida de los golpes (trauma compartido con la cámara táctica).
+    const shakeRoll = CameraTrauma.apply(this.tmpEye, this.tmpLook);
     const camera = this.getCamera();
     if (Math.abs(camera.getFov() / DEG - this.fov) > 1e-3) camera.setFov(this.fov);
-    camera.lookAt(this.tmpEye, this.tmpLook, this.rolledUp());
-  }
-
-  /** Vertical girada `roll` grados alrededor de la dirección de la vista (Rodrigues). */
-  private rolledUp(): vec3 {
-    if (Math.abs(this.roll) < 1e-3) return UP;
-    const k = vec3.normalize(this.tmpForward, vec3.sub(this.tmpForward, this.tmpLook, this.tmpEye));
-    const a = this.roll * DEG;
-    const cos = Math.cos(a);
-    const out = vec3.cross(this.tmpUp, k, UP);
-    vec3.scale(out, out, Math.sin(a));
-    vec3.scaleAndAdd(out, out, UP, cos);
-    return vec3.scaleAndAdd(out, out, k, vec3.dot(k, UP) * (1 - cos));
+    const up = CameraTrauma.rolledUp(this.tmpEye, this.tmpLook, this.roll * DEG + shakeRoll, this.tmpUp);
+    camera.lookAt(this.tmpEye, this.tmpLook, up);
   }
 
   private fovOf(def: ShotDef): number {

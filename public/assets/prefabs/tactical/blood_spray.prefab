@@ -1,0 +1,62 @@
+{
+  "children": [],
+  "components": {
+    "name": "BloodSpray",
+    "transform": {
+      "position": [
+        0,
+        -1000,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "particle_system": {
+      "worldSpace": true,
+      "material": "particle_blood.mat",
+      "emitting": false,
+      "maxParticles": 2048,
+      "spawnRadius": [
+        0.08,
+        0.1,
+        0.08
+      ],
+      "baseVelocity": [
+        0,
+        2,
+        0
+      ],
+      "velocitySpread": 2.0,
+      "speedVariance": 0.7,
+      "drag": 0.8,
+      "gravity": [
+        0,
+        -13,
+        0
+      ],
+      "particleLife": 1.1,
+      "particleLifeVarianceMin": -0.3,
+      "particleLifeVarianceMax": 0.3,
+      "startSize": 0.06,
+      "endSize": 0.045,
+      "sizeVariance": 0.75,
+      "stretch": 0.035,
+      "startColor": [
+        0.13,
+        0.005,
+        0.004,
+        1
+      ],
+      "endColor": [
+        0.1,
+        0.004,
+        0.003,
+        1
+      ],
+      "translucency": 0.12
+    }
+  }
+}

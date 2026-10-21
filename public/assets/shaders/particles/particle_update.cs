@@ -1,12 +1,12 @@
 // Estructura de la partícula (debe coincidir con particle.vs)
 struct Particle {
     position: vec3<f32>,
-    padding1: f32,
+    floorY: f32,      // Muere al bajar de esta altura (suelo bajo la ráfaga que la creó)
     velocity: vec3<f32>,
     lifetime: f32,    // Tiempo total de vida
     age: f32,         // Edad actual
     alive: u32,      // 1 = viva, 0 = muerta
-    padding2: u32,    // Alineamiento
+    sizeMul: f32,     // Escala del tamaño de su ráfaga
     padding3: u32,    // Alineamiento (total: 48 bytes)
 };
 
@@ -22,7 +22,7 @@ struct IndirectDrawArgs {
 // Parámetros de simulación (32 bytes total)
 struct SimulationParams {
     deltaTime: f32,    // offset  0
-    padding1: f32,     // offset  4
+    drag: f32,         // offset  4 (frenado del aire: v *= exp(-drag·dt))
     padding2: f32,     // offset  8
     padding3: f32,     // offset 12
     gravity: vec3<f32>, // offset 16 (aceleración acumulada en velocidad por frame)
@@ -56,12 +56,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         
         // Acumular gravedad en velocidad: v += g * dt
         particle.velocity += simParams.gravity * simParams.deltaTime;
+        particle.velocity *= exp(-simParams.drag * simParams.deltaTime);
 
         // Actualizar posición basándose en velocidad y deltaTime
         particle.position += particle.velocity * simParams.deltaTime;
         
-        // Comprobar si ha superado su tiempo de vida
-        if (particle.age >= particle.lifetime) {
+        // Comprobar si ha superado su tiempo de vida o ha tocado el suelo
+        if (particle.age >= particle.lifetime || particle.position.y < particle.floorY) {
             particle.alive = 0u; // Marcar como muerta
             
             // OPTIMIZACIÓN: Push a free list cuando muere
