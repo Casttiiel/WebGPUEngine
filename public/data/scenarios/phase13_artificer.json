@@ -1,5 +1,5 @@
 {
-  "description": "Fase 13, Artificiera: autoataque Pistola y cinco gadgets que gastan metal de la Reserva y tienen recarga, sin cargas por combate. Dardo de cromo (vacía la Reserva y deja Seco; al acabar su turno Seco, se llena; contra quien no tiene Reserva, no). Pulso de ettmetal (todo lo metálico a 4 m sale despedido hacia fuera 3 + POT/2 = 5 m; lo de madera no se mueve). Inyector de oro (aliado pegado, cura 12 + POT = 16; si está lejos, se acerca). Granada de bendaleo (burbuja lanzada de 2 m: quien acaba su turno dentro juega otro; el borde corta los proyectiles; no se cierra ni se rompe aunque la Artificiera se mueva). Granada de cadmio (burbuja lanzada de 3 m: quien empieza su turno dentro lo pierde, una vez; los proyectiles sí cruzan el borde). Las dos lanzadas duran hasta el siguiente turno de la Artificiera.",
+  "description": "Fase 13, Artificiera: autoataque Granada de mano y cuatro gadgets que gastan metal de la Reserva y tienen recarga, sin cargas por combate. Dardo de cromo (vacía la Reserva y deja Seco; al acabar su turno Seco, se llena; contra quien no tiene Reserva, no). Pulso de ettmetal (todo lo metálico a 4 m sale despedido hacia fuera 3 + POT/2 = 5 m; lo de madera no se mueve). Inyector de oro (aliado pegado, cura 12 + POT = 16; si está lejos, se acerca). Granada de cadmio (burbuja lanzada de 3 m: quien empieza su turno dentro lo pierde, una vez; los proyectiles sí cruzan el borde; dura hasta el siguiente turno de la Artificiera). Granada de mano: en arco (no necesita línea de visión), estalla en 1,5 m y alcanza también a los aliados.",
   "scenes": ["tactical.json", "tactical_props.json", "tactical_dummies.json"],
   "seed": 13,
   "steps": [
@@ -40,22 +40,18 @@
       "eval": "__enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit(__S).maxMetal = 20; __unit(__S).setMetal(20); __unit('Enemy3').setMetal(0); window.__round0 = __engine.getCombatState().round"
     },
     {
-      "log": "El kit: Pistola, cinco gadgets y las tres mentes espirituales (más duraluminio y recargar)"
+      "log": "El kit: Granada de mano y cuatro gadgets (más duraluminio y recargar)"
     },
     {
       "assert": {
         "expr": "[__unit(__S).getAttacks().map(a => a.id), __unit(__S).getSkillIds()]",
         "value": [
-          ["pistol"],
+          ["hand_grenade"],
           [
             "cadmium_grenade",
-            "bendalloy_grenade",
             "chromium_dart",
             "ettmetal_pulse",
             "gold_injector",
-            "spirit_fortune",
-            "spirit_connection",
-            "spirit_investiture",
             "duralumin",
             "refill"
           ]
@@ -161,35 +157,6 @@
       }
     },
     {
-      "log": "Granada de bendaleo sobre Enemy2: lanzada, 2 m, no se cierra"
-    },
-    {
-      "assert": {
-        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'bendalloy_grenade', to: [-15, 0, -4] }).then(r => [r.ok, r.metalCost, r.affected])",
-        "value": [true, 3, ["Enemy2"]]
-      }
-    },
-    {
-      "wait_until": {
-        "expr": "__idle()",
-        "value": true
-      },
-      "timeout_frames": 600
-    },
-    {
-      "assert": {
-        "expr": "(() => { const b = __bubbles('fast'); return [b.length, b[0].radius, b[0].anchored, b[0].untilRound - __round0]; })()",
-        "value": [1, 2, false, 1]
-      }
-    },
-    {
-      "assert": {
-        "expr": "__engine.gameCommand('plan_skill', { unit: __S, skill: 'bendalloy_grenade', to: [-15, 0, -4] }).then(r => [r.canCast, r.reason, __hotbar().includes('Cerrar burbuja')])",
-        "value": [false, "on cooldown", false],
-        "message": "no se cierra: la habilidad sigue siendo la granada (recargando)"
-      }
-    },
-    {
       "log": "Granada de cadmio sobre Enemy3: lanzada, 3 m"
     },
     {
@@ -215,12 +182,12 @@
       "screenshot": "02-bubbles"
     },
     {
-      "log": "Los proyectiles cruzan el borde del cadmio, no el del bendaleo"
+      "log": "La granada de mano cruza el borde del cadmio (va en arco)"
     },
     {
       "assert": {
-        "expr": "Promise.all([__engine.gameCommand('plan_attack', { unit: __S, target: 'Enemy3', attack: 'pistol' }), __engine.gameCommand('plan_attack', { unit: __S, target: 'Enemy2', attack: 'pistol' })]).then(([a, b]) => [a.lineOfSight, b.lineOfSight])",
-        "value": [true, false]
+        "expr": "__engine.gameCommand('plan_attack', { unit: __S, target: 'Enemy3', attack: 'hand_grenade' }).then(r => [r.lineOfSight, r.inRange])",
+        "value": [true, true]
       }
     },
     {
@@ -230,10 +197,9 @@
       "assert": {
         "expr": "[__unit(__S).getMetal(), __engine.getCombatState().units.find(u => u.name === __S).cooldowns]",
         "value": [
-          8,
+          11,
           {
             "cadmium_grenade": 3,
-            "bendalloy_grenade": 3,
             "chromium_dart": 3,
             "ettmetal_pulse": 2,
             "gold_injector": 2
@@ -253,11 +219,48 @@
     {
       "assert": {
         "expr": "[__bubbles('fast').length, __bubbles('slow').length]",
-        "value": [1, 1]
+        "value": [0, 1]
       }
     },
     {
-      "log": "Una ronda completa hasta su siguiente turno: Enemy2 juega dos seguidos, Enemy3 pierde el suyo, Enemy1 acaba Seco y se llena"
+      "log": "Granada de mano sobre Enemy2: estalla en 1,5 m y pilla también al Lanzamonedas, que está a su lado; Enemy1, lejos, no"
+    },
+    {
+      "eval": "__tp('Enemy2', -13, -7); __tp('Lanzamonedas', -13, -8.4)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "eval": "window.__from = __log.length"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('attack', { unit: __S, target: 'Enemy2', attack: 'hand_grenade' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__log.slice(__from).filter(l => l[0] === 'damage').map(l => [l[1], l[2] > 0]).sort()",
+        "value": [
+          ["Enemy2", true],
+          ["Lanzamonedas", true]
+        ]
+      }
+    },
+    {
+      "screenshot": "03-hand-grenade"
+    },
+    {
+      "log": "Una ronda completa hasta su siguiente turno: Enemy3 pierde el suyo, Enemy1 acaba Seco y se llena"
     },
     {
       "eval": "window.__from = __log.length; __mark(__S); __engine.gameCommand('end_turn', {})"
@@ -268,12 +271,6 @@
         "value": true
       },
       "timeout_frames": 6000
-    },
-    {
-      "assert": {
-        "expr": "(() => { const l = __log.slice(__from); const t = l.filter(x => x[0] === 'turn').map(x => x[1]); const i = t.indexOf('Enemy2'); return [__turns('Enemy2', __from), t[i + 1], l.some(x => x[0] === 'extra-turn' && x[1] === 'Enemy2')]; })()",
-        "value": [2, "Enemy2", true]
-      }
     },
     {
       "assert": {
@@ -291,7 +288,7 @@
       "assert": {
         "expr": "[__bubbles('fast').length, __bubbles('slow').length]",
         "value": [0, 0],
-        "message": "las dos caducan al empezar su turno"
+        "message": "caduca al empezar su turno"
       }
     },
     {

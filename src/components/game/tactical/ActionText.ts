@@ -51,10 +51,13 @@ export const STATUS_HELP: Record<string, string> = {
  * fórmula ("6 + FUE"); el daño es el máximo (sin armadura delante).
  */
 export function attackSummary(attack: UnitAttack, unit?: UnitComponent): string {
-  const kind = attack.kind === 'melee' ? 'Cuerpo a cuerpo' : 'A distancia';
+  const radius = attack.radius ?? 0;
+  const kind =
+    attack.kind === 'melee' ? 'Cuerpo a cuerpo' : radius > 0 ? 'Arrojadizo' : 'A distancia';
+  const area = radius > 0 ? ` (área de ${fmt(radius)} m)` : '';
   const cost = COST_NAME[attack.cost ?? 'action'];
   const damage = scaledText(attack.damage, attack.scale ?? 'FUE', unit);
-  return `${kind} · alcance ${fmt(attack.range)} m · ${damage} de daño · ${cost}`;
+  return `${kind} · alcance ${fmt(attack.range)} m${area} · ${damage} de daño · ${cost}`;
 }
 
 /** "10 (4 + POT 6)" con lanzador; "4 + POT" sin él; "4" sin escala. */

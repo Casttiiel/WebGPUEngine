@@ -39,6 +39,12 @@ export interface UnitAttack {
   scale?: AttributeId;
   /** Recurso que consume. Default 'action'. */
   cost?: 'action' | 'bonusAction';
+  /**
+   * Arrojadizo (granada de mano): va en arco y alcanza a todos los que están a `radius` m del
+   * objetivo, aliados incluidos. No necesita línea de visión, así que la cobertura no protege;
+   * el borde de una burbuja de bendaleo sí lo para. Default 0 (un solo objetivo).
+   */
+  radius?: number;
   /** Arma de metal: el Tirón se la quita (desarme, GDD §10.1). Default false. */
   metallic?: boolean;
   /** Animación (clip) al atacar. */

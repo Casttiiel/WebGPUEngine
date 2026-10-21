@@ -161,12 +161,15 @@ duran hasta el siguiente turno de quien las lanzó, así todos juegan un turno c
 
 - [x] Gadgets sin cargas por combate: gastan metal de la Reserva y tienen recarga (cooldown),
       como el resto de habilidades.
-- [x] Pistola (autoataque a distancia, 12 m, 6 de daño).
+- [x] Granada de mano (autoataque arrojadizo, 10 m, 2 de daño): en arco, no necesita línea de
+      visión (la cobertura no protege; el borde de una burbuja de bendaleo sí la para) y estalla
+      en 1,5 m alrededor del objetivo, aliados incluidos, con el mismo crítico (campo `radius`
+      del ataque). Sustituye a la Pistola.
 - [x] Granada de cadmio (Acción, 3 de metal, recarga 3): burbuja lanzada de 3 m. Quien empieza
       su turno dentro lo pierde (una vez por burbuja) y nadie sale andando. Los proyectiles sí
       cruzan el borde.
-- [x] Granada de bendaleo (Acción, 3 de metal, recarga 3): la burbuja del Deslizador, pero
-      lanzada a un punto, de 2 m y sin poder cerrarla.
+- ~~Granada de bendaleo~~: quitada (el bendaleo es del Deslizador). La habilidad sigue en el
+  catálogo (`bendalloy_grenade`).
 - [x] Dardo de cromo (Acción, 2 de metal, recarga 3): vacía la Reserva del objetivo y lo deja
       **Seco** (al acabar ese turno, la Reserva se llena). Solo contra quien tiene Reserva.
 - [x] Pulso de ettmetal (Acción, 2 de metal, recarga 2): todo lo metálico a 4 m del punto
@@ -174,7 +177,7 @@ duran hasta el siguiente turno de quien las lanzó, así todos juegan un turno c
       en la vista previa.
 - [x] Inyector de oro (Adicional, 2 de metal, recarga 2): cura a un aliado pegado `12 + POT`
       (también la levanta si está caído).
-- **Liberar mente espiritual** va con las zonas espirituales (fase 14).
+- La Artificiera **no crea zonas espirituales** (GDD §8): solo salen de los relicarios.
 
 ### Fase 14 — Zonas espirituales (GDD §8)
 
@@ -190,9 +193,10 @@ Hecho en `SpiritZones.ts`. Escenarios: `phase14_zones` y `phase14_ai`.
 - [x] Afectan a **los dos bandos**; la IA lo tiene en cuenta: prefiere acabar en Fortuna (si
       ataca) o Investidura (si tiene habilidades), evita la Conexión con aliados dentro y cuenta
       las copias de la Conexión al valorar una habilidad de estado.
-- [x] Liberar mente espiritual (Artificiera): tres habilidades (Fortuna, Conexión, Investidura;
-      Acción, 3 de metal, punto a 10 m, 3 m de radio) con la recarga compartida (`group`). Una
-      zona activa a la vez, durante 3 turnos suyos.
+- [x] Liberar mente espiritual: tres habilidades (Fortuna, Conexión, Investidura; Acción, 3 de
+      metal, punto a 10 m, 3 m de radio) con la recarga compartida (`group`). Una zona activa a
+      la vez, durante 3 turnos suyos. **Ya no las tiene la Artificiera**: quedan en el catálogo
+      (`phase14_zones` se las da para probarlas) por si las usa un enemigo o un objeto.
 - [x] Relicarios (`relic_fortune/connection/investiture.prefab`): props metálicos que emiten
       una zona que va con ellos (empuje y tirón la mueven); al romperse, sueltan la zona de
       golpe donde estaban hasta la ronda siguiente.

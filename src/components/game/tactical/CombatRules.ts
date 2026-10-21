@@ -77,6 +77,22 @@ export function unitLineOfSightFrom(
   return clearRay(eye, aim, unit, target);
 }
 
+/**
+ * ¿Llega el ataque de `unit`, con los pies en `feet`, a `target`? Cuerpo a cuerpo, siempre; un
+ * arrojadizo va en arco (ni muros ni cobertura), salvo el borde de una burbuja de bendaleo; a
+ * distancia, línea de visión.
+ */
+export function attackReachesFrom(
+  unit: UnitComponent,
+  feet: vec3,
+  target: UnitComponent,
+  attack: UnitAttack,
+): boolean {
+  if (attack.kind === 'melee') return true;
+  if ((attack.radius ?? 0) > 0) return !Zones.blocksProjectile(feet, target.getFeetPosition(tmpB));
+  return unitLineOfSightFrom(unit, feet, target);
+}
+
 export interface AttackRoll {
   /** Probabilidad de impacto (0-1). Siempre 1: se acierta siempre (GDD §4). */
   hitChance: number;

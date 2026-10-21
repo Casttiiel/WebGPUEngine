@@ -14,25 +14,17 @@
       "armor": 0,
       "attacks": [
         {
-          "id": "pistol",
-          "name": "Pistola",
+          "id": "hand_grenade",
+          "name": "Granada de mano",
           "kind": "ranged",
-          "range": 12,
-          "damage": 6,
+          "range": 10,
+          "radius": 1.5,
+          "damage": 2,
           "metallic": true,
           "clip": "Spell_Simple_Shoot"
         }
       ],
-      "skills": [
-        "cadmium_grenade",
-        "bendalloy_grenade",
-        "chromium_dart",
-        "ettmetal_pulse",
-        "gold_injector",
-        "spirit_fortune",
-        "spirit_connection",
-        "spirit_investiture"
-      ]
+      "skills": ["cadmium_grenade", "chromium_dart", "ettmetal_pulse", "gold_injector"]
     }
   }
 }

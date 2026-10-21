@@ -1,5 +1,5 @@
 {
-  "description": "Fase 14, zonas espirituales (GDD §8). Relicario de Conexión: el Lanzamonedas lo atrae junto a 3 enemigos (la zona va con él) y la Marca del cazador sobre uno se copia a los otros dos. Fortuna: +10 % de crítico a quien ataca desde dentro. Investidura: las habilidades lanzadas desde dentro, ×1,5. Liberar mente espiritual (Artificiera): una zona a la vez durante 3 turnos suyos; las tres comparten la recarga. Un relicario roto suelta su zona donde estaba hasta la ronda siguiente.",
+  "description": "Fase 14, zonas espirituales (GDD §8). Relicario de Conexión: el Lanzamonedas lo atrae junto a 3 enemigos (la zona va con él) y la Marca del cazador sobre uno se copia a los otros dos. Fortuna: +10 % de crítico a quien ataca desde dentro. Investidura: las habilidades lanzadas desde dentro, ×1,5. Liberar mente espiritual (habilidades del catálogo, que el escenario le da a la Artificiera): una zona a la vez durante 3 turnos suyos; las tres comparten la recarga. Un relicario roto suelta su zona donde estaba hasta la ronda siguiente.",
   "scenes": ["tactical.json", "tactical_dummies.json"],
   "entities": [
     {
@@ -22,7 +22,7 @@
       "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.source ? d.source.getName() : null, d.status ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__turns = (n) => __log.filter(l => l[0] === 'turn' && l[1] === n).length; window.__marks = {}; window.__mark = (n) => { __marks[n] = __turns(n); }; window.__turnOf = (n) => { const s = __engine.getCombatState(); if (__turns(n) > (__marks[n] ?? -1) && s.activeUnit === n && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__zones = () => __engine.getCombatState().spiritZones; window.__fresh = (n) => { __enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit(n).clearCooldowns(); __unit(n).setMetal(99); }"
     },
     {
-      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; } __enc.joinRadius = 60; __tp('Lanzamonedas', -6, -14); __tp('Enemy1', -7.8, -14.8); __tp('Enemy2', -8, -12.6); __tp('Enemy3', -8.6, -14); __tp('Artificiera', 6, -2); __tp('Deslizador', 8, -1); __tp('Voz', 9, 2)"
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; } __enc.joinRadius = 60; __tp('Lanzamonedas', -6, -14); __tp('Enemy1', -7.8, -14.8); __tp('Enemy2', -8, -12.6); __tp('Enemy3', -8.6, -14); __tp('Artificiera', 6, -2); __tp('Deslizador', 8, -1); __tp('Voz', 9, 2); __unit('Artificiera').skills = ['gold_injector', 'spirit_fortune', 'spirit_connection', 'spirit_investiture']"
     },
     { "wait_frames": 3 },
     { "log": "Los relicarios emiten su zona desde que existen (también fuera de combate)" },
@@ -105,7 +105,7 @@
     { "eval": "__fresh('Artificiera')" },
     { "log": "Fortuna: quien ataca desde dentro tiene +10 % de crítico" },
     {
-      "eval": "window.__crit = () => __engine.gameCommand('plan_attack', { unit: 'Artificiera', target: 'Enemy2', attack: 'pistol' }).then(r => r.critChance); window.__c0 = null; __crit().then(c => window.__c0 = c)"
+      "eval": "window.__crit = () => __engine.gameCommand('plan_attack', { unit: 'Artificiera', target: 'Enemy2', attack: 'hand_grenade' }).then(r => r.critChance); window.__c0 = null; __crit().then(c => window.__c0 = c)"
     },
     { "wait_frames": 2 },
     { "eval": "__tp('RelicFortune', 6.8, -2.6)" },
@@ -168,7 +168,12 @@
     {
       "assert": {
         "expr": "__engine.getCombatState().units.find(u => u.name === 'Artificiera').cooldowns",
-        "value": { "gold_injector": 2, "spirit_fortune": 3, "spirit_connection": 3, "spirit_investiture": 3 }
+        "value": {
+          "gold_injector": 2,
+          "spirit_fortune": 3,
+          "spirit_connection": 3,
+          "spirit_investiture": 3
+        }
       }
     },
     { "eval": "__fresh('Artificiera')" },

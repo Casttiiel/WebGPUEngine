@@ -32,6 +32,7 @@ import {
 import {
   EYE_HEIGHT,
   STEEL_BUBBLE_MISS,
+  attackReachesFrom,
   damageDealtMultiplier,
   finisherDamage,
   hitRange,
@@ -302,6 +303,8 @@ interface PendingHit {
   hit: boolean;
   crit: boolean;
   damage: number;
+  /** Arrojadizo: dónde estalla (se ve al impactar). */
+  explosion?: vec3 | undefined;
 }
 
 const DETECTION_INTERVAL = 0.25;
@@ -732,7 +735,12 @@ export class EncounterComponent extends Component {
 
     result.distance = unitDistance(unit, target);
     result.inRange = result.distance <= attack.range + EPS;
-    result.lineOfSight = attack.kind === 'melee' || unitLineOfSight(unit, target);
+    result.lineOfSight = attackReachesFrom(
+      unit,
+      unit.getFeetPosition(vec3.create()),
+      target,
+      attack,
+    );
     const roll = previewAttack(unit, target, attack);
     result.hitChance = roll.hitChance;
     result.damage = roll.damage;
@@ -761,7 +769,7 @@ export class EncounterComponent extends Component {
       radii,
       (feet) =>
         unitDistanceFrom(unit, feet, target) <= attack.range + EPS &&
-        (melee || unitLineOfSightFrom(unit, feet, target)),
+        attackReachesFrom(unit, feet, target, attack),
     );
     if (!result.approach) {
       if (melee) return fail('target out of reach');
@@ -2464,7 +2472,34 @@ export class EncounterComponent extends Component {
       unit.faceTowards(target.getPosition(this.tmpA));
       unit.playAction(attack.clip, ATTACK_TIME);
       const roll = rollAttack(unit, target, attack);
-      this.pendingHits.push({ timer: HIT_DELAY, attacker: unit, target, ...roll });
+      const radius = attack.radius ?? 0;
+      const center = radius > 0 ? target.getFeetPosition(vec3.create()) : undefined;
+      this.pendingHits.push({
+        timer: HIT_DELAY,
+        attacker: unit,
+        target,
+        ...roll,
+        explosion: center,
+      });
+      // Arrojadizo: los de alrededor (aliados incluidos) con el mismo crítico, sin sacar más
+      // canicas de la bolsa.
+      if (center) {
+        for (const u of this.unitsAround(center, radius)) {
+          if (u === target || u === unit) continue;
+          const splash = previewAttack(unit, u, attack);
+          const damage = roll.crit
+            ? splash.critDamage
+            : rollRange({ min: splash.minDamage, max: splash.maxDamage });
+          this.pendingHits.push({
+            timer: HIT_DELAY,
+            attacker: unit,
+            target: u,
+            hit: true,
+            crit: roll.crit,
+            damage,
+          });
+        }
+      }
       this.emit('attack', { unit: target.getOwner(), source: unit.getOwner() });
     });
   }
@@ -2505,7 +2540,10 @@ export class EncounterComponent extends Component {
       due.push(h);
       return false;
     });
-    for (const h of due) this.applyHit(h.attacker, h.target, h.hit, h.damage, 'attack', h.crit);
+    for (const h of due) {
+      if (h.explosion) this.surfaces.spawnExplosion(h.explosion);
+      this.applyHit(h.attacker, h.target, h.hit, h.damage, 'attack', h.crit);
+    }
   }
 
   private applyHit(
@@ -2584,6 +2622,17 @@ export class EncounterComponent extends Component {
     this.checkCombatEnd(unit, isParty);
   }
 
+  /** Unidades y objetos vivos a `radius` m (de borde) de `center`, en su mismo nivel. */
+  private unitsAround(center: vec3, radius: number): UnitComponent[] {
+    const p = vec3.create();
+    return UnitComponent.getAll().filter((u) => {
+      if (!u.isAlive()) return false;
+      u.getFeetPosition(p);
+      const d = Math.hypot(p[0]! - center[0]!, p[2]! - center[2]!) - u.getCapsuleRadius();
+      return d <= radius && Math.abs(p[1]! - center[1]!) < 2;
+    });
+  }
+
   /** Daño en área alrededor de un objeto explosivo (en cadena) y la superficie que deja. */
   private explode(
     prop: UnitComponent,
@@ -2593,15 +2642,10 @@ export class EncounterComponent extends Component {
     const center = prop.getFeetPosition(vec3.create());
     this.surfaces.spawnExplosion(center);
     this.emit('explosion', { unit: prop.getOwner(), source: instigator?.getOwner() ?? null });
-    const p = vec3.create();
-    for (const u of UnitComponent.getAll()) {
-      if (u === prop || !u.isAlive()) continue;
-      u.getFeetPosition(p);
-      const d = Math.hypot(p[0]! - center[0]!, p[2]! - center[2]!) - u.getCapsuleRadius();
-      if (d <= explosion.radius && Math.abs(p[1]! - center[1]!) < 2) {
-        const range = hitRange(null, u, explosion.damage);
-        this.applyHit(instigator, u, true, rollRange(range), 'explosion');
-      }
+    for (const u of this.unitsAround(center, explosion.radius)) {
+      if (u === prop) continue;
+      const range = hitRange(null, u, explosion.damage);
+      this.applyHit(instigator, u, true, rollRange(range), 'explosion');
     }
     if (explosion.surface) {
       this.surfaces.add(explosion.surface, center, explosion.surfaceRadius ?? explosion.radius);

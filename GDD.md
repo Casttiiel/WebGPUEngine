@@ -218,7 +218,7 @@ que ya tienes** (§14), así que la barra de habilidades no crece.
 | **Lanzamonedas** | **Aviador** (POT, REF): saltos más largos, empujes de props,     | **Artillero** (FUE, AGU): revólver, bala empujada, marca del cazador, críticos y penetración. Talento _Rebote_ (la bala empujada rebota en el metal) |
 | **Deslizador**   | **Virtuoso** (REF, AGU, FUE): Ritmo, Finta, Proyección, críticos | **Inmortal** (RES, TEM): mente de oro más potente, Guardia más frecuente, Pullas, burbujas más largas                                                |
 | **Voz**          | **Titiritero** (POT, TEM): control de grupos, más objetivos      | **Duelista** (FUE, REF): estoque, réplica a los Enfurecidos, se puede elegir como objetivo de su propio Provocar                                     |
-| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, zonas, recargas más cortas   | **Tiradora** (AGU, FUE): dardo de cromo, pistola, detonación de asistencia                                                                          |
+| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, pulso, recargas más cortas   | **Tiradora** (AGU, FUE): granada de mano, dardo de cromo, detonación de asistencia                                                                  |
 
 **Ejemplo, la Voz Duelista:** usa _Provocar_ sobre un grupo eligiéndose a sí misma como objetivo
 del ataque. Con el talento _Réplica_, cada enemigo Enfurecido que la ataca recibe un
@@ -487,8 +487,10 @@ terrible si es tu party la que está dentro cuando el enemigo te aplica algo.
   Lanzamonedas puede atraerlos o empujarlos para **mover la zona**. Esto es diseño sistémico en
   estado puro: la zona entra en la física del acero sin ninguna regla nueva. Si se rompen,
   sueltan la zona de golpe durante una ronda.
-- **Habilidad de la Artificiera**: puede crear **una zona a la vez**, durante 3 turnos, con
-  recarga. Es su identidad.
+- **Habilidad de un personaje: no** (decidido). Antes las creaba la Artificiera, pero no encajaba
+  con ella: las zonas salen **solo de los relicarios** del escenario. Las habilidades _Liberar
+  Fortuna / Conexión / Investidura_ se quedan en el catálogo (`skills.json`) por si las usa un
+  enemigo o un objeto.
 
 ### ¿Son demasiadas mecánicas? (presupuesto de complejidad)
 
@@ -503,7 +505,6 @@ más; lo que importa no es el número, sino:
   2. Acto 1, mitad: asistencias (cuando tengas los 4 personajes).
   3. Acto 1, final: feruquimia equipable y duraluminio.
   4. Acto 2: relicarios del escenario.
-  5. Acto 2, mitad: la Artificiera aprende a crear zonas.
 - **Orden de recorte** si hay que quitar algo (del primero en caer al último): Investidura → Conexión → Fortuna → mentes de metal → asistencias. Las asistencias y los props
   son el corazón del juego; eso no se toca.
 
@@ -581,7 +582,7 @@ ser autoprotección a ser **sinergia**.
 
 |                 | Lanzamonedas                               | Deslizador                                              | Voz                        | Artificiera                                                        |
 | --------------- | ------------------------------------------ | ------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------ |
-| **Metales**     | Acero, hierro, estaño + hierro feruquímico | Bendaleo, peltre + oro feruquímico, técnica de bastones | Cinc, latón, bronce, cobre | Gadgets de ettmetal, cadmio en dispositivos, feruquimia espiritual |
+| **Metales**     | Acero, hierro, estaño + hierro feruquímico | Bendaleo, peltre + oro feruquímico, técnica de bastones | Cinc, latón, bronce, cobre | Gadgets de ettmetal, cadmio y cromo en dispositivos, oro no sellado |
 | **Rol**         | Daño a distancia, movilidad                | Duelista que aguanta regenerándose, primera línea       | Control, apoyo             | Control del terreno, utilidad                                      |
 | **Distancia**   | Larga                                      | Cuerpo a cuerpo                                         | Media                      | Media                                                              |
 | **Builds** (§3) | Aviador / Artillero                        | Virtuoso / Inmortal                                     | Titiritero / Duelista      | Ingeniera / Tiradora                                               |
@@ -705,23 +706,22 @@ ataca a distancia.
 | **Calma** (latón)                             | Acción, 3    | El enemigo no es hostil durante 1 turno (se rompe si le haces daño)                                                                             |
 | **Nube de cobre**                             | Acción, 2    | Zona de 4 m durante 3 turnos: los aliados dentro son inmunes a efectos emocionales y no se les puede leer con bronce. Fuera del combate: sigilo |
 
-### 10.4 La Artificiera — _ettmetal, cadmio y feruquimia espiritual_
+### 10.4 La Artificiera — _ettmetal, cadmio y cromo_
 
 **Fantasía**: la científica de la Era 2. No es la más fuerte, pero rediseña el campo de batalla.
-**Bucle**: preparar el terreno (burbujas, zonas, cargas) → que los demás lo aprovechen.
+**Bucle**: preparar el terreno (burbuja de cadmio, pulso, cargas) → que los demás lo aprovechen.
+Su granada de mano es lo que **saca a los enemigos de la cobertura** (§5: las áreas la anulan).
 
 | Habilidad                         | Coste                   | Efecto                                                                                                                                                                                                     |
 | --------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: pistola_             | —                       | Distancia media                                                                                                                                                                                            |
+| _Autoataque: granada de mano_     | —                       | Arrojadiza, 10 m, en arco: no necesita línea de visión (la cobertura no protege; el borde de una burbuja de bendaleo sí la para). Estalla en 1,5 m con poco daño (2 + FUE) y alcanza también a los aliados |
 | **Dardo de cromo**                | Acción, 2, recarga 3    | Un disparo a un enemigo alomántico: le vacía la Reserva y queda **Seco** (§2). El "silencio" del kit, usando un estado que ya existe                                                                     |
 | **Granada de cadmio**             | Acción, 3, recarga 3    | Burbuja **lanzada** de 3 m donde el tiempo va **lento** hasta tu siguiente turno: quien empieza su turno dentro **lo pierde** y nadie sale andando. Los proyectiles sí cruzan el borde                      |
-| **Granada de bendaleo**           | Acción, 3, recarga 3    | La inversa del cadmio: burbuja **lanzada** de 2 m donde el tiempo va **rápido** hasta tu siguiente turno. Quien acaba su turno dentro juega otro seguido. Nadie sale andando y ningún proyectil cruza el borde. No se puede cerrar |
 | **Pulso de ettmetal**             | Acción, 2, recarga 2    | Empuje radial desde un punto: todo lo metálico en 4 m sale despedido hacia fuera                                                                                                                           |
 | **Carga de ettmetal**             | Adicional, 1            | Pegas una carga a un prop: cuando ese prop sufre un IMPACTO, explota (Directo, 3 m). **En el agua, el ettmetal reacciona de forma violenta** (lore): combina con la superficie de agua                     |
-| **Liberar mente espiritual**      | Acción, 3               | Crea una zona de Fortuna, Conexión o Investidura (§8). Una activa a la vez, 3 turnos                                                                                                                       |
 | **Inyector de oro**               | Adicional, 2, recarga 2 | Cura a un aliado adyacente 12 + Potencia. Es una mente de oro no sellada: la principal curación de la party                                                                                                |
 
-> **Los gadgets de la Artificiera** (granadas, dardo, pulso, inyector) **no tienen cargas por
+> **Los gadgets de la Artificiera** (granada de cadmio, dardo, pulso, inyector) **no tienen cargas por
 > combate**: gastan metal de la Reserva, como todo lo demás, y se limitan con **recarga**, el
 > mismo sistema que ya tienen todas las habilidades. Un solo recurso, como los otros tres
 > personajes: así no se le suma complejidad a la que ya es la más compleja.
@@ -861,6 +861,9 @@ charco**. Si ese combate es divertido, el sistema funciona.
 - **La Artificiera sin cargas por combate**: sus gadgets gastan metal y tienen recarga (§10.4).
 - **Las zonas** (burbujas, nubes, zonas espirituales) se implementan con la Artificiera, después
   del prototipo de dos personajes.
+- **La Artificiera no crea zonas espirituales ni burbujas de bendaleo** (§8, §10.4): las zonas
+  salen solo de los relicarios y el bendaleo es del Deslizador. Su autoataque pasa a ser la
+  **granada de mano** (área pequeña en arco, ignora la cobertura).
 - **Seis atributos libres** con coste creciente y dos builds por personaje (§3).
 - **El Deslizador (arquetipo de Wayne) sustituye al Violento.** Se queda el peltre (Proyección,
   Avivar peltre) y la Guardia (el contraataque del estaño). La **Marca del cazador** y la vista

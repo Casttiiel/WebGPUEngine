@@ -146,7 +146,11 @@ export function hotbarTooltip(
   }
   if (entry.attack) {
     info(attackSummary(entry.attack, unit));
-    if (entry.kind === 'ranged') info('Necesita línea de visión.');
+    if ((entry.attack.radius ?? 0) > 0) {
+      info(
+        'En arco: no necesita línea de visión y la cobertura no protege. Alcanza también a los aliados.',
+      );
+    } else if (entry.kind === 'ranged') info('Necesita línea de visión.');
   } else if (entry.skill) {
     const s = entry.skill;
     const recharge = s.cooldown > 0 ? ` · recarga ${turns(s.cooldown)}` : '';
