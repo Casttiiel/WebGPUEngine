@@ -126,6 +126,7 @@ const STATUS_FLOAT: Partial<Record<string, string>> = {
   pewter: '¡Peltre!',
   pewter_drag: 'Arrastre',
   gold_heal: 'Mente de oro',
+  copper: 'Mente de cobre',
 };
 /** Acciones de metal junto a la barra de metal (no en la hotbar). */
 const METAL_BUTTONS = ['duralumin', 'refill'] as const;
@@ -364,6 +365,18 @@ export class CombatHUDController extends WidgetController {
       case 'duralumin':
         this.spawnFloat(unit, `Duraluminio ×${multiplierText(data.amount ?? 1)}`, FLOAT_CRIT, 1.5);
         break;
+      case 'metal-gain':
+        this.spawnFloat(unit, `+${Math.round(data.amount ?? 0)} de metal`, FLOAT_METAL, 1.5);
+        break;
+      case 'echo-ready':
+        this.spawnFloat(unit, 'Cobre: se puede repetir', FLOAT_METAL, 1.5);
+        break;
+      case 'echo':
+        this.spawnFloat(unit, '¡Otra vez!', FLOAT_CRIT, 1.5);
+        break;
+      case 'pylon':
+        this.spawnFloat(unit, 'Pilón de acero', FLOAT_METAL, 1.5);
+        break;
       case 'declare-drained':
         this.spawnFloat(unit, 'Bebe un vial', FLOAT_METAL, 1.5);
         break;
@@ -590,7 +603,7 @@ export class CombatHUDController extends WidgetController {
       }
       const x = Math.min(-total / 2, HOTBAR_RIGHT - total) + i * (HOTBAR_WIDTH + HOTBAR_GAP);
       slot.frame.setPosition(x, slot.frame.getY());
-      const cooldown = exploring || !unit ? 0 : unit.getCooldown(entry.id);
+      const cooldown = exploring || !unit || entry.echo ? 0 : unit.getCooldown(entry.id);
       // Lo que no se puede pagar con la Reserva (o estando Seco), desactivado.
       const blocker = entry.skill && unit ? encounter.metalBlocker(unit, entry.skill) : null;
       const left = entry.cost === 'free' ? Infinity : resources[entry.cost];

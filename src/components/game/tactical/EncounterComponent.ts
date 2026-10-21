@@ -7,6 +7,10 @@ import { DevBridge } from '../../../core/debug/DevBridge';
 import { ModuleGameController } from '../../../modules/game/ModuleGameController';
 import { Zones, type TimeBubble } from './Zones';
 import { SpiritZones } from './SpiritZones';
+import { ResonanceAuras } from './ResonanceAuras';
+import { Loader } from '../../../core/loaders/Loader';
+import type { EntityDataType } from '../../../types/SceneData.type';
+import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { Cover, rayToProp } from './Cover';
 import {
   RHYTHM_MAX,
@@ -65,6 +69,7 @@ import {
   coneDirection,
   hasEffect,
   isAnchoredBubble,
+  isCopperMind,
   isHostile,
   isMetalAction,
   lineReach,
@@ -386,6 +391,8 @@ const WALL_MULTIPLIER = 1.5;
 /** Plano de acción: segundos que se mantiene tras el impacto, y tras una muerte. */
 const SHOT_AFTER_HIT = 0.7;
 const SHOT_AFTER_KILL = 1.3;
+/** Pilón de acero: hueco libre que necesita alrededor (m, además del radio de cada unidad). */
+const PYLON_CLEARANCE = 0.4;
 
 /**
  * EncounterComponent — máquina de estados del juego táctico y combate por turnos.
@@ -452,6 +459,8 @@ export class EncounterComponent extends Component {
   private blood = new BloodFX();
   /** Unidades que estaban dentro de un fuego el frame anterior (quemar solo al entrar). */
   private inFire = new Set<UnitComponent>();
+  /** Pilón de acero de cada lanzador (uno a la vez; null: cargándose). */
+  private pylons = new Map<UnitComponent, Entity | null>();
   private initialized = false;
 
   private readonly tmpA = vec3.create();
@@ -503,6 +512,7 @@ export class EncounterComponent extends Component {
     this.updateFire();
     this.updateBubbles();
     SpiritZones.syncRelics();
+    ResonanceAuras.update(this.state === 'combat');
 
     if (this.canRestart() && Engine.getInput().isKeyJustPressed(KeyCode.R)) this.restart();
 
@@ -1331,8 +1341,11 @@ export class EncounterComponent extends Component {
       result.canCast = true;
       return result;
     }
+    // Mente de cobre: la habilidad que se repite no cuesta acción, metal ni recarga.
+    const echo = this.isEcho(unit, skill);
+    if (isCopperMind(skill) && this.state !== 'combat') return fail('only in combat');
     const cost = metalCost(unit, skill);
-    result.metalCost = this.state === 'combat' ? cost.metal : 0;
+    result.metalCost = this.state === 'combat' && !echo ? cost.metal : 0;
     // Investidura: lanzada desde dentro, +50 % (como el multiplicador del duraluminio).
     const power = cost.power * (isMetalAction(skill) ? 1 : SpiritZones.powerFor(unit));
     result.power = power;
@@ -1359,6 +1372,13 @@ export class EncounterComponent extends Component {
         // Dardo de cromo: solo contra quien tiene Reserva (los alománticos).
         if (hasEffect(skill, 'drain') && !targetUnit.hasReserve()) {
           return fail('not allomantic');
+        }
+        // Vial de metal: a otro, con Reserva, no Seco y sin la Reserva llena.
+        if (hasEffect(skill, 'restoreMetal')) {
+          if (targetUnit === unit) return fail('target must be an ally');
+          if (!targetUnit.hasReserve()) return fail('not allomantic');
+          if (targetUnit.isDrained()) return fail('target is drained');
+          if (targetUnit.getMetal() >= targetUnit.getMaxMetal()) return fail('reserve full');
         }
         const self = targetUnit === unit;
         const distance = unitDistance(unit, targetUnit);
@@ -1405,6 +1425,17 @@ export class EncounterComponent extends Component {
         // El tiempo de una burbuja (o una zona espiritual) no afecta a los objetos.
         if (hasEffect(skill, 'bubble') || hasEffect(skill, 'spiritZone')) {
           result.affected = result.affected.filter((u) => !PropComponent.of(u.getOwner()));
+        }
+        if (hasEffect(skill, 'pylon')) {
+          // Pilón de acero: en el suelo, en un hueco libre.
+          if (!isOnNavMesh(point[0]!, point[1]!, point[2]!, 0.3)) return fail('cannot place there');
+          const blocked = UnitComponent.getAll().some((u) => {
+            if (!u.isAlive()) return false;
+            const p = u.getFeetPosition(this.tmpB);
+            const gap = Math.hypot(p[0]! - point[0]!, p[2]! - point[2]!) - u.getCapsuleRadius();
+            return gap < PYLON_CLEARANCE && Math.abs(p[1]! - point[1]!) < 2;
+          });
+          if (blocked) return fail('cannot place there');
         }
         if (hasEffect(skill, 'radialPush')) {
           // Pulso de ettmetal: solo lo metálico se mueve (y lo que pille, recibe el golpe).
@@ -1490,10 +1521,12 @@ export class EncounterComponent extends Component {
     }
 
     if (unit.hasStatus('fear') && isHostile(skill)) return fail('frightened');
-    const permission = this.canAct(unit, skill.cost === 'free' ? null : skill.cost, skill);
+    const permission = this.canAct(unit, skill.cost === 'free' || echo ? null : skill.cost, skill);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
-    if (this.state === 'combat' && unit.getCooldown(skill.id) > 0) return fail('on cooldown');
+    if (this.state === 'combat' && !echo && unit.getCooldown(skill.id) > 0) {
+      return fail('on cooldown');
+    }
     if (!result.inRange || !result.lineOfSight) {
       // No llega o no ve: buscar desde dónde sí (unidad o punto; cono y self no se mueven).
       result.approach = this.planSkillApproach(entity, unit, skill, targetUnit, result.origin);
@@ -1736,9 +1769,22 @@ export class EncounterComponent extends Component {
     if (hasEffect(skill, 'hurl') && !plan.motion) {
       return { ...plan, ok: false, reason: 'no destination' };
     }
-    if (this.state === 'combat') {
+    if (this.state === 'combat' && this.isEcho(unit, skill)) {
+      // Mente de cobre: la repetición, gratis (y se gasta el estado).
+      unit.removeStatus('copper');
+      unit.setEchoSkill(null);
+      if (skill.allomantic) unit.setMetalBoost(null);
+      this.emit('status-end', { unit: entity, status: 'copper' });
+      this.emit('echo', { unit: entity });
+    } else if (this.state === 'combat') {
       if (skill.cost !== 'free') {
         this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
+      }
+      // Mente de cobre decantada: la siguiente es la que se podrá repetir.
+      if (isCopperMind(skill)) unit.setEchoSkill(null);
+      else if (unit.hasStatus('copper') && unit.getEchoSkill() === null && !isMetalAction(skill)) {
+        unit.setEchoSkill(skill.id);
+        this.emit('echo-ready', { unit: entity });
       }
       unit.setCooldown(skill.id, skill.cooldown);
       // Las del mismo grupo comparten la recarga.
@@ -1989,6 +2035,23 @@ export class EncounterComponent extends Component {
         case 'radialPush':
           for (const m of plan.motions) this.launch(caster, m);
           break;
+        case 'pylon':
+          this.placePylon(caster, origin, effect.prefab);
+          break;
+        case 'restoreMetal': {
+          // Vial de metal: 2 + TEM/2, sin pasarse del máximo.
+          const scale = skill.scale ? caster.getAttribute(skill.scale) : 0;
+          const amount = Math.floor(
+            (effect.amount + (effect.amountPerPoint ?? 0) * scale) * plan.power,
+          );
+          for (const u of affected()) {
+            if (!u.isAlive() || !u.hasReserve() || u.isDrained()) continue;
+            const before = u.getMetal();
+            u.setMetal(before + amount);
+            this.emit('metal-gain', { unit: u.getOwner(), amount: u.getMetal() - before });
+          }
+          break;
+        }
         case 'teleport':
         case 'leap':
         case 'flank':
@@ -2008,6 +2071,53 @@ export class EncounterComponent extends Component {
     ) {
       this.startCombat(enemy.getOwner());
     }
+  }
+
+  /**
+   * Pilón de acero: el prop, clavado en `point` (de pie sobre el suelo). El anterior del mismo
+   * lanzador desaparece.
+   */
+  private placePylon(caster: UnitComponent, point: vec3, prefab: string): void {
+    this.removePylon(caster);
+    this.pylons.set(caster, null);
+    const ground = groundHeightAt(point[0]!, point[2]!, point[1]! + 0.5) ?? point[1]!;
+    // Se crea ya en su sitio: el cuerpo (kinematic) sale de ahí y copia su posición al
+    // transform. El pivote, a la altura del prefab sobre el suelo (media altura del pilón).
+    void ResourceManager.loadPrefab(prefab)
+      .then((json) => {
+        const lift = (json.components?.transform?.position as number[] | undefined)?.[1] ?? 0;
+        return Loader.spawnFromJSON({
+          prefab,
+          components: {
+            name: `${caster.getOwner().getName()}_Pylon`,
+            transform: { position: [point[0]!, ground + lift, point[2]!] },
+          },
+        } as EntityDataType);
+      })
+      .then((e) => {
+        // Sustituido (o se acabó el combate) mientras cargaba.
+        if (!this.pylons.has(caster) || this.pylons.get(caster) !== null) {
+          Engine.getEntities().destroyEntity(e);
+          return;
+        }
+        this.pylons.set(caster, e);
+        this.emit('pylon', { unit: e, source: caster.getOwner() });
+      });
+  }
+
+  private removePylon(caster: UnitComponent): void {
+    const pylon = this.pylons.get(caster);
+    if (pylon) Engine.getEntities().destroyEntity(pylon);
+    this.pylons.delete(caster);
+  }
+
+  private clearPylons(): void {
+    for (const caster of [...this.pylons.keys()]) this.removePylon(caster);
+  }
+
+  /** ¿Es `skill` la que `unit` puede repetir gratis con la mente de cobre? */
+  public isEcho(unit: UnitComponent, skill: SkillDef): boolean {
+    return this.state === 'combat' && unit.getEchoSkill() === skill.id;
   }
 
   /**
@@ -2267,6 +2377,7 @@ export class EncounterComponent extends Component {
     this.turnLost = false;
     Zones.clear();
     SpiritZones.clear((z) => !z.relic);
+    this.clearPylons();
     for (const u of UnitComponent.getAll()) {
       u.clearCooldowns();
       u.clearStatuses();
@@ -2310,6 +2421,8 @@ export class EncounterComponent extends Component {
     CameraTrauma.clear();
     Zones.clear();
     SpiritZones.clear((z) => !z.relic);
+    this.clearPylons();
+    ResonanceAuras.clear();
     this.inFire.clear();
     this.detectionTimer = DETECTION_INTERVAL;
     this.setState('exploration');
@@ -2378,6 +2491,8 @@ export class EncounterComponent extends Component {
   public metalBlocker(unit: UnitComponent, skill: SkillDef): string | null {
     // Cerrar la burbuja propia no cuesta nada.
     if (isAnchoredBubble(skill) && Zones.ownedBy(unit)) return null;
+    // Mente de cobre: la repetición no cuesta metal (pero sigue siendo alomancia).
+    if (this.isEcho(unit, skill)) return skill.allomantic && unit.isDrained() ? 'drained' : null;
     // Mente de metal: una carga por combate, que no se recarga.
     if (skill.charge && this.state === 'combat' && unit.getCharges(skill.charge) <= 0) {
       return 'no charges';
@@ -2791,6 +2906,8 @@ export class EncounterComponent extends Component {
   private hasUsableResources(unit: UnitComponent): boolean {
     if (this.resources.movement >= EPS) return true;
     if (unit.getAttacks().some((a) => this.resources[a.cost ?? 'action'] > 0)) return true;
+    // Mente de cobre: le queda la repetición.
+    if (unit.getEchoSkill() !== null) return true;
     // Habilidades sobre uno mismo: siempre tienen objetivo.
     // (Las acciones de metal no cuentan: sin nada más que hacer, no se espera por ellas.)
     const selfSkill = unit.getSkillIds().some((id) => {

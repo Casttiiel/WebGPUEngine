@@ -28,6 +28,7 @@ export const STATUS_NAME: Record<string, string> = {
   pewter: 'Peltre avivado',
   pewter_drag: 'Arrastre de peltre',
   gold_heal: 'Mente de oro',
+  copper: 'Mente de cobre',
 };
 
 /** Qué hace cada estado (tooltips, ficha). */
@@ -44,6 +45,7 @@ export const STATUS_HELP: Record<string, string> = {
   pewter: '+3 m de movimiento, inmune a Derribado y Aturdido, +20 % de daño',
   pewter_drag: '−50 % de movimiento y de daño',
   gold_heal: 'se cura al empezar cada turno',
+  copper: 'puede repetir gratis la siguiente habilidad del turno',
 };
 
 /**
@@ -156,6 +158,18 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
         }[e.zone];
         const time = e.rounds === 1 ? 'hasta tu siguiente turno' : `${e.rounds} turnos tuyos`;
         return `zona de ${SPIRIT_NAME[e.zone]} de ${fmt(e.radius)} m (${time}; una a la vez): ${rule}, a los dos bandos`;
+      }
+      case 'pylon':
+        return 'clava un pilón de acero (cobertura, metálico; uno a la vez)';
+      case 'restoreMetal': {
+        const tem = skill.scale && caster?.hasAttributes() ? caster.getAttribute(skill.scale) : null;
+        const per = e.amountPerPoint ?? 0;
+        const amount = !per
+          ? `${e.amount}`
+          : tem !== null
+            ? `${Math.floor(e.amount + per * tem)} (${e.amount} + ${skill.scale} ${tem}/${fmt(1 / per)})`
+            : `${e.amount} + ${skill.scale}/${fmt(1 / per)}`;
+        return `recupera ${amount} de Reserva`;
       }
       case 'radialPush':
         return `todo lo metálico sale despedido hacia fuera ${distanceText(steelDistanceFor, caster)}`;

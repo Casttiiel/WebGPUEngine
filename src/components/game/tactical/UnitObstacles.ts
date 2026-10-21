@@ -41,6 +41,13 @@ export class UnitObstacles {
 
     let changed = false;
     const units = UnitComponent.getAll();
+    // Las que ya no existen (un pilón de acero sustituido o al acabar el combate).
+    for (const [unit, entry] of this.entries) {
+      if (units.includes(unit)) continue;
+      navMesh.removeObstacle(entry.obstacle);
+      this.entries.delete(unit);
+      changed = true;
+    }
     for (const unit of units) {
       const entry = this.entries.get(unit);
       // Los caídos no bloquean (se puede pasar por encima de un cadáver).

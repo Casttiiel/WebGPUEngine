@@ -19,10 +19,16 @@ export interface HotbarEntry {
   skill: SkillDef | null;
   /** Burbuja de bendaleo con la suya activa: el hueco la cierra. */
   closes?: boolean;
+  /** Mente de cobre: esta habilidad se puede repetir gratis (sin acción, metal ni recarga). */
+  echo?: boolean;
 }
 
-/** Id del hueco de la pasiva del Ritmo (no se arma ni se lanza). */
+/** Ids de los huecos de las pasivas: Ritmo y Resonancia (no se arman ni se lanzan). */
 export const RHYTHM_ENTRY = 'rhythm';
+export const RESONANCE_ENTRY = 'resonance';
+
+export const isPassiveEntry = (id: string | null): boolean =>
+  id === RHYTHM_ENTRY || id === RESONANCE_ENTRY;
 
 export type AbilityId = 'jump' | 'push' | 'throw';
 
@@ -58,14 +64,17 @@ export function hotbarEntries(unit: UnitComponent): HotbarEntry[] {
     ...skills.map((s): HotbarEntry => {
       // Con su burbuja activa, el hueco la cierra (sin acción).
       const closes = isAnchoredBubble(s) && Zones.ownedBy(unit) !== null;
+      // Mente de cobre: la repetición no gasta nada.
+      const echo = unit.getEchoSkill() === s.id;
       return {
         id: s.id,
-        name: closes ? 'Cerrar burbuja' : s.name,
+        name: closes ? 'Cerrar burbuja' : echo ? `${s.name} ×2` : s.name,
         kind: 'skill',
-        cost: closes ? 'free' : s.cost,
+        cost: closes || echo ? 'free' : s.cost,
         attack: null,
         skill: s,
         ...(closes && { closes }),
+        ...(echo && { echo }),
       };
     }),
     // La pasiva del Ritmo, con su % actual.
@@ -74,6 +83,19 @@ export function hotbarEntries(unit: UnitComponent): HotbarEntry[] {
           {
             id: RHYTHM_ENTRY,
             name: `Ritmo +${unit.getStatus('rhythm')?.amount ?? 0} %`,
+            kind: 'passive',
+            cost: 'free',
+            attack: null,
+            skill: null,
+          } satisfies HotbarEntry,
+        ]
+      : []),
+    // La Resonancia de ettmetal (aura).
+    ...(unit.getResonance()
+      ? [
+          {
+            id: RESONANCE_ENTRY,
+            name: 'Resonancia',
             kind: 'passive',
             cost: 'free',
             attack: null,
@@ -130,6 +152,17 @@ export function hotbarTooltip(
 ): { title: string; lines: TooltipLine[] } {
   const lines: TooltipLine[] = [];
   const info = (text: string) => lines.push({ text, style: 'info' });
+  if (entry.id === RESONANCE_ENTRY) {
+    const aura = unit?.getResonance();
+    info(
+      `Pasiva · los aliados a ${fmt(aura?.radius ?? 3)} m de ti cuentan con +${aura?.amount ?? 2} de ${aura?.attribute ?? 'POT'}`,
+    );
+    lines.push({
+      text: 'Un núcleo de ettmetal en tu equipo: los alomantes que queman metal cerca arden más fuerte (empujes, saltos, burbujas, emociones). A ti no te afecta.',
+      style: 'description',
+    });
+    return { title: 'Resonancia de ettmetal', lines };
+  }
   if (entry.kind === 'passive') {
     info(
       `Pasiva · +${RHYTHM_STEP} % por golpe seguido al mismo objetivo (hasta +${RHYTHM_STEP * RHYTHM_MAX} %)`,
@@ -143,6 +176,9 @@ export function hotbarTooltip(
   if (entry.closes) {
     info('Sin acción · cierra tu burbuja de bendaleo ya');
     return { title: entry.name, lines };
+  }
+  if (entry.echo) {
+    info('Mente de cobre · sin acción, sin metal y sin recarga; puedes cambiar de objetivo');
   }
   if (entry.attack) {
     info(attackSummary(entry.attack, unit));

@@ -130,7 +130,19 @@ export type UnitComponentDataType = Readonly<{
    * habilidades con `charge` (skills.json). Se rellenan al empezar cada combate.
    */
   metalminds?: Record<string, number>;
+  /**
+   * Resonancia de ettmetal (pasiva de la Artificiera, GDD §10.4): los aliados a `radius` m
+   * (de borde a borde; ella no) cuentan con +`amount` en `attribute`. Default: sin aura.
+   */
+  resonance?: UnitResonance;
 }>;
+
+/** Aura que sube un atributo a los aliados cercanos (Resonancia de ettmetal). */
+export interface UnitResonance {
+  attribute: AttributeId;
+  amount: number;
+  radius: number;
+}
 
 /**
  * Estado alterado (GDD §6) o efecto de una habilidad sobre uno mismo.
@@ -147,6 +159,7 @@ export type UnitComponentDataType = Readonly<{
  *   pewter:       Peltre avivado: +3 m, inmune a Derribado y Aturdido, +20 % de daño.
  *   pewter_drag:  Arrastre de peltre: −50 % de movimiento y de daño.
  *   gold_heal:    Mente de oro: se cura `amount` al decantar y al empezar sus turnos.
+ *   copper:       Mente de cobre: la siguiente habilidad del turno se puede repetir gratis.
  */
 export type UnitStatusId =
   | 'fear'
@@ -160,7 +173,8 @@ export type UnitStatusId =
   | 'rhythm'
   | 'pewter'
   | 'pewter_drag'
-  | 'gold_heal';
+  | 'gold_heal'
+  | 'copper';
 
 /** Ritmo: % de daño por punto y máximo de puntos (GDD §10.2). */
 export const RHYTHM_STEP = 15;
@@ -231,6 +245,8 @@ const UP = vec3.fromValues(0, 1, 0);
  * las pone EncounterComponent; aquí solo está la ejecución.
  */
 export class UnitComponent extends Component {
+  /** Las unidades con Resonancia (pocas: así getAttributes no recorre todas). */
+  private static resonators = new Set<UnitComponent>();
   private faction: UnitFaction = 'neutral';
   private displayName: string | null = null;
   private role: string | null = null;
@@ -249,6 +265,11 @@ export class UnitComponent extends Component {
   /** Cargas por combate de cada mente de metal innata, y las que le quedan. */
   private metalminds: Record<string, number> = {};
   private charges = new Map<string, number>();
+  /** Mente de cobre: la habilidad que se puede repetir gratis (con el estado copper). */
+  private echoSkill: string | null = null;
+  private resonance: UnitResonance | null = null;
+  /** Atributos con la Resonancia de los aliados cercanos (se reutiliza: getAttributes). */
+  private readonly resonated: Attributes = makeAttributes();
   private down = false;
   private abilities: UnitAbility[] = [];
   private hideWhenDown = false;
@@ -332,6 +353,9 @@ export class UnitComponent extends Component {
     this.rhythm = data.rhythm ?? false;
     this.metalminds = { ...(data.metalminds ?? {}) };
     this.refillCharges();
+    this.resonance = data.resonance ? { ...data.resonance } : null;
+    if (this.resonance) UnitComponent.resonators.add(this);
+    else UnitComponent.resonators.delete(this);
     this.stats = a ? this.computeStats() : null;
   }
 
@@ -588,6 +612,18 @@ export class UnitComponent extends Component {
     this.charges = new Map(Object.entries(this.metalminds));
   }
 
+  /**
+   * Mente de cobre: la habilidad que puede repetir gratis este turno (null: ninguna, o aún
+   * no ha usado ninguna desde que decantó).
+   */
+  public getEchoSkill(): string | null {
+    return this.hasStatus('copper') ? this.echoSkill : null;
+  }
+
+  public setEchoSkill(id: string | null): void {
+    this.echoSkill = id;
+  }
+
   /** Al empezar y acabar un combate: rearmado y con las cargas de sus mentes de metal. */
   public resetForCombat(): void {
     this.rearm();
@@ -601,9 +637,45 @@ export class UnitComponent extends Component {
     return this.attributes !== null;
   }
 
-  /** Atributos (todos a 0 si no tiene). */
+  /**
+   * Atributos (todos a 0 si no tiene), con lo que sume la Resonancia de los aliados cercanos.
+   * Lo que se devuelve se reutiliza: copiarlo si hay que guardarlo.
+   */
   public getAttributes(): Readonly<Attributes> {
+    const base = this.attributes;
+    if (!base) return NO_ATTRIBUTES;
+    const bonus = this.resonanceBonus();
+    if (!bonus) return base;
+    Object.assign(this.resonated, base);
+    this.resonated[bonus.attribute] += bonus.amount;
+    return this.resonated;
+  }
+
+  /** Los atributos propios, sin la Resonancia (la ficha, el reparto de puntos). */
+  public getBaseAttributes(): Readonly<Attributes> {
     return this.attributes ?? NO_ATTRIBUTES;
+  }
+
+  public getResonance(): Readonly<UnitResonance> | null {
+    return this.resonance;
+  }
+
+  /**
+   * Lo que le sube la Resonancia de un aliado vivo cercano (null: nada). Varias del mismo
+   * atributo no se suman: cuenta la mayor.
+   */
+  public resonanceBonus(): { attribute: AttributeId; amount: number; source: UnitComponent } | null {
+    if (UnitComponent.resonators.size === 0 || !this.isAlive()) return null;
+    let best: { attribute: AttributeId; amount: number; source: UnitComponent } | null = null;
+    for (const r of UnitComponent.resonators) {
+      const aura = r.resonance!;
+      if (r === this || r.faction !== this.faction || !r.isAlive()) continue;
+      if (best && best.amount >= aura.amount) continue;
+      if (unitGap(r, this) <= aura.radius) {
+        best = { attribute: aura.attribute, amount: aura.amount, source: r };
+      }
+    }
+    return best;
   }
 
   public getAttribute(id: AttributeId): number {
@@ -1055,6 +1127,10 @@ export class UnitComponent extends Component {
   }
 
   /** Todas las unidades de la escena: primero la party, después enemigos y neutrales. */
+  public override dispose(): void {
+    UnitComponent.resonators.delete(this);
+  }
+
   public static getAll(): UnitComponent[] {
     const list = (Engine.getEntities().getObjectManagerByName('unit')?.getList() ??
       []) as UnitComponent[];
@@ -1090,6 +1166,16 @@ export interface UnitStats {
 }
 
 const NO_ATTRIBUTES: Readonly<Attributes> = makeAttributes();
+
+/** Distancia horizontal de borde a borde entre dos unidades (Infinity si no están al mismo nivel). */
+function unitGap(a: UnitComponent, b: UnitComponent): number {
+  const p = a.getFeetPosition(gapA);
+  const q = b.getFeetPosition(gapB);
+  if (Math.abs(p[1]! - q[1]!) > 2) return Infinity;
+  return Math.hypot(p[0]! - q[0]!, p[2]! - q[2]!) - a.getCapsuleRadius() - b.getCapsuleRadius();
+}
+const gapA = vec3.create();
+const gapB = vec3.create();
 
 /** Materiales de silueta por bando (los neutrales, como los objetos, no tienen). */
 const SILHOUETTES: Partial<Record<UnitFaction, string>> = {

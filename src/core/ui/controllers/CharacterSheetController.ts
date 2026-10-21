@@ -36,6 +36,12 @@ const GOLD: RGBA = [1, 0.84, 0.5, 1];
 const WHITE: RGBA = [1, 1, 1, 1];
 const GREY: RGBA = [0.72, 0.72, 0.78, 1];
 const RED: RGBA = [1, 0.45, 0.4, 1];
+/** Mentes de metal innatas que enseña la ficha (cargas por combate). */
+const METALMIND_NAME: Record<string, string> = {
+  iron: 'Mente de hierro',
+  gold: 'Mente de oro',
+  copper: 'Mente de cobre',
+};
 /** Cada estilo de línea: tamaño de letra, alto de la línea y espacio antes (px de referencia). */
 const STYLES: Record<LineStyle, { size: number; height: number; gap: number; color: RGBA }> = {
   header: { size: 24, height: 30, gap: 12, color: GOLD },
@@ -260,18 +266,36 @@ export class CharacterSheetController extends WidgetController {
     const add = (text: string, style: LineStyle, color?: RGBA) =>
       out.push({ text, style, ...(color && { color }) });
 
-    const iron = unit.getMaxCharges('iron');
+    const minds = Object.entries(METALMIND_NAME)
+      .filter(([mind]) => unit.getMaxCharges(mind) > 0)
+      .map(([mind, name]) => `${name} ${unit.getCharges(mind)} / ${unit.getMaxCharges(mind)}`);
+    const resonated = unit.resonanceBonus();
     add(
       [
         `Iniciativa ${unit.getInitiativeBase()} + 1d4`,
         `Penetración ${unit.getPenetration()}`,
         `Próximo crítico ${fmt(unit.getNextCritChance() * 100)} %`,
         ...(unit.hasReserve() ? [`Reserva ${unit.getMetal()} / ${unit.getMaxMetal()}`] : []),
-        ...(iron > 0 ? [`Mente de hierro ${unit.getCharges('iron')} / ${iron}`] : []),
+        ...minds,
         ...(unit.isMetallic() ? ['Lleva metal'] : []),
       ].join(' · '),
       'body',
     );
+
+    // Resonancia de ettmetal: la que emite y la que recibe de un aliado cercano.
+    const aura = unit.getResonance();
+    if (aura) {
+      add('PASIVAS', 'header');
+      add('Resonancia de ettmetal', 'title');
+      add(
+        `Los aliados a ${fmt(aura.radius)} m de ti cuentan con +${aura.amount} de ${aura.attribute} (a ti no te afecta)`,
+        'body',
+      );
+    }
+    if (resonated) {
+      const from = resonated.source.getDisplayName();
+      add(`Resonancia: +${resonated.amount} de ${resonated.attribute} (cerca de ${from})`, 'body');
+    }
 
     add('ATAQUES', 'header');
     for (const attack of unit.getAttacks()) {

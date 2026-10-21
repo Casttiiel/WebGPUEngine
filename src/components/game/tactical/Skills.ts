@@ -103,6 +103,17 @@ export type SkillEffect =
    */
   | { type: 'spiritZone'; zone: SpiritKind; rounds: number; radius: number }
   /**
+   * Pilón de acero: clava en el punto un prop (`prefab`: metálico, alto, da cobertura). Uno
+   * por lanzador: el nuevo sustituye al anterior. Desaparece al acabar el combate.
+   */
+  | { type: 'pylon'; prefab: string }
+  /**
+   * Vial de metal: el objetivo (un aliado con Reserva, no Seco) recupera `amount` +
+   * `amountPerPoint` por punto del atributo de escala (redondeado hacia abajo), sin pasarse del
+   * máximo.
+   */
+  | { type: 'restoreMetal'; amount: number; amountPerPoint?: number }
+  /**
    * Acciones de metal (GDD §2, §11), sobre uno mismo y al momento:
    *   duralumin: quema toda la Reserva; la siguiente, ×(1 + quemado / máximo) y sin coste.
    *   refill:    se declara Seco: el turno siguiente sin alomancia y, al acabarlo, Reserva llena.
@@ -220,6 +231,10 @@ export const isAnchoredBubble = (skill: SkillDef): boolean =>
 /** ¿Es una acción de metal (duraluminio, recargar)? */
 export const isMetalAction = (skill: SkillDef): boolean =>
   skill.effects.some((e) => e.type === 'duralumin' || e.type === 'refill');
+
+/** ¿Es la mente de cobre (deja repetir la siguiente habilidad del turno)? */
+export const isCopperMind = (skill: SkillDef): boolean =>
+  skill.effects.some((e) => e.type === 'status' && e.status === 'copper');
 
 /** ¿Es hostil? (daña, empuja o atrae: el cursor es de ataque y empieza combates). */
 export const isHostile = (skill: SkillDef): boolean =>

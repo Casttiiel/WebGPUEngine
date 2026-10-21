@@ -1,0 +1,48 @@
+{
+  "children": [],
+  "components": {
+    "name": "SteelPylon",
+    "transform": {
+      "position": [0, 0.8, 0],
+      "scale": [0.45, 1.6, 0.45]
+    },
+    "capsule_collider": {
+      "height": 1.6,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 60,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_crate_metal.mat"
+        }
+      ]
+    },
+    "unit": {
+      "faction": "neutral",
+      "displayName": "Pilón de acero",
+      "movement": 0,
+      "moveSpeed": 6,
+      "sightRange": 0,
+      "attacks": [],
+      "hideWhenDown": true
+    },
+    "health": {
+      "maxHp": 30
+    },
+    "tactical_prop": {
+      "size": "large",
+      "metallic": true,
+      "breakOnImpact": false
+    }
+  }
+}

@@ -19,7 +19,7 @@ import {
   type ThrowPlan,
 } from './EncounterComponent';
 import { PropComponent } from './PropComponent';
-import { RHYTHM_ENTRY, hotbarEntries, isAbilityId, unitSkill } from './Hotbar';
+import { hotbarEntries, isAbilityId, isPassiveEntry, unitSkill } from './Hotbar';
 import { circleOutline, coneOutline, isHostile, lineOutline, type SkillDef } from './Skills';
 import type { SkillMotion, SkillPlan, SkillTarget } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
@@ -389,7 +389,7 @@ export class TacticalPointerComponent extends Component {
   /** Arma un ataque para el próximo click en un enemigo (hotbar). Repetir lo desarma. */
   public armAttack(id: string | null): void {
     this.syncArmedOwner();
-    if (id === RHYTHM_ENTRY) return; // la pasiva no se arma
+    if (isPassiveEntry(id)) return; // las pasivas no se arman
     // Habilidades sobre uno mismo: no hay que elegir objetivo, se lanzan ya.
     const selected = PartyComponent.find()?.getSelected() ?? null;
     const skill = unitSkill(selected?.getComponent('unit') as UnitComponent | null, id);

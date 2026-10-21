@@ -12,8 +12,9 @@
  *   zone_cadmium.png    burbuja de cadmio (el mismo decal, en ámbar y con el borde a trazos)
  *   zone_fortune.png, zone_connection.png, zone_investiture.png
  *                       zonas espirituales (Fortuna dorada, Conexión violeta, Investidura blanca)
+ *   zone_resonance.png  aura de la Resonancia de ettmetal (aro fino turquesa)
  *   status_*.png      iconos del resto de estados: Seco, Aturdido, Derribado, Marcado, Burbuja
- *                     de acero y mente de hierro (Ligero / Pesado)
+ *                     de acero, mente de hierro (Ligero / Pesado) y mente de cobre
  *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
  *   ash_flakes.png    atlas 2×2 (512 px) de copos de ceniza distintos: bordes dentados de papel
  *                     quemado, más oscuros en el borde, con vetas (cada partícula usa uno)
@@ -89,6 +90,19 @@ const textures = {
     <circle cx="128" cy="128" r="118" fill="#dff0ff" fill-opacity="0.15" stroke="#ffffff" stroke-width="6" stroke-opacity="0.9"/>
     <circle cx="128" cy="128" r="108" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.7"/>
     <circle cx="128" cy="128" r="96" fill="none" stroke="#dff0ff" stroke-width="5" stroke-opacity="0.55" stroke-dasharray="2 14" stroke-linecap="round"/>`,
+  // Resonancia de ettmetal (aura de la Artificiera): casi sin relleno, solo un aro fino turquesa
+  // con un anillo de puntos, para que no se confunda con una burbuja ni con una zona.
+  'zone_resonance.png': `
+    <circle cx="128" cy="128" r="118" fill="#7fe8d8" fill-opacity="0.06" stroke="#c8fff4" stroke-width="4" stroke-opacity="0.75"/>
+    <circle cx="128" cy="128" r="110" fill="none" stroke="#7fe8d8" stroke-width="4" stroke-opacity="0.5" stroke-dasharray="1 11" stroke-linecap="round"/>`,
+  // Mente de cobre: dos flechas en círculo (repetir).
+  'status_copper.png': statusIcon(
+    '#b0603a',
+    '#ffd8c0',
+    `<path d="M80 128 A48 48 0 0 1 168 102" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+    <path d="M176 128 A48 48 0 0 1 88 154" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+    <path d="M150 82 L176 98 L156 122 Z M106 174 L80 158 L100 134 Z" fill="#ffffff"/>`,
+  ),
   // Ritmo: tres marcas en racha.
   'status_rhythm.png': statusIcon(
     '#3c6e3a',

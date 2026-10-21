@@ -40,7 +40,7 @@
       "eval": "__enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit(__S).maxMetal = 20; __unit(__S).setMetal(20); __unit('Enemy3').setMetal(0); window.__round0 = __engine.getCombatState().round"
     },
     {
-      "log": "El kit: Granada de mano y cuatro gadgets (más duraluminio y recargar)"
+      "log": "El kit: Granada de mano, seis gadgets y la mente de cobre (más duraluminio y recargar)"
     },
     {
       "assert": {
@@ -52,6 +52,9 @@
             "chromium_dart",
             "ettmetal_pulse",
             "gold_injector",
+            "steel_pylon",
+            "metal_vial",
+            "copper_mind",
             "duralumin",
             "refill"
           ]
