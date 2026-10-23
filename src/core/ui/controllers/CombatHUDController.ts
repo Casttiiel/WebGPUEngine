@@ -30,6 +30,8 @@ import { TacticalCameraControllerComponent } from '../../../components/game/tact
 import { PropComponent } from '../../../components/game/tactical/PropComponent';
 import { rangeText } from '../../../components/game/tactical/Stats';
 import { SkillCatalog } from '../../../components/game/tactical/Skills';
+import { intentText } from '../../../components/game/tactical/ActionText';
+import type { TacticalAIComponent } from '../../../components/game/tactical/TacticalAIComponent';
 import { wrapText } from '../textWrap';
 
 type RGBA = readonly [number, number, number, number];
@@ -127,7 +129,12 @@ const STATUS_FLOAT: Partial<Record<string, string>> = {
   pewter_drag: 'Arrastre',
   gold_heal: 'Mente de oro',
   copper: 'Mente de cobre',
+  enraged: '¡Enfurecido!',
+  soothed: 'Aplacado',
+  rallied: '¡Arenga!',
 };
+/** Rótulo de la intención leída (Leer intenciones): metros por encima del centro de la unidad. */
+const INTENT_HEIGHT = 1.75;
 /** Acciones de metal junto a la barra de metal (no en la hotbar). */
 const METAL_BUTTONS = ['duralumin', 'refill'] as const;
 /** Borde de arriba del panel de recursos (ancla abajo-centro). */
@@ -236,6 +243,8 @@ export class CombatHUDController extends WidgetController {
   private hotbar: HotbarSlot[] = [];
   private floats: FloatingText[] = [];
   private freeFloats: TextWidget[] = [];
+  /** Rótulos de Leer intenciones (uno por enemigo leído). */
+  private intents: TextWidget[] = [];
   /** Iconos de estado (miedo) sobre la cabeza de las unidades afectadas. */
   private statusIcons: ImageWidget[] = [];
   private coverShields: ImageWidget[] = [];
@@ -276,6 +285,7 @@ export class CombatHUDController extends WidgetController {
     this.updateRestartHint(encounter);
     this.updateFloats(dt);
     this.updateStatusIcons();
+    this.updateIntents();
     this.updateCoverShields();
     this.updateDamagePreview();
 
@@ -376,6 +386,21 @@ export class CombatHUDController extends WidgetController {
         break;
       case 'pylon':
         this.spawnFloat(unit, 'Pilón de acero', FLOAT_METAL, 1.5);
+        break;
+      case 'intent':
+        this.spawnFloat(unit, 'Leído', FLOAT_METAL, 1.5);
+        break;
+      case 'dispel':
+        this.spawnFloat(unit, 'Pierde los bufos', FLOAT_METAL, 1.5);
+        break;
+      case 'cleanse':
+        this.spawnFloat(unit, 'Sereno', FLOAT_HEAL, 1.5);
+        break;
+      case 'copper-cloud':
+        this.spawnFloat(unit, 'Nube de cobre', FLOAT_METAL, 1.5);
+        break;
+      case 'zinc-mind':
+        this.spawnFloat(unit, 'Mente de cinc', FLOAT_METAL, 1.5);
         break;
       case 'declare-drained':
         this.spawnFloat(unit, 'Bebe un vial', FLOAT_METAL, 1.5);
@@ -783,6 +808,38 @@ export class CombatHUDController extends WidgetController {
     });
   }
 
+  /** Leer intenciones: sobre cada enemigo leído, lo que va a hacer en su turno. */
+  private updateIntents(): void {
+    const read: { unit: UnitComponent; text: string }[] = [];
+    if (this.subscribed?.isInCombat()) {
+      for (const unit of UnitComponentRef.getAll()) {
+        if (!unit.isAlive()) continue;
+        const ai = unit.getOwner().getComponent('tactical_ai') as TacticalAIComponent | null;
+        const plan = ai?.getForecast();
+        if (plan) read.push({ unit, text: `Intención: ${intentText(plan, unit)}` });
+      }
+    }
+    this.intents.forEach((w, i) => {
+      const entry = read[i];
+      const screen = entry
+        ? this.worldToUI(
+            (() => {
+              const p = entry.unit.getPosition(this.tmpPos);
+              p[1] = p[1]! + INTENT_HEIGHT;
+              return p;
+            })(),
+          )
+        : null;
+      if (!entry || !screen) {
+        w.setVisible(false);
+        return;
+      }
+      w.setText(entry.text);
+      w.setPosition(screen[0] - w.getWidth() / 2, screen[1] - 16);
+      w.setVisible(true);
+    });
+  }
+
   /**
    * Sobre la cabeza de cada unidad viva, una fila con un icono por cada estado que tiene
    * (Aturdido, Derribado, Marcado, Seco, miedo, burbuja, mente de hierro), mientras dure.
@@ -885,6 +942,7 @@ export class CombatHUDController extends WidgetController {
       ...this.initiative.map((s) => s.frame),
       ...this.hotbar.map((s) => s.frame),
       ...this.statusIcons,
+      ...this.intents,
       ...this.damageBars.map((b) => b.root),
     ];
     for (const w of all) w?.setVisible(false);
@@ -982,6 +1040,8 @@ export class CombatHUDController extends WidgetController {
     for (let i = 1; i <= 8; i++) {
       const w = get<TextWidget>(`float_${i}`);
       if (w) this.freeFloats.push(w);
+      const intent = get<TextWidget>(`intent_${i}`);
+      if (intent) this.intents.push(intent);
     }
     for (let i = 1; i <= DAMAGE_BARS; i++) {
       const root = get<ImageWidget>(`dmg_bar_${i}`);

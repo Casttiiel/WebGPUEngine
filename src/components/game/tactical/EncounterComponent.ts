@@ -8,11 +8,16 @@ import { ModuleGameController } from '../../../modules/game/ModuleGameController
 import { Zones, type TimeBubble } from './Zones';
 import { SpiritZones } from './SpiritZones';
 import { ResonanceAuras } from './ResonanceAuras';
+import { CopperClouds } from './CopperClouds';
+import { planTurn, type TurnPlan } from './TacticalPlanner';
 import { Loader } from '../../../core/loaders/Loader';
 import type { EntityDataType } from '../../../types/SceneData.type';
 import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { Cover, rayToProp } from './Cover';
 import {
+  BUFF_STATUSES,
+  NEGATIVE_STATUSES,
+  RALLY_MOVEMENT,
   RHYTHM_MAX,
   UnitComponent,
   type StatusOptions,
@@ -164,6 +169,8 @@ export interface SkillPlan {
   motion: SkillMotion | null;
   /** Pulso de ettmetal: todo lo que sale despedido a la vez. */
   motions: SkillMotion[];
+  /** Provocar: a quién tendrá que atacar (null: falta elegirlo, el segundo paso al apuntar). */
+  forcedTarget?: UnitComponent | null;
   /**
    * Conexión: quién recibiría también los estados (de su bando, en la misma zona que un
    * afectado). No reciben daño ni el resto de efectos.
@@ -459,6 +466,11 @@ export class EncounterComponent extends Component {
   private blood = new BloodFX();
   /** Unidades que estaban dentro de un fuego el frame anterior (quemar solo al entrar). */
   private inFire = new Set<UnitComponent>();
+  /**
+   * Leer intenciones: la unidad cuyo turno se está previendo (planTurn la trata como la activa,
+   * con los recursos de un turno suyo). null fuera de forecastTurn.
+   */
+  private forecasting: UnitComponent | null = null;
   /** Pilón de acero de cada lanzador (uno a la vez; null: cargándose). */
   private pylons = new Map<UnitComponent, Entity | null>();
   private initialized = false;
@@ -537,6 +549,7 @@ export class EncounterComponent extends Component {
   /** Unidad cuyo turno es (solo en combate). */
   public getActiveUnit(): Entity | null {
     if (this.state !== 'combat') return null;
+    if (this.forecasting) return this.forecasting.getOwner();
     return this.combatants[this.turnIndex]?.unit.getOwner() ?? null;
   }
 
@@ -742,7 +755,8 @@ export class EncounterComponent extends Component {
     const fail = (reason: string): AttackPlan => ({ ...result, reason });
     if (!unit || !target) return fail('not a unit');
     if (!attack) return fail(`unknown attack '${attackId}'`);
-    if (target === unit || target.getFaction() === unit.getFaction()) {
+    const forced = unit.getForcedTarget() === target;
+    if (target === unit || (target.getFaction() === unit.getFaction() && !forced)) {
       return fail('cannot attack an ally');
     }
     if (!target.isAlive()) return fail('target is down');
@@ -1343,7 +1357,7 @@ export class EncounterComponent extends Component {
     }
     // Mente de cobre: la habilidad que se repite no cuesta acción, metal ni recarga.
     const echo = this.isEcho(unit, skill);
-    if (isCopperMind(skill) && this.state !== 'combat') return fail('only in combat');
+    if (needsCombat(skill) && this.state !== 'combat') return fail('only in combat');
     const cost = metalCost(unit, skill);
     result.metalCost = this.state === 'combat' && !echo ? cost.metal : 0;
     // Investidura: lanzada desde dentro, +50 % (como el multiplicador del duraluminio).
@@ -1372,6 +1386,26 @@ export class EncounterComponent extends Component {
         // Dardo de cromo: solo contra quien tiene Reserva (los alománticos).
         if (hasEffect(skill, 'drain') && !targetUnit.hasReserve()) {
           return fail('not allomantic');
+        }
+        // Nube de cobre: dentro de la de su bando, la alomancia rival lanzada desde fuera no llega.
+        if (blockedByCopper(skill) && CopperClouds.shields(targetUnit, unit)) {
+          return fail('copper cloud');
+        }
+        // Leer intenciones: solo a quien decide con una IA.
+        if (hasEffect(skill, 'readIntent') && !this.getAI(targetUnit)) {
+          return fail('no intentions');
+        }
+        // Provocar: a quién tendrá que atacar (cualquiera vivo menos él mismo).
+        if (hasEffect(skill, 'provoke')) {
+          const forced = (target.toUnit?.getComponent('unit') as UnitComponent | null) ?? null;
+          if (forced === targetUnit) return fail('no target');
+          if (forced && !forced.isAlive()) return fail('target is down');
+          if (forced && PropComponent.of(forced.getOwner())) return fail('no target');
+          result.forcedTarget = forced;
+        }
+        // Serenar: solo si tiene algo que quitarle.
+        if (hasEffect(skill, 'cleanse') && !NEGATIVE_STATUSES.some((id) => targetUnit.hasStatus(id))) {
+          return fail('nothing to cleanse');
         }
         // Vial de metal: a otro, con Reserva, no Seco y sin la Reserva llena.
         if (hasEffect(skill, 'restoreMetal')) {
@@ -1511,6 +1545,12 @@ export class EncounterComponent extends Component {
       }
     }
 
+    // Nube de cobre: en un área, los que protege no reciben la alomancia (ni salen despedidos).
+    if (blockedByCopper(skill)) {
+      result.affected = result.affected.filter((u) => !CopperClouds.shields(u, unit));
+      result.motions = result.motions.filter((m) => !CopperClouds.shields(m.body, unit));
+    }
+
     // Conexión: los estados se copian a los del mismo bando que estén en la zona.
     if (hasEffect(skill, 'status') || hasEffect(skill, 'drain')) {
       const copies = new Set<UnitComponent>();
@@ -1524,7 +1564,9 @@ export class EncounterComponent extends Component {
     const permission = this.canAct(unit, skill.cost === 'free' || echo ? null : skill.cost, skill);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
-    if (this.state === 'combat' && !echo && unit.getCooldown(skill.id) > 0) {
+    // Previendo su turno, las recargas ya han avanzado una (beginTurn).
+    const tick = this.forecasting === unit ? 1 : 0;
+    if (this.state === 'combat' && !echo && unit.getCooldown(skill.id) - tick > 0) {
       return fail('on cooldown');
     }
     if (!result.inRange || !result.lineOfSight) {
@@ -1765,8 +1807,11 @@ export class EncounterComponent extends Component {
       if (bubble) this.endBubble(bubble);
       return { ...plan, ok: true };
     }
-    // Lanzar necesita destino (el segundo paso al apuntar).
+    // Lanzar necesita destino y Provocar, a quién (el segundo paso al apuntar).
     if (hasEffect(skill, 'hurl') && !plan.motion) {
+      return { ...plan, ok: false, reason: 'no destination' };
+    }
+    if (hasEffect(skill, 'provoke') && !plan.forcedTarget) {
       return { ...plan, ok: false, reason: 'no destination' };
     }
     if (this.state === 'combat' && this.isEcho(unit, skill)) {
@@ -2038,6 +2083,62 @@ export class EncounterComponent extends Component {
         case 'pylon':
           this.placePylon(caster, origin, effect.prefab);
           break;
+        case 'readIntent':
+          for (const u of affected()) if (u.isAlive()) this.readIntent(u);
+          break;
+        case 'provoke': {
+          const forced = plan.forcedTarget;
+          if (!forced?.isAlive()) break;
+          for (const u of affected()) {
+            this.applyStatus(u, 'enraged', caster, effect.turns, { target: forced.getOwner() });
+          }
+          break;
+        }
+        case 'soothe':
+          // Aplacar: le quita los bufos; si no tiene, queda Aplacado.
+          for (const u of affected()) {
+            if (!u.isAlive()) continue;
+            const buffs = BUFF_STATUSES.filter((id) => u.hasStatus(id));
+            if (!buffs.length) {
+              this.applyStatus(u, 'soothed', caster, effect.turns);
+              continue;
+            }
+            for (const id of buffs) {
+              u.removeStatus(id);
+              this.emit('status-end', { unit: u.getOwner(), status: id });
+            }
+            this.emit('dispel', { unit: u.getOwner(), source: caster.getOwner(), amount: buffs.length });
+          }
+          break;
+        case 'cleanse':
+          // Serenar: fuera los estados negativos (no Seco ni el Arrastre).
+          for (const u of affected()) {
+            const bad = NEGATIVE_STATUSES.filter((id) => u.hasStatus(id));
+            for (const id of bad) {
+              u.removeStatus(id);
+              this.emit('status-end', { unit: u.getOwner(), status: id });
+            }
+            if (bad.length) this.emit('cleanse', { unit: u.getOwner(), amount: bad.length });
+          }
+          break;
+        case 'copperCloud':
+          // Una a la vez: la nueva sustituye a la anterior.
+          CopperClouds.clear((c) => c.caster === caster);
+          CopperClouds.add(caster, origin, effect.radius, this.round + effect.rounds);
+          this.emit('copper-cloud', { unit: caster.getOwner() });
+          break;
+        case 'zincMind': {
+          // Pensar deprisa: las intenciones de todos los enemigos y una Acción adicional más.
+          for (const c of this.combatants) {
+            const u = c.unit;
+            if (u.isAlive() && u.getFaction() !== caster.getFaction() && this.getAI(u)) {
+              this.readIntent(u);
+            }
+          }
+          if (caster.getOwner() === this.getActiveUnit()) this.resources.bonusAction += 1;
+          this.emit('zinc-mind', { unit: caster.getOwner() });
+          break;
+        }
         case 'restoreMetal': {
           // Vial de metal: 2 + TEM/2, sin pasarse del máximo.
           const scale = skill.scale ? caster.getAttribute(skill.scale) : 0;
@@ -2113,6 +2214,57 @@ export class EncounterComponent extends Component {
 
   private clearPylons(): void {
     for (const caster of [...this.pylons.keys()]) this.removePylon(caster);
+  }
+
+  /**
+   * Leer intenciones: lo que `unit` haría si su turno empezara ahora (la misma IA, con los
+   * recursos de un turno suyo). Se le queda comprometido (TacticalAIComponent.setForecast).
+   */
+  private readIntent(unit: UnitComponent): void {
+    const plan = this.forecastTurn(unit);
+    if (!plan) return;
+    this.getAI(unit)?.setForecast(plan);
+    this.emit('intent', { unit: unit.getOwner() });
+  }
+
+  /**
+   * Prevé el turno de `unit` sin jugarlo: planTurn con ella como activa, sus recursos de turno
+   * y su obstáculo del navmesh quitado. Lo deja todo como estaba. null si no tiene IA.
+   */
+  public forecastTurn(unit: UnitComponent): TurnPlan | null {
+    const ai = this.getAI(unit);
+    if (this.state !== 'combat' || !ai || !unit.isAlive()) return null;
+    const saved = { resources: this.resources, turnLost: this.turnLost };
+    this.forecasting = unit;
+    this.resources = this.turnResourcesFor(unit);
+    this.turnLost = false;
+    UnitObstacles.sync(unit.getOwner());
+    try {
+      return planTurn(this, unit, ai.getProfile());
+    } finally {
+      this.forecasting = null;
+      this.resources = saved.resources;
+      this.turnLost = saved.turnLost;
+      UnitObstacles.sync(this.getActingUnit());
+    }
+  }
+
+  /**
+   * Recursos con los que empieza un turno `unit`: Peltre avivado +3 m, Arrastre la mitad,
+   * Arenga +2 m, Aplacado −2 m, Aturdido sin Acción, Derribado la mitad del movimiento. En una
+   * burbuja de cadmio que aún no le ha quitado un turno, nada (lo pierde).
+   */
+  private turnResourcesFor(unit: UnitComponent): TurnResources {
+    const slow = Zones.containing(unit, 'slow');
+    if (slow && !slow.lostTurns.has(unit)) return { action: 0, bonusAction: 0, movement: 0 };
+    const r = { action: 1, bonusAction: 1, movement: unit.getMovement() };
+    if (unit.hasStatus('pewter')) r.movement += PEWTER_MOVEMENT;
+    if (unit.hasStatus('pewter_drag')) r.movement /= 2;
+    if (unit.hasStatus('rallied')) r.movement += RALLY_MOVEMENT;
+    if (unit.hasStatus('soothed')) r.movement = Math.max(0, r.movement - RALLY_MOVEMENT);
+    if (unit.hasStatus('stunned')) r.action = 0;
+    if (unit.hasStatus('prone')) r.movement /= 2;
+    return r;
   }
 
   /** ¿Es `skill` la que `unit` puede repetir gratis con la mente de cobre? */
@@ -2213,10 +2365,15 @@ export class EncounterComponent extends Component {
     const untilTurnStart = options.untilTurnStart ?? (id === 'stunned' || id === 'prone');
     unit.addStatus(id, turns, source?.getOwner() ?? null, { ...options, untilTurnStart });
     if (source !== unit) unit.stop();
-    // Peltre avivado en su turno: los metros extra ya.
+    // Peltre avivado en su turno: los metros extra ya (y la Arenga, los suyos).
     if (id === 'pewter' && unit.getOwner() === this.getActiveUnit()) {
       this.resources.movement += PEWTER_MOVEMENT;
     }
+    if (id === 'rallied' && unit.getOwner() === this.getActiveUnit()) {
+      this.resources.movement += RALLY_MOVEMENT;
+    }
+    // Una emoción nueva le cambia los planes: lo que se le leyó ya no vale.
+    if (id === 'enraged' || id === 'soothed' || id === 'fear') this.getAI(unit)?.clearForecast();
     // Mente de oro: la primera curación, al decantar.
     if (id === 'gold_heal' && options.amount) this.healUnit(unit, options.amount);
     // Seco por otro (dardo de cromo): la Reserva, vacía (al acabar el turno Seco, se llena).
@@ -2378,6 +2535,7 @@ export class EncounterComponent extends Component {
     Zones.clear();
     SpiritZones.clear((z) => !z.relic);
     this.clearPylons();
+    CopperClouds.clear();
     for (const u of UnitComponent.getAll()) {
       u.clearCooldowns();
       u.clearStatuses();
@@ -2422,6 +2580,7 @@ export class EncounterComponent extends Component {
     Zones.clear();
     SpiritZones.clear((z) => !z.relic);
     this.clearPylons();
+    CopperClouds.clear();
     ResonanceAuras.clear();
     this.inFire.clear();
     this.detectionTimer = DETECTION_INTERVAL;
@@ -2982,6 +3141,7 @@ export class EncounterComponent extends Component {
       // Las de un relicario roto, al empezar la ronda; las liberadas, en el turno de quien las
       // liberó (beginTurn) o aquí, una ronda después, si ha caído.
       SpiritZones.clear((z) => this.round >= z.untilRound + (z.caster ? 1 : 0));
+      CopperClouds.clear((c) => this.round >= c.untilRound + 1);
       this.emit('round', {});
     }
   }
@@ -2994,7 +3154,6 @@ export class EncounterComponent extends Component {
     }
     const active = this.combatants[this.turnIndex];
     if (!active) return;
-    this.resources = { action: 1, bonusAction: 1, movement: active.unit.getMovement() };
     // Una burbuja lanzada dura rondas completas: caduca al empezar el turno de quien la lanzó.
     for (const b of [...Zones.getAll()]) {
       if (!b.anchored && b.caster === active.unit && this.round >= b.untilRound) {
@@ -3002,19 +3161,13 @@ export class EncounterComponent extends Component {
       }
     }
     SpiritZones.clear((z) => z.caster === active.unit && this.round >= z.untilRound);
+    CopperClouds.clear((c) => c.caster === active.unit && this.round >= c.untilRound);
     // Burbuja de cadmio: quien empieza su turno dentro lo pierde (una vez por burbuja).
+    // Peltre, Arrastre, Arenga, Aplacado, Aturdido y Derribado: turnResourcesFor.
+    this.resources = this.turnResourcesFor(active.unit);
     const slow = Zones.containing(active.unit, 'slow');
     this.turnLost = !!slow && !slow.lostTurns.has(active.unit);
-    if (this.turnLost) {
-      slow!.lostTurns.add(active.unit);
-      this.resources = { action: 0, bonusAction: 0, movement: 0 };
-    }
-    // Peltre avivado: +3 m. Arrastre: la mitad. Aturdido: pierde la Acción. Derribado:
-    // levantarse cuesta la mitad del movimiento.
-    if (active.unit.hasStatus('pewter')) this.resources.movement += PEWTER_MOVEMENT;
-    if (active.unit.hasStatus('pewter_drag')) this.resources.movement /= 2;
-    if (active.unit.hasStatus('stunned')) this.resources.action = 0;
-    if (active.unit.hasStatus('prone')) this.resources.movement /= 2;
+    if (this.turnLost) slow!.lostTurns.add(active.unit);
     active.unit.setHitThisTurn(false);
     // Mente de oro: se cura al empezar cada turno mientras dure.
     const gold = active.unit.getStatus('gold_heal');
@@ -3400,6 +3553,7 @@ export class EncounterComponent extends Component {
               motion: r.motion ? motionSummary(r.motion) : null,
               motions: r.motions.map(motionSummary),
               connected: r.connected.map((u) => u.getOwner().getName()),
+              forcedTarget: r.forcedTarget?.getOwner().getName() ?? null,
               approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
@@ -3515,6 +3669,30 @@ function aimWithin(away: vec3, wanted: vec3 | null, skill: SkillDef): vec3 {
  * El enemigo a cuya espalda acabaría `unit` con los pies en `point`: pegado a él (de borde a
  * borde, FLANK_REACH) y detrás de hacia donde mira.
  */
+/** Solo tienen sentido en combate (cargas, turnos, IA): la mente de cobre y la de cinc, leer. */
+function needsCombat(skill: SkillDef): boolean {
+  return isCopperMind(skill) || hasEffect(skill, 'zincMind') || hasEffect(skill, 'readIntent');
+}
+
+/**
+ * ¿La para la Nube de cobre? La alomancia que actúa sobre la unidad: empujes, tirones, el pulso,
+ * emociones, cromo y bronce. No lo físico (el peltre) ni lo que solo empuja una moneda.
+ */
+function blockedByCopper(skill: SkillDef): boolean {
+  if (!skill.allomantic) return false;
+  return skill.effects.some(
+    (e) =>
+      e.type === 'steelPush' ||
+      e.type === 'ironPull' ||
+      e.type === 'radialPush' ||
+      e.type === 'provoke' ||
+      e.type === 'soothe' ||
+      e.type === 'drain' ||
+      e.type === 'readIntent' ||
+      (e.type === 'status' && (e.status === 'fear' || e.status === 'enraged' || e.status === 'soothed')),
+  );
+}
+
 function flankedEnemy(unit: UnitComponent, point: vec3): UnitComponent | null {
   const p = vec3.create();
   for (const u of UnitComponent.getAll()) {

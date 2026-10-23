@@ -160,6 +160,10 @@ export interface UnitResonance {
  *   pewter_drag:  Arrastre de peltre: −50 % de movimiento y de daño.
  *   gold_heal:    Mente de oro: se cura `amount` al decantar y al empezar sus turnos.
  *   copper:       Mente de cobre: la siguiente habilidad del turno se puede repetir gratis.
+ *   enraged:      Enfurecido (Provocar): tiene que atacar a `target`; +25 % de daño hecho y −3
+ *                 de armadura.
+ *   soothed:      Aplacado: −2 m de movimiento y −20 % de daño (lo contrario de la Arenga).
+ *   rallied:      Arenga: +2 m de movimiento y +20 % de daño.
  */
 export type UnitStatusId =
   | 'fear'
@@ -174,7 +178,39 @@ export type UnitStatusId =
   | 'pewter'
   | 'pewter_drag'
   | 'gold_heal'
-  | 'copper';
+  | 'copper'
+  | 'enraged'
+  | 'soothed'
+  | 'rallied';
+
+/** Bufos: lo que Aplacar le quita a un enemigo (si no tiene ninguno, lo deja Aplacado). */
+export const BUFF_STATUSES: readonly UnitStatusId[] = [
+  'rallied',
+  'pewter',
+  'steel_bubble',
+  'iron_light',
+  'iron_heavy',
+  'gold_heal',
+  'rhythm',
+  'copper',
+];
+
+/**
+ * Estados negativos que Serenar le quita a un aliado. Seco y el Arrastre de peltre no: son la
+ * resaca de un poder propio (GDD §10.0, regla 4).
+ */
+export const NEGATIVE_STATUSES: readonly UnitStatusId[] = [
+  'fear',
+  'stunned',
+  'prone',
+  'marked',
+  'enraged',
+  'soothed',
+];
+
+/** Enfurecido: armadura que pierde. Arenga y Aplacado: metros de movimiento (+/−). */
+export const ENRAGED_ARMOR = 3;
+export const RALLY_MOVEMENT = 2;
 
 /** Ritmo: % de daño por punto y máximo de puntos (GDD §10.2). */
 export const RHYTHM_STEP = 15;
@@ -205,11 +241,14 @@ export interface UnitStatus {
   amount?: number;
   /** Se acaba al empezar su siguiente turno (Derribado, Aturdido, burbuja, Pesado). */
   untilTurnStart?: boolean;
+  /** Enfurecido: a quién tiene que atacar. */
+  target?: Entity | null;
 }
 
 export interface StatusOptions {
   amount?: number;
   untilTurnStart?: boolean;
+  target?: Entity | null;
 }
 
 /** Acciones que no son ataques: saltar (gasta movimiento) y empujar un objeto (acción adicional). */
@@ -682,8 +721,9 @@ export class UnitComponent extends Component {
     return this.getAttributes()[id];
   }
 
+  /** Armadura (Enfurecido: −3). */
   public getArmor(): number {
-    return this.armor;
+    return this.hasStatus('enraged') ? Math.max(0, this.armor - ENRAGED_ARMOR) : this.armor;
   }
 
   /** Para pruebas y, más adelante, el equipo. */
@@ -822,7 +862,16 @@ export class UnitComponent extends Component {
     const amount = Math.max(options.amount ?? 0, current?.amount ?? 0);
     if (amount > 0) status.amount = amount;
     if (options.untilTurnStart) status.untilTurnStart = true;
+    const target = options.target !== undefined ? options.target : current?.target;
+    if (target) status.target = target;
     this.statuses.set(id, status);
+  }
+
+  /** Enfurecido: la unidad viva a la que tiene que atacar (null: no lo está o ya cayó). */
+  public getForcedTarget(): UnitComponent | null {
+    const target = this.statuses.get('enraged')?.target;
+    const unit = (target?.getComponent('unit') as UnitComponent | null | undefined) ?? null;
+    return unit?.isAlive() ? unit : null;
   }
 
   /** Empieza su turno: se acaban los estados "hasta tu siguiente turno". Devuelve cuáles. */

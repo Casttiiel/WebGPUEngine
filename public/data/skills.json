@@ -604,5 +604,126 @@
     ],
     "clip": "Spell_Simple_Shoot",
     "description": "Liberas una mente de niquelsil feruquímica en el suelo: una zona de Investidura de 3 m durante 3 turnos tuyos. Las habilidades lanzadas desde dentro, de cualquier bando, hacen +50 %. Solo una zona a la vez; las tres mentes comparten la recarga."
+  },
+  "read_intent": {
+    "name": "Leer intenciones",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "target": "unit",
+    "range": 15,
+    "targets": "enemy",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "readIntent"
+      }
+    ],
+    "description": "Quemas bronce y escuchas sus pulsos: ves qué va a hacer en su turno. Mientras pueda, lo hará; si se lo impides (o lo cambias con tus emociones), improvisa."
+  },
+  "provoke": {
+    "name": "Encender: Provocar",
+    "cost": "action",
+    "metal": 2,
+    "allomantic": true,
+    "cooldown": 1,
+    "target": "unit",
+    "range": 12,
+    "targets": "enemy",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "provoke",
+        "turns": 1
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Le enciendes la rabia: en su turno tiene que atacar a quien tú elijas (a ti, a un aliado o a otro enemigo), con +25 % de daño y −3 de armadura. Primero el enemigo y después a quién."
+  },
+  "rally": {
+    "name": "Encender: Arenga",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "cooldown": 1,
+    "target": "unit",
+    "range": 12,
+    "targets": "ally",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "status",
+        "status": "rallied",
+        "turns": 1
+      }
+    ],
+    "description": "Le enciendes el ánimo a un aliado: durante su siguiente turno, +2 m de movimiento y +20 % de daño."
+  },
+  "soothe": {
+    "name": "Aplacar",
+    "cost": "action",
+    "metal": 2,
+    "allomantic": true,
+    "target": "unit",
+    "range": 12,
+    "targets": "enemy",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "soothe",
+        "turns": 1
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Le apagas las ganas: pierde los bufos que tenga. Si no tiene ninguno, queda Aplacado durante su siguiente turno: −2 m de movimiento y −20 % de daño."
+  },
+  "serene": {
+    "name": "Aplacar: Serenar",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "cooldown": 2,
+    "target": "unit",
+    "range": 12,
+    "targets": "ally",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "cleanse"
+      }
+    ],
+    "description": "Le calmas el miedo, la rabia y el aturdimiento a un aliado: pierde los estados negativos (no el Seco ni el Arrastre de peltre)."
+  },
+  "copper_cloud": {
+    "name": "Nube de cobre",
+    "cost": "action",
+    "metal": 2,
+    "allomantic": true,
+    "cooldown": 3,
+    "target": "point",
+    "range": 10,
+    "radius": 4,
+    "affects": "allies",
+    "effects": [
+      {
+        "type": "copperCloud",
+        "rounds": 2,
+        "radius": 4
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Quemas cobre y envuelves la zona: durante 2 rondas, a los aliados de dentro no les puede alcanzar la alomancia enemiga lanzada desde fuera (empujes, tirones, emociones, cromo, bronce)."
+  },
+  "zinc_mind": {
+    "name": "Mente de cinc",
+    "cost": "free",
+    "charge": "zinc",
+    "target": "self",
+    "effects": [
+      {
+        "type": "zincMind"
+      }
+    ],
+    "description": "Decantas velocidad mental de tu mente de cinc (sin gastar acción): lees las intenciones de todos los enemigos y ganas una Acción adicional este turno."
   }
 }

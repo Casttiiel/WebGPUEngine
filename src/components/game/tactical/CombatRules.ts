@@ -146,6 +146,10 @@ export function damageDealtMultiplier(
   let m = 1;
   if (attacker.hasStatus('pewter')) m *= 1.2;
   if (attacker.hasStatus('pewter_drag')) m *= 0.5;
+  // Arenga +20 %, Aplacado −20 %, Enfurecido +25 % (GDD §6).
+  if (attacker.hasStatus('rallied')) m *= 1.2;
+  if (attacker.hasStatus('soothed')) m *= 0.8;
+  if (attacker.hasStatus('enraged')) m *= 1.25;
   if (target) m *= 1 + (attacker.getRhythmPoints(target) * RHYTHM_STEP) / 100;
   return m;
 }

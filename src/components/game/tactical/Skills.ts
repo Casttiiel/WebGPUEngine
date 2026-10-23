@@ -114,6 +114,28 @@ export type SkillEffect =
    */
   | { type: 'restoreMetal'; amount: number; amountPerPoint?: number }
   /**
+   * Leer intenciones (bronce): enseña qué hará el enemigo en su turno (lo que planea su IA
+   * ahora) y lo compromete a ello mientras siga siendo posible.
+   */
+  | { type: 'readIntent' }
+  /**
+   * Provocar (cinc): el objetivo queda Enfurecido `turns` turnos suyos contra la unidad que se
+   * elija (SkillTarget.toUnit: la Voz, un aliado u otro enemigo).
+   */
+  | { type: 'provoke'; turns: number }
+  /** Aplacar (latón): le quita los bufos; si no tiene, queda Aplacado `turns` turnos suyos. */
+  | { type: 'soothe'; turns: number }
+  /** Serenar (latón): le quita a un aliado los estados negativos (no Seco ni el Arrastre). */
+  | { type: 'cleanse' }
+  /**
+   * Nube de cobre: zona de `radius` m hasta el turno de quien la lanza en `rounds` rondas.
+   * Los de su bando que estén dentro no pueden ser objetivo de la alomancia de los rivales
+   * lanzada desde fuera.
+   */
+  | { type: 'copperCloud'; rounds: number; radius: number }
+  /** Mente de cinc (pensar deprisa): lee las intenciones de todos los enemigos y +1 Acción adicional. */
+  | { type: 'zincMind' }
+  /**
    * Acciones de metal (GDD §2, §11), sobre uno mismo y al momento:
    *   duralumin: quema toda la Reserva; la siguiente, ×(1 + quemado / máximo) y sin coste.
    *   refill:    se declara Seco: el turno siguiente sin alomancia y, al acabarlo, Reserva llena.
@@ -245,6 +267,8 @@ export const isHostile = (skill: SkillDef): boolean =>
     hasEffect(skill, 'steelPush') ||
     hasEffect(skill, 'ironPull') ||
     hasEffect(skill, 'radialPush') ||
+    hasEffect(skill, 'provoke') ||
+    hasEffect(skill, 'soothe') ||
     hasEffect(skill, 'drain') ||
     hasEffect(skill, 'hurl') ||
     hasEffect(skill, 'finisher'));

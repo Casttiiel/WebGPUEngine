@@ -13,8 +13,10 @@
  *   zone_fortune.png, zone_connection.png, zone_investiture.png
  *                       zonas espirituales (Fortuna dorada, Conexión violeta, Investidura blanca)
  *   zone_resonance.png  aura de la Resonancia de ettmetal (aro fino turquesa)
+ *   zone_copper.png     Nube de cobre (disco cobrizo, borde de humo a trazos cortos)
  *   status_*.png      iconos del resto de estados: Seco, Aturdido, Derribado, Marcado, Burbuja
- *                     de acero, mente de hierro (Ligero / Pesado) y mente de cobre
+ *                     de acero, mente de hierro (Ligero / Pesado), mente de cobre, Enfurecido,
+ *                     Aplacado y Arenga
  *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
  *   ash_flakes.png    atlas 2×2 (512 px) de copos de ceniza distintos: bordes dentados de papel
  *                     quemado, más oscuros en el borde, con vetas (cada partícula usa uno)
@@ -95,6 +97,28 @@ const textures = {
   'zone_resonance.png': `
     <circle cx="128" cy="128" r="118" fill="#7fe8d8" fill-opacity="0.06" stroke="#c8fff4" stroke-width="4" stroke-opacity="0.75"/>
     <circle cx="128" cy="128" r="110" fill="none" stroke="#7fe8d8" stroke-width="4" stroke-opacity="0.5" stroke-dasharray="1 11" stroke-linecap="round"/>`,
+  // Nube de cobre: disco cobrizo más opaco (humo) con el borde a trazos cortos.
+  'zone_copper.png': `
+    <circle cx="128" cy="128" r="118" fill="#c07040" fill-opacity="0.22" stroke="#f0c0a0" stroke-width="6" stroke-opacity="0.85" stroke-dasharray="8 6"/>
+    <circle cx="128" cy="128" r="100" fill="none" stroke="#e09868" stroke-width="10" stroke-opacity="0.25"/>`,
+  // Enfurecido: llama.
+  'status_enraged.png': statusIcon(
+    '#a8281c',
+    '#ffc0a8',
+    `<path d="M128 56 C 150 96 178 108 178 150 A50 50 0 0 1 78 150 C 78 124 96 112 104 88 C 112 108 120 112 128 116 C 132 96 128 76 128 56 Z" fill="#ffffff"/>`,
+  ),
+  // Aplacado: ola (calma).
+  'status_soothed.png': statusIcon(
+    '#2c5e8a',
+    '#c0dcf4',
+    `<path d="M64 112 Q 96 84 128 112 T 192 112 M64 152 Q 96 124 128 152 T 192 152" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>`,
+  ),
+  // Arenga: flecha hacia arriba.
+  'status_rallied.png': statusIcon(
+    '#b8861c',
+    '#fff0b8',
+    `<path d="M128 60 L184 124 H148 V196 H108 V124 H72 Z" fill="#ffffff"/>`,
+  ),
   // Mente de cobre: dos flechas en círculo (repetir).
   'status_copper.png': statusIcon(
     '#b0603a',

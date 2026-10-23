@@ -142,6 +142,13 @@ const REASON_TEXT: Record<string, string> = {
   covered: 'a cubierto',
   'not allomantic': 'no tiene Reserva de metal',
   'turn lost': 'pierde el turno (cadmio)',
+  'cannot place there': 'no cabe ahí',
+  'reserve full': 'tiene la Reserva llena',
+  'target is drained': 'está Seco',
+  'only in combat': 'solo en combate',
+  'copper cloud': 'protegido por una nube de cobre',
+  'no intentions': 'no hay nada que leer',
+  'nothing to cleanse': 'no tiene nada que quitarle',
 };
 
 /**
@@ -418,7 +425,7 @@ export class TacticalPointerComponent extends Component {
     return (
       !!skill &&
       skill.target === 'unit' &&
-      skill.effects.some((e) => e.type === 'steelPush' || e.type === 'hurl')
+      skill.effects.some((e) => e.type === 'steelPush' || e.type === 'hurl' || e.type === 'provoke')
     );
   }
 
@@ -427,6 +434,10 @@ export class TacticalPointerComponent extends Component {
     const unit = this.hoveredUnit?.getComponent('unit') as UnitComponent | null | undefined;
     if (this.hoverKind === 'ui' || this.hoverKind === 'none') return { unit: held };
     const selected = PartyComponent.find()?.getSelected() ?? null;
+    // Provocar: contra la unidad bajo el cursor (también la propia Voz).
+    if (skill.effects.some((e) => e.type === 'provoke')) {
+      return unit && unit.getOwner() !== held ? { unit: held, toUnit: unit.getOwner() } : { unit: held };
+    }
     const other = unit && unit.getOwner() !== held && unit.getOwner() !== selected ? unit : null;
     if (skill.effects.some((e) => e.type === 'hurl')) {
       // Lanzar: junto a la unidad bajo el cursor, o al punto del suelo.
@@ -832,8 +843,13 @@ export class TacticalPointerComponent extends Component {
     });
     let label = skill.name;
     const motion = plan.motion;
+    const provoke = skill.effects.some((e) => e.type === 'provoke');
     if (this.isAimedPush(skill) && plan.canCast) {
-      label += this.skillHeld ? ' (apunta y haz click)' : ' (click para elegir)';
+      const second = provoke ? ' (elige a quién ataca)' : ' (apunta y haz click)';
+      label += this.skillHeld ? second : ' (click para elegir)';
+    }
+    if (provoke && plan.forcedTarget && plan.affected[0]) {
+      label += `: ${plan.affected[0].getDisplayName()} ataca a ${plan.forcedTarget.getDisplayName()}`;
     }
     if (!plan.canCast && plan.reason) label += ` · ${reasonText(plan.reason)}`;
     else if (motion?.kind === 'disarm') label += ` → desarma a ${motion.body.getDisplayName()}`;
@@ -1230,7 +1246,7 @@ export class TacticalPointerComponent extends Component {
         this.skillHeld = this.hoveredUnit;
         return;
       }
-      if (!plan.motion) return;
+      if (!plan.motion && !plan.forcedTarget) return;
       const result = encounter?.requestSkill(
         selected,
         skill.id,

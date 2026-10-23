@@ -41,6 +41,7 @@ const METALMIND_NAME: Record<string, string> = {
   iron: 'Mente de hierro',
   gold: 'Mente de oro',
   copper: 'Mente de cobre',
+  zinc: 'Mente de cinc',
 };
 /** Cada estilo de línea: tamaño de letra, alto de la línea y espacio antes (px de referencia). */
 const STYLES: Record<LineStyle, { size: number; height: number; gap: number; color: RGBA }> = {

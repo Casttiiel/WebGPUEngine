@@ -2443,6 +2443,142 @@
     "visible": false
   },
   {
+    "name": "intent_1",
+    "alias": "intent_1",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_2",
+    "alias": "intent_2",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_3",
+    "alias": "intent_3",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_4",
+    "alias": "intent_4",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_5",
+    "alias": "intent_5",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_6",
+    "alias": "intent_6",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_7",
+    "alias": "intent_7",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "intent_8",
+    "alias": "intent_8",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 360,
+    "height": 32,
+    "textParams": {
+      "text": "",
+      "size": [26, 26],
+      "color": [0.8, 0.88, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
     "name": "cursor_label",
     "alias": "cursor_label",
     "type": "text",

@@ -1,5 +1,6 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
-import type { SkillDef } from './Skills';
+import { SkillCatalog, type SkillDef } from './Skills';
+import type { TurnPlan } from './TacticalPlanner';
 import { SPIRIT_NAME } from './SpiritZones';
 import { skillDamage } from './CombatRules';
 import { steelDistanceFor, steelJumpFor, type AttributeId } from './Stats';
@@ -29,6 +30,9 @@ export const STATUS_NAME: Record<string, string> = {
   pewter_drag: 'Arrastre de peltre',
   gold_heal: 'Mente de oro',
   copper: 'Mente de cobre',
+  enraged: 'Enfurecido',
+  soothed: 'Aplacado',
+  rallied: 'Arenga',
 };
 
 /** Qué hace cada estado (tooltips, ficha). */
@@ -46,6 +50,9 @@ export const STATUS_HELP: Record<string, string> = {
   pewter_drag: '−50 % de movimiento y de daño',
   gold_heal: 'se cura al empezar cada turno',
   copper: 'puede repetir gratis la siguiente habilidad del turno',
+  enraged: 'tiene que atacar a su objetivo; +25 % de daño y −3 de armadura',
+  soothed: '−2 m de movimiento y −20 % de daño',
+  rallied: '+2 m de movimiento y +20 % de daño',
 };
 
 /**
@@ -171,6 +178,18 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
             : `${e.amount} + ${skill.scale}/${fmt(1 / per)}`;
         return `recupera ${amount} de Reserva`;
       }
+      case 'readIntent':
+        return 'ves qué hará en su turno (y lo hará, si puede)';
+      case 'provoke':
+        return `Enfurecido ${turns(e.turns)}: ataca a quien elijas, +25 % de daño y −3 de armadura`;
+      case 'soothe':
+        return `le quita los bufos; si no tiene, Aplacado ${turns(e.turns)} (−2 m y −20 % de daño)`;
+      case 'cleanse':
+        return 'le quita los estados negativos (no Seco ni el Arrastre)';
+      case 'copperCloud':
+        return `nube de ${fmt(e.radius)} m durante ${turns(e.rounds).replace('turno', 'ronda')}: a los aliados de dentro no les llega la alomancia enemiga lanzada desde fuera`;
+      case 'zincMind':
+        return 'lees las intenciones de todos los enemigos y +1 Acción adicional';
       case 'radialPush':
         return `todo lo metálico sale despedido hacia fuera ${distanceText(steelDistanceFor, caster)}`;
       case 'duralumin':
@@ -180,6 +199,28 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
     }
   });
   return `${target}: ${effects.filter((x) => x !== null).join(', ')}`;
+}
+
+/**
+ * Lo que una unidad va a hacer en su turno (Leer intenciones): "Golpe contra Deslizador",
+ * "se mueve y Arco contra Voz", "avanza", "se retira", "espera" (la fuente no tiene "→").
+ */
+export function intentText(plan: TurnPlan, unit: UnitComponent): string {
+  const nameOf = (e: { getComponent(n: string): unknown } | null | undefined) =>
+    (e?.getComponent('unit') as UnitComponent | null | undefined)?.getDisplayName() ?? '?';
+  const moves = plan.move ? 'se mueve y ' : '';
+  if (plan.skill) {
+    const name = SkillCatalog.get(plan.skill.id)?.name ?? plan.skill.id;
+    const target = plan.skill.target.unit ? ` contra ${nameOf(plan.skill.target.unit)}` : '';
+    return `${moves}${name}${target}`;
+  }
+  if (plan.attack) {
+    const attack = unit.getAttack(plan.attack.attackId)?.name ?? plan.attack.attackId;
+    return `${moves}${attack} contra ${nameOf(plan.attack.target)}`;
+  }
+  return { advance: 'avanza', retreat: 'se retira', reposition: 'se recoloca', wait: 'espera' }[
+    plan.kind as 'advance' | 'retreat' | 'reposition' | 'wait'
+  ] ?? plan.reason;
 }
 
 /** "4,5 m" con lanzador; la fórmula sin él. */

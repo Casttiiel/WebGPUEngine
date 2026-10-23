@@ -1,0 +1,420 @@
+{
+  "description": "Fase 15, Voz: solo la pistola; Leer intenciones (bronce: enseña el plan de la IA y lo compromete; una emoción nueva lo cambia), Arenga (+2 m y +20 % en su turno), Aplacar (quita los bufos; si no hay, Aplacado: −2 m y −20 %), Provocar en dos pasos (Enfurecido contra quien se elija, también otro enemigo; −3 de armadura), Serenar (quita estados negativos a un aliado), Nube de cobre (la alomancia enemiga lanzada desde fuera no llega a los aliados de dentro) y Mente de cinc (lee a todos y +1 Acción adicional).",
+  "scenes": ["tactical.json", "tactical_enemies.json"],
+  "seed": 15,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__ai = (n) => Engine.getEntities().getEntityByName(n).getComponent('tactical_ai'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.source ? d.source.getName() : null, d.amount ?? null, d.status ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__turns = (n, from = 0) => __log.slice(from).filter(l => l[0] === 'turn' && l[1] === n).length; window.__marks = {}; window.__mark = (n) => { __marks[n] = __turns(n); }; window.__turnOf = (n) => { const s = __engine.getCombatState(); if (__turns(n) > (__marks[n] ?? -1) && s.activeUnit === n && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__st = (n) => __unit(n).getStatuses().map(s => s.id).sort(); window.__ui = (a) => Engine.getModules().getModule('ui').getWidgetByAlias(a); window.__fc = (n) => __ai(n).getForecast(); window.__dmg = (n) => __engine.gameCommand('plan_attack', { unit: 'Deslizador', target: n }).then(r => r.maxDamage)"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; u.setCritChance(0); } for (const n of ['Lanzamonedas', 'Deslizador', 'Voz', 'Artificiera', 'Brute', 'Archer']) { const h = __unit(n).getHealth(); h.setMaxHp(400); h.restore(); } __enc.joinRadius = 60; __tp('Voz', 0, -6); __tp('Deslizador', 1.5, -3); __tp('Lanzamonedas', -3, -7); __tp('Artificiera', -5, -9); __tp('Brute', 1.5, 1); __tp('Archer', 5, 0)"
+    },
+    {
+      "command": "damage",
+      "args": {
+        "unit": "Skirmisher",
+        "amount": 1000
+      }
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "log": "El kit: solo la pistola, seis habilidades y la mente de cinc"
+    },
+    {
+      "assert": {
+        "expr": "[__unit('Voz').getAttacks().map(a => a.id), __unit('Voz').getSkillIds(), __unit('Voz').getMaxCharges('zinc')]",
+        "value": [
+          ["pistol"],
+          [
+            "read_intent",
+            "provoke",
+            "rally",
+            "soothe",
+            "serene",
+            "copper_cloud",
+            "zinc_mind",
+            "duralumin",
+            "refill"
+          ],
+          1
+        ]
+      }
+    },
+    {
+      "eval": "__mark('Voz')"
+    },
+    {
+      "command": "start_combat"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf('Voz')",
+        "value": true
+      },
+      "timeout_frames": 6000
+    },
+    {
+      "eval": "__enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit('Voz').maxMetal = 40; __unit('Voz').setMetal(40); __tp('Voz', 0, -6); __tp('Deslizador', 1.5, -3); __tp('Lanzamonedas', -3, -7); __tp('Artificiera', -5, -9); __tp('Brute', 1.5, 1); __tp('Archer', 5, 0); for (const n of ['Lanzamonedas', 'Deslizador', 'Voz', 'Artificiera', 'Brute', 'Archer']) { __unit(n).clearStatuses(); __unit(n).getHealth().restore(); __ai(n)?.clearForecast(); }"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "log": "Leer intenciones: solo a enemigos con IA; el plan del Bruto aparece sobre su cabeza"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Voz', skill: 'read_intent', target: 'Deslizador' }).then(r => r.reason)",
+        "value": "target must be an enemy"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'read_intent', target: 'Brute' }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 1]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__fc('Brute') !== null, __fc('Archer')]",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_frames": 2
+    },
+    {
+      "assert": {
+        "expr": "[__ui('intent_1').isVisible(), __ui('intent_1').getText().startsWith('Intención: ')]",
+        "value": [true, true]
+      }
+    },
+    {
+      "screenshot": "01-read-intent"
+    },
+    {
+      "log": "Arenga al Deslizador: +2 m en su turno y +20 % de daño"
+    },
+    {
+      "eval": "window.__before = null; __dmg('Brute').then(d => window.__before = d)"
+    },
+    {
+      "wait_until": {
+        "expr": "window.__before !== null",
+        "value": true
+      },
+      "timeout_frames": 30
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'rally', target: 'Deslizador' }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 1]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__st('Deslizador'), __enc.turnResourcesFor(__unit('Deslizador')).movement - __unit('Deslizador').getMovement()]",
+        "value": [["rallied"], 2]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__dmg('Brute').then(d => d === Math.round(__before * 1.2))",
+        "value": true
+      }
+    },
+    {
+      "log": "Aplacar al Bruto (sin bufos): Aplacado, −2 m; se le olvida lo leído (una emoción nueva)"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'soothe', target: 'Brute' }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 2]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__st('Brute'), __unit('Brute').getMovement() - __enc.turnResourcesFor(__unit('Brute')).movement, __fc('Brute')]",
+        "value": [["soothed"], 2, null]
+      }
+    },
+    {
+      "log": "Aplacar al Arquero con Arenga: pierde el bufo y no queda Aplacado"
+    },
+    {
+      "eval": "__unit('Archer').addStatus('rallied', 1); window.__from = __log.length"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'soothe', target: 'Archer' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__st('Archer'), __log.slice(__from).some(l => l[0] === 'dispel' && l[1] === 'Archer')]",
+        "value": [[], true]
+      }
+    },
+    {
+      "log": "Provocar en dos pasos: el Arquero, Enfurecido contra el Bruto (otro enemigo)"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Voz', skill: 'provoke', target: 'Archer' }).then(r => [r.canCast, r.forcedTarget])",
+        "value": [true, null]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'provoke', target: 'Archer' }).then(r => [r.ok, r.reason])",
+        "value": [false, "no destination"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Voz', skill: 'provoke', target: 'Archer', toUnit: 'Archer' }).then(r => r.reason)",
+        "value": "no target"
+      }
+    },
+    {
+      "eval": "__unit('Archer').setArmor(4); __unit('Voz').setCooldown('provoke', 0)"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'provoke', target: 'Archer', toUnit: 'Brute' }).then(r => [r.ok, r.metalCost, r.forcedTarget])",
+        "value": [true, 2, "Brute"]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__st('Archer'), __unit('Archer').getForcedTarget().getOwner().getName(), __unit('Archer').getArmor()]",
+        "value": [["enraged"], "Brute", 1]
+      }
+    },
+    {
+      "log": "Lo que hará el Arquero: atacar al Bruto"
+    },
+    {
+      "assert": {
+        "expr": "__enc.forecastTurn(__unit('Archer')).attack.target.getName()",
+        "value": "Brute"
+      }
+    },
+    {
+      "log": "Serenar: al Deslizador Derribado y Marcado se le quitan; al que no tiene nada, no"
+    },
+    {
+      "eval": "__unit('Deslizador').addStatus('prone', 1); __unit('Deslizador').addStatus('marked', 2, null, { amount: 50 })"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'serene', target: 'Deslizador' }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 1]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__st('Deslizador')",
+        "value": ["rallied"],
+        "message": "la Arenga (un bufo) se queda"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Voz', skill: 'serene', target: 'Lanzamonedas' }).then(r => r.reason)",
+        "value": "nothing to cleanse"
+      }
+    },
+    {
+      "log": "Nube de cobre sobre el Lanzamonedas: un tirón enemigo desde fuera no le llega; desde dentro, sí"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'copper_cloud', to: [-3, 0, -7] }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 2]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getEntityByName('CopperCloud') !== null",
+        "value": true
+      }
+    },
+    {
+      "eval": "__unit('Archer').skills = ['iron_pull']"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Archer', skill: 'iron_pull', target: 'Lanzamonedas' }).then(r => r.reason)",
+        "value": "copper cloud"
+      }
+    },
+    {
+      "eval": "window.__archer = __unit('Archer').getFeetPosition().slice(); __tp('Archer', -3, -4.5)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Archer', skill: 'iron_pull', target: 'Lanzamonedas' }).then(r => r.reason)",
+        "value": "not this unit’s turn"
+      }
+    },
+    {
+      "eval": "__tp('Archer', 5, 0); __unit('Archer').skills = []"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "screenshot": "02-copper-cloud"
+    },
+    {
+      "log": "Mente de cinc: lee a todos los enemigos y +1 Acción adicional; una carga"
+    },
+    {
+      "eval": "window.__bonus = __enc.resources.bonusAction"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'zinc_mind' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__fc('Brute') !== null, __fc('Archer').attack.target.getName(), __enc.resources.bonusAction - __bonus, __unit('Voz').getCharges('zinc')]",
+        "value": [true, "Brute", 1, 0]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Voz', skill: 'zinc_mind' }).then(r => r.reason)",
+        "value": "no charges"
+      }
+    },
+    {
+      "wait_frames": 2
+    },
+    {
+      "screenshot": "03-zinc-mind"
+    },
+    {
+      "log": "Una ronda: el Arquero Enfurecido dispara al Bruto; el Bruto hace lo que se le leyó"
+    },
+    {
+      "eval": "window.__bruteRead = __fc('Brute').reason; window.__from = __log.length; __mark('Voz'); __engine.gameCommand('end_turn', {})"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf('Voz')",
+        "value": true
+      },
+      "timeout_frames": 9000
+    },
+    {
+      "assert": {
+        "expr": "__log.slice(__from).some(l => l[0] === 'damage' && l[1] === 'Brute' && l[2] === 'Archer')",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "expr": "__ai('Brute').getLastPlan().reason === __bruteRead",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "expr": "[__fc('Brute'), __fc('Archer')]",
+        "value": [null, null],
+        "message": "ya lo han jugado"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().aiTimeouts",
+        "value": 0
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

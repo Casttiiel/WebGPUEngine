@@ -14,15 +14,6 @@
       "armor": 0,
       "attacks": [
         {
-          "id": "rapier",
-          "name": "Estoque",
-          "kind": "melee",
-          "range": 1.5,
-          "damage": 4,
-          "metallic": true,
-          "clip": "Sword_Attack_Standing"
-        },
-        {
           "id": "pistol",
           "name": "Pistola ligera",
           "kind": "ranged",
@@ -32,7 +23,18 @@
           "clip": "Spell_Simple_Shoot"
         }
       ],
-      "skills": ["fear"]
+      "skills": [
+        "read_intent",
+        "provoke",
+        "rally",
+        "soothe",
+        "serene",
+        "copper_cloud",
+        "zinc_mind"
+      ],
+      "metalminds": {
+        "zinc": 1
+      }
     }
   }
 }

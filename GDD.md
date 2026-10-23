@@ -218,7 +218,7 @@ que ya tienes** (§14), así que la barra de habilidades no crece.
 | **Lanzamonedas** | **Aviador** (POT, REF): saltos más largos, empujes de props,     | **Artillero** (FUE, AGU): revólver, bala empujada, marca del cazador, críticos y penetración. Talento _Rebote_ (la bala empujada rebota en el metal) |
 | **Deslizador**   | **Virtuoso** (REF, AGU, FUE): Ritmo, Finta, Proyección, críticos | **Inmortal** (RES, TEM): mente de oro más potente, Guardia más frecuente, Pullas, burbujas más largas                                                |
 | **Voz**          | **Titiritero** (POT, TEM): control de grupos, más objetivos      | **Duelista** (FUE, REF): estoque, réplica a los Enfurecidos, se puede elegir como objetivo de su propio Provocar                                     |
-| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, pulso, recargas más cortas   | **Tiradora** (AGU, FUE): granada de mano, dardo de cromo, detonación de asistencia                                                                  |
+| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, pulso, recargas más cortas   | **Tiradora** (AGU, FUE): granada de mano, dardo de cromo, detonación de asistencia                                                                   |
 
 **Ejemplo, la Voz Duelista:** usa _Provocar_ sobre un grupo eligiéndose a sí misma como objetivo
 del ataque. Con el talento _Réplica_, cada enemigo Enfurecido que la ataca recibe un
@@ -384,7 +384,7 @@ duraciones son fijas en cada habilidad (POT no las alarga, §3).
 | **Derribado**  | Física      | Levantarse cuesta la mitad del movimiento; los ataques melee contra él son crítico seguro       | Tirón de hierro, unidad empujada, Proyección |
 | **Marcado**    | Preparación | El siguiente golpe que recibe hace +50 % (+30 % + 5 %·POT con la Marca del cazador); se consume | Marca del cazador, Deslizar, Detonación      |
 | **Enfurecido** | Control     | Tiene que atacar al objetivo que elijas; +25 % al daño que hace y −3 de armadura                | Encender (cinc)                              |
-| **Aplacado**   | Control     | Sin Reacción y −25 % de daño                                                                    | Aplacar (latón)                              |
+| **Aplacado**   | Control     | −2 m de movimiento y −20 % de daño (lo contrario de la Arenga)                                  | Aplacar (latón)                              |
 | **Seco**       | Recurso     | Sin alomancia este turno                                                                        | Quedarse sin Reserva, cromo                  |
 
 > **Simplificado**: _Lanzado_ desaparece (un empuje ya acaba en IMPACTO y Derribado) y
@@ -580,14 +580,14 @@ ser autoprotección a ser **sinergia**.
 
 ### Resumen
 
-|                 | Lanzamonedas                               | Deslizador                                              | Voz                        | Artificiera                                                        |
-| --------------- | ------------------------------------------ | ------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------ |
+|                 | Lanzamonedas                               | Deslizador                                              | Voz                        | Artificiera                                                         |
+| --------------- | ------------------------------------------ | ------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------- |
 | **Metales**     | Acero, hierro, estaño + hierro feruquímico | Bendaleo, peltre + oro feruquímico, técnica de bastones | Cinc, latón, bronce, cobre | Gadgets de ettmetal, cadmio y cromo en dispositivos, oro no sellado |
-| **Rol**         | Daño a distancia, movilidad                | Duelista que aguanta regenerándose, primera línea       | Control, apoyo             | Control del terreno, utilidad                                      |
-| **Distancia**   | Larga                                      | Cuerpo a cuerpo                                         | Media                      | Media                                                              |
-| **Builds** (§3) | Aviador / Artillero                        | Virtuoso / Inmortal                                     | Titiritero / Duelista      | Ingeniera / Tiradora                                               |
-| **Complejidad** | ★★☆                                        | ★☆☆ (el más fácil)                                      | ★★☆                        | ★★★                                                                |
-| **Referente**   | Wax, Vin                                   | Wayne                                                   | Brisa (Breeze)             | Marasi (Pulsadora, cadmio), Steris                                 |
+| **Rol**         | Daño a distancia, movilidad                | Duelista que aguanta regenerándose, primera línea       | Control, apoyo             | Control del terreno, utilidad                                       |
+| **Distancia**   | Larga                                      | Cuerpo a cuerpo                                         | Media                      | Media                                                               |
+| **Builds** (§3) | Aviador / Artillero                        | Virtuoso / Inmortal                                     | Titiritero / Duelista      | Ingeniera / Tiradora                                                |
+| **Complejidad** | ★★☆                                        | ★☆☆ (el más fácil)                                      | ★★☆                        | ★★★                                                                 |
+| **Referente**   | Wax, Vin                                   | Wayne                                                   | Brisa (Breeze)             | Marasi (Pulsadora, cadmio), Steris                                  |
 
 > Un personaje de complejidad baja (el Lanzamonedas) es importante: es el "personaje de entrada"
 > para quien no conoce el sistema, igual que en Overwatch o los MOBA.
@@ -696,15 +696,20 @@ ataca a distancia.
 **Fantasía**: el titiritero emocional. Decide quién pega a quién.
 **Bucle**: leer intenciones → redirigir (Encender/Aplacar) → potenciar a los aliados.
 
-| Habilidad                                     | Coste        | Efecto                                                                                                                                          |
-| --------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: bastón-estoque o pistola ligera_ | —            | Distancia media                                                                                                                                 |
-| **Leer intenciones** (bronce)                 | Adicional, 1 | Revela la próxima acción de 1 enemigo. Como el _telegraphing_ de Into the Breach: convierte la incertidumbre en un puzle                        |
-| **Encender: Provocar** (cinc)                 | Acción, 2    | Enemigo Enfurecido: ataca al objetivo que tú elijas (normalmente el Deslizador, con la Mente de oro cargada)                                    |
-| **Encender: Arenga** (cinc)                   | Adicional, 1 | Un aliado gana +2 m de movimiento y +20 % de daño este turno                                                                                    |
-| **Aplacar** (latón)                           | Acción, 2    | En un enemigo: Aplacado y pierde sus buffs. En un aliado: le quita los estados negativos                                                        |
-| **Calma** (latón)                             | Acción, 3    | El enemigo no es hostil durante 1 turno (se rompe si le haces daño)                                                                             |
-| **Nube de cobre**                             | Acción, 2    | Zona de 4 m durante 3 turnos: los aliados dentro son inmunes a efectos emocionales y no se les puede leer con bronce. Fuera del combate: sigilo |
+| Habilidad                        | Coste                   | Efecto                                                                                                                                                                              |
+| -------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _Autoataque: pistola ligera_     | —                       | Distancia media (12 m). Sin estoque: un solo autoataque                                                                                                                             |
+| **Leer intenciones** (bronce)    | Adicional, 1            | Revela qué hará 1 enemigo en su turno y lo **compromete**: lo hará mientras pueda; si se lo impides, improvisa. Una emoción nueva se lo cambia. Como Into the Breach                |
+| **Encender: Provocar** (cinc)    | Acción, 2, recarga 1    | Enemigo Enfurecido su siguiente turno contra quien elijas: tú, un aliado (el Deslizador con la Mente de oro cargada) u **otro enemigo**                                             |
+| **Encender: Arenga** (cinc)      | Adicional, 1, recarga 1 | Durante su **siguiente** turno, un aliado gana +2 m de movimiento y +20 % de daño                                                                                                   |
+| **Aplacar** (latón)              | Acción, 2               | A un enemigo le quita los bufos; si no tiene ninguno, queda **Aplacado** (−2 m y −20 % de daño: lo contrario de la Arenga)                                                          |
+| **Aplacar: Serenar** (latón)     | Adicional, 1, recarga 2 | A un aliado le quita los estados negativos (no Seco ni el Arrastre de peltre: son la resaca de un poder propio)                                                                     |
+| **Nube de cobre**                | Acción, 2, recarga 3    | Zona de 4 m durante 2 rondas: a los aliados de dentro no les llega la alomancia enemiga lanzada desde fuera (empujes, tirones, emociones, cromo, bronce). Fuera del combate: sigilo |
+| **Mente de cinc** _(feruquimia)_ | Sin acción, 1 carga     | **Pensar deprisa**: lees las intenciones de todos los enemigos y ganas 1 Acción adicional este turno                                                                                |
+
+> Descartadas: _Calma_ (va contra un grupo que quiere pegar), _Miedo_ (un cuarto control sin
+> identidad) y _Disturbio_. Las dos ramas (§3) están por decidir: **Titiritera** (POT, TEM) y
+> **Agitadora** (AGU, REF), o la **Duelista** con el talento _Desdén_.
 
 ### 10.4 La Artificiera — _ettmetal, cadmio y cromo_
 
@@ -712,14 +717,14 @@ ataca a distancia.
 **Bucle**: preparar el terreno (burbuja de cadmio, pulso, cargas) → que los demás lo aprovechen.
 Su granada de mano es lo que **saca a los enemigos de la cobertura** (§5: las áreas la anulan).
 
-| Habilidad                         | Coste                   | Efecto                                                                                                                                                                                                     |
-| --------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: granada de mano_     | —                       | Arrojadiza, 10 m, en arco: no necesita línea de visión (la cobertura no protege; el borde de una burbuja de bendaleo sí la para). Estalla en 1,5 m con poco daño (2 + FUE) y alcanza también a los aliados |
-| **Dardo de cromo**                | Acción, 2, recarga 3    | Un disparo a un enemigo alomántico: le vacía la Reserva y queda **Seco** (§2). El "silencio" del kit, usando un estado que ya existe                                                                     |
-| **Granada de cadmio**             | Acción, 3, recarga 3    | Burbuja **lanzada** de 3 m donde el tiempo va **lento** hasta tu siguiente turno: quien empieza su turno dentro **lo pierde** y nadie sale andando. Los proyectiles sí cruzan el borde                      |
-| **Pulso de ettmetal**             | Acción, 2, recarga 2    | Empuje radial desde un punto: todo lo metálico en 4 m sale despedido hacia fuera                                                                                                                           |
-| **Carga de ettmetal**             | Adicional, 1            | Pegas una carga a un prop: cuando ese prop sufre un IMPACTO, explota (Directo, 3 m). **En el agua, el ettmetal reacciona de forma violenta** (lore): combina con la superficie de agua                     |
-| **Inyector de oro**               | Adicional, 2, recarga 2 | Cura a un aliado adyacente 12 + Potencia. Es una mente de oro no sellada: la principal curación de la party                                                                                                |
+| Habilidad                     | Coste                   | Efecto                                                                                                                                                                                                     |
+| ----------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _Autoataque: granada de mano_ | —                       | Arrojadiza, 10 m, en arco: no necesita línea de visión (la cobertura no protege; el borde de una burbuja de bendaleo sí la para). Estalla en 1,5 m con poco daño (2 + FUE) y alcanza también a los aliados |
+| **Dardo de cromo**            | Acción, 2, recarga 3    | Un disparo a un enemigo alomántico: le vacía la Reserva y queda **Seco** (§2). El "silencio" del kit, usando un estado que ya existe                                                                       |
+| **Granada de cadmio**         | Acción, 3, recarga 3    | Burbuja **lanzada** de 3 m donde el tiempo va **lento** hasta tu siguiente turno: quien empieza su turno dentro **lo pierde** y nadie sale andando. Los proyectiles sí cruzan el borde                     |
+| **Pulso de ettmetal**         | Acción, 2, recarga 2    | Empuje radial desde un punto: todo lo metálico en 4 m sale despedido hacia fuera                                                                                                                           |
+| **Carga de ettmetal**         | Adicional, 1            | Pegas una carga a un prop: cuando ese prop sufre un IMPACTO, explota (Directo, 3 m). **En el agua, el ettmetal reacciona de forma violenta** (lore): combina con la superficie de agua                     |
+| **Inyector de oro**           | Adicional, 2, recarga 2 | Cura a un aliado adyacente 12 + Potencia. Es una mente de oro no sellada: la principal curación de la party                                                                                                |
 
 > **Los gadgets de la Artificiera** (granada de cadmio, dardo, pulso, inyector) **no tienen cargas por
 > combate**: gastan metal de la Reserva, como todo lo demás, y se limitan con **recarga**, el

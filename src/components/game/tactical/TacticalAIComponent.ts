@@ -8,6 +8,7 @@ import { AlwaysSucceed } from '../../../ai/nodes/Decorators';
 import { Wait } from '../../../ai/nodes/Wait';
 import type { EncounterComponent } from './EncounterComponent';
 import type { UnitComponent } from './UnitComponent';
+import { unitDistanceFrom, unitLineOfSightFrom } from './CombatRules';
 import {
   planBonusSkill,
   planTurn,
@@ -60,6 +61,11 @@ export class TacticalAIComponent extends Component {
   private lastPlan: TurnPlan | null = null;
   /** Habilidad de acción adicional del turno actual (debug / MCP). */
   private lastBonus: TurnPlan | null = null;
+  /**
+   * Leer intenciones: el plan que se le ha leído. En su turno lo cumple si sigue siendo
+   * posible; si no (o si una emoción se lo ha cambiado), planifica de nuevo.
+   */
+  private forecast: TurnPlan | null = null;
 
   public load(data: TacticalAIComponentDataType): void {
     this.role = data.role ?? null;
@@ -100,6 +106,20 @@ export class TacticalAIComponent extends Component {
   public clearPlan(): void {
     this.lastPlan = null;
     this.lastBonus = null;
+    this.forecast = null;
+  }
+
+  /** Lo que se le ha leído (Leer intenciones) y aún no ha jugado (null: nada). */
+  public getForecast(): TurnPlan | null {
+    return this.forecast;
+  }
+
+  public setForecast(plan: TurnPlan | null): void {
+    this.forecast = plan;
+  }
+
+  public clearForecast(): void {
+    this.forecast = null;
   }
 
   /** Habilidad de acción adicional del turno (si la usó). */
@@ -126,7 +146,13 @@ export class TacticalAIComponent extends Component {
         new Action('plan', () => {
           const unit = this.getUnit();
           if (!unit || !this.encounter) return Status.FAILURE;
-          this.lastPlan = planTurn(this.encounter, unit, this.getProfile());
+          // Lo que se le leyó, si aún puede hacerlo; si no, improvisa.
+          const forecast = this.forecast;
+          this.forecast = null;
+          this.lastPlan =
+            forecast && this.stillPossible(forecast, unit)
+              ? forecast
+              : planTurn(this.encounter, unit, this.getProfile());
           this.bb.set('plan', this.lastPlan);
           return Status.SUCCESS;
         }),
@@ -202,6 +228,23 @@ export class TacticalAIComponent extends Component {
       ],
       { label: 'Turn' },
     );
+  }
+
+  /**
+   * ¿Puede aún hacer lo que se le leyó? El objetivo sigue vivo y le llega: desde el punto al
+   * que iba a moverse (alcance y, a distancia, visión) o, sin moverse, con las reglas de
+   * siempre (el cuerpo a cuerpo se acerca solo).
+   */
+  private stillPossible(plan: TurnPlan, unit: UnitComponent): boolean {
+    const encounter = this.encounter!;
+    if (plan.skill) return encounter.planSkill(this.getOwner(), plan.skill.id, plan.skill.target).canCast;
+    if (!plan.attack) return true;
+    const target = plan.attack.target.getComponent('unit') as UnitComponent | null;
+    const attack = unit.getAttack(plan.attack.attackId);
+    if (!target?.isAlive() || !attack) return false;
+    if (!plan.move) return encounter.planAttack(this.getOwner(), plan.attack.target, attack.id).canAttack;
+    if (unitDistanceFrom(unit, plan.move, target) > attack.range + 0.05) return false;
+    return attack.kind !== 'ranged' || unitLineOfSightFrom(unit, plan.move, target);
   }
 
   /** RUNNING mientras la unidad se mueve, ataca o hay un golpe por resolver. */

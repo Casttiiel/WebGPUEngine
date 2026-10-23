@@ -205,18 +205,39 @@ Hecho en `SpiritZones.ts`. Escenarios: `phase14_zones` y `phase14_ai`.
 
 ### Fase 15 — Voz (GDD §10.3)
 
-- [ ] **Estados emocionales** (GDD §6): `enraged` (Enfurecido: objetivo forzado, que la IA
-      tiene que respetar; +25 % de daño hecho, −3 de armadura) y `soothed` (Aplacado: sin
-      Reacción y −25 % de daño). Decidir si `fear` se queda o se sustituye por Calma.
-- [ ] Leer intenciones: muestra el TurnPlan que la IA tiene previsto para un enemigo.
-      Requisito: que la IA planifique su turno **antes** y lo mantenga, o que se vuelva a
-      planificar de forma determinista.
-- [ ] Provocar: Enfurecido con un objetivo forzado que elige la Voz (puede ser ella misma).
-- [ ] Arenga: un aliado gana +2 m de movimiento y +20 % de daño ese turno.
-- [ ] Aplacar: en un enemigo, Aplacado y le quita los buffs; en un aliado, le quita los estados
-      negativos.
-- [ ] Calma: el enemigo no es hostil durante 1 turno; se rompe si recibe daño.
-- La **Nube de cobre** es una zona: va en la fase 16.
+Escenario `phase15_voice`. Autoataque: solo la **pistola ligera** (el estoque se quita). Kit:
+6 habilidades + la mente de cinc.
+
+- [x] **Estados emocionales** (GDD §6): `enraged` (Enfurecido: tiene que atacar a su objetivo,
+      aunque sea de su bando, y la IA lo respeta y no se retira; +25 % de daño hecho, −3 de
+      armadura), `soothed` (Aplacado: −2 m de movimiento y −20 % de daño, lo contrario de la
+      Arenga) y `rallied` (Arenga: +2 m y +20 %). Duran el siguiente turno de quien los recibe.
+- [x] Leer intenciones (bronce; Adicional, 1 de metal, 15 m): prevé el turno del enemigo con su
+      propia IA (`forecastTurn`: planTurn con él como activo, sus recursos de turno y las
+      recargas ya avanzadas) y se lo **compromete**: en su turno lo cumple si sigue siendo
+      posible; si no, improvisa. Una emoción nueva (Enfurecido, Aplacado, miedo) lo borra.
+      Rótulo "Intención: …" sobre la cabeza.
+- [x] Encender: Provocar (Acción, 2 de metal, recarga 1, 12 m): en dos pasos, el enemigo y a
+      quién tiene que atacar (la Voz, un aliado u **otro enemigo**).
+- [x] Encender: Arenga (Adicional, 1 de metal, recarga 1): un aliado, durante su siguiente
+      turno.
+- [x] Aplacar (Acción, 2 de metal): a un enemigo le quita los bufos; si no tiene ninguno, queda
+      Aplacado.
+- [x] Aplacar: Serenar (Adicional, 1 de metal, recarga 2): a un aliado le quita los estados
+      negativos (miedo, Aturdido, Derribado, Marcado, Enfurecido, Aplacado; no Seco ni el
+      Arrastre, que son la resaca de un poder propio).
+- [x] Nube de cobre (Acción, 2 de metal, recarga 3): zona de 4 m durante 2 rondas
+      (`CopperClouds`). A los aliados de dentro no les llega la alomancia enemiga lanzada desde
+      fuera: empujes, tirones, pulso, emociones, cromo y bronce (no el peltre ni la bala
+      empujada).
+- [x] Mente de cinc (feruquimia, 1 carga): lee las intenciones de todos los enemigos y +1
+      Acción adicional ese turno.
+- ~~Calma~~ y ~~Disturbio~~: descartadas. ~~Miedo~~: fuera del kit (sigue en el catálogo;
+  `phase10_statuses` se lo da a la Voz para probarlo).
+- [ ] Talentos de las dos ramas (cuando haya árbol de talentos): decidir **Agitadora** (AGU,
+      REF) o **Duelista** arreglada (talento _Desdén_).
+- [ ] Encender el ánimo (asistencia: BAJA o CRÍTICO de un aliado → 1 Acción adicional) va con
+      las asistencias, en la fase 16.
 
 ### Fase 16 — Zonas genéricas (burbujas, nubes y lo que necesita la Artificiera)
 

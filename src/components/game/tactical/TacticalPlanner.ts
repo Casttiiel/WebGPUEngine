@@ -111,11 +111,15 @@ export function planTurn(
   profile: AIProfile,
 ): TurnPlan {
   const self = me.getOwner();
-  const foes = encounter
-    .getCombatantUnits()
-    .filter(
-      (u) => u.isAlive() && u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral',
-    );
+  // Enfurecido (Provocar): solo le vale su objetivo, sea del bando que sea.
+  const forced = me.getForcedTarget();
+  const foes = forced
+    ? [forced]
+    : encounter
+        .getCombatantUnits()
+        .filter(
+          (u) => u.isAlive() && u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral',
+        );
   const wait: TurnPlan = {
     kind: 'wait',
     move: null,
@@ -129,7 +133,9 @@ export function planTurn(
   const fear = me.getStatus('fear');
   if (fear) return planFlee(encounter, me, fear.source, foes, wait);
 
+  // Enfurecido: no se retira.
   const low =
+    !forced &&
     profile.retreatHp > 0 && me.getMaxHp() > 0 && me.getHp() / me.getMaxHp() < profile.retreatHp;
   const resources = encounter.getResources();
   const candidates: TurnPlan[] = [wait];
