@@ -1,0 +1,20 @@
+{
+  "components": {
+    "name": "SweepSpot",
+    "spot_light": {
+      "color": [0.85, 0.25, 1, 1],
+      "intensity": 14,
+      "radius": 26,
+      "startFallof": 12,
+      "projector": "projector.png",
+      "fov": 22,
+      "position": [0, 6.5, -13],
+      "target": [0, -1, -4],
+      "hasShadows": true
+    },
+    "light_sweep": {
+      "targets": [[-2.5, -1, -6], [2.5, -1, 0], [-2.5, -1, 6]],
+      "period": 14
+    }
+  }
+}

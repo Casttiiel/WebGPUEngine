@@ -4,6 +4,7 @@ const FOLDER_CONFIG: Record<string, { open: boolean; cssClass?: string }> = {
   'Scene':           { open: false, cssClass: 'gui-cat-scene' },
   'Lighting':        { open: false, cssClass: 'gui-cat-lighting' },
   'Atmosphere':      { open: false, cssClass: 'gui-cat-atmosphere' },
+  'Global Illumination': { open: false, cssClass: 'gui-cat-lighting' },
   'Post Processing': { open: false, cssClass: 'gui-cat-postprocessing' },
   'Time Control':    { open: false, cssClass: 'gui-cat-time' },
   'Statistics':      { open: false, cssClass: 'gui-cat-statistics' },

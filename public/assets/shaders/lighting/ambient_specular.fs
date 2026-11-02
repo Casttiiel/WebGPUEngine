@@ -28,6 +28,15 @@
 @group(2) @binding(8) var<storage, read> probeSet: ProbeSet;
 @group(2) @binding(9) var probeEnvArray: texture_cube_array<f32>;
 
+#ifdef REALTIME_GI
+// Realtime GI permutation (RealtimeGI.getSpecularOverride): the cubemaps were captured without
+// the local lighting, so scale them by how much darker the GI irradiance is than the irradiance
+// the probes/sky assume here — Reflections × FrameIrradiance / ProbeIrradiance (idTech 8,
+// Lazarov 2013). The ratio (≤ 1) comes from the GI resolve's alpha (gi/gi_resolve.cs).
+@group(3) @binding(0) var giResolve: texture_2d<f32>;
+@group(3) @binding(1) var giResolveSampler: sampler;
+#endif
+
 fn computeSpecularOcclusion(ao: f32, NoV: f32, roughness: f32) -> f32 {
     let exponent: f32 = exp2((-16.0 * roughness) - 1.0);
     let so: f32 = clamp((pow((NoV + ao), exponent) - 1.0) + ao, 0.0, 1.0);
@@ -58,7 +67,11 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let Ems  = 1.0 - (brdf.x + brdf.y);
     let Favg = F0 + (1.0 - F0) / 21.0;
     let Fms  = FssEss * Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+#ifdef REALTIME_GI
+    let splitSum = (FssEss + Fms) * textureSampleLevel(giResolve, giResolveSampler, uv, 0.0).a;
+#else
     let splitSum = FssEss + Fms;
+#endif
 
     // ── SSR: reflected radiance × same split-sum BRDF (same energy space as IBL) ─
     // The stochastic SSR resolves screen misses and edge fades to this same prefiltered

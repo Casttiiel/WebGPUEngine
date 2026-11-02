@@ -649,6 +649,14 @@ export class Mesh extends GPUResource {
     return this.vertices;
   }
 
+  public getUVs(): Float32Array | undefined {
+    return this.uvs;
+  }
+
+  public getNormals(): Float32Array | undefined {
+    return this.normals;
+  }
+
   public getIndices(): Uint16Array | Uint32Array {
     return this.indices;
   }

@@ -1,0 +1,325 @@
+[
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "cameras/player_camera.prefab",
+    "components": {
+      "camera": {
+        "controllable": true,
+        "fov": 60,
+        "position": [
+          24,
+          9,
+          30
+        ],
+        "target": [
+          0,
+          1,
+          0
+        ]
+      },
+      "camera_bookmarks": {
+        "views": [
+          {
+            "position": [
+              24,
+              9,
+              30
+            ],
+            "target": [
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "position": [
+              2.8,
+              1.6,
+              2.2
+            ],
+            "target": [
+              -2.5,
+              0.8,
+              -2.5
+            ]
+          },
+          {
+            "position": [
+              0,
+              1.7,
+              9
+            ],
+            "target": [
+              0,
+              1.4,
+              0
+            ]
+          },
+          {
+            "position": [
+              18.5,
+              1.6,
+              -3.8
+            ],
+            "target": [
+              13.5,
+              1.0,
+              -8
+            ]
+          },
+          {
+            "position": [
+              6.6,
+              1.7,
+              33
+            ],
+            "target": [
+              6,
+              1.6,
+              12
+            ]
+          },
+          {
+            "position": [
+              0,
+              3,
+              70
+            ],
+            "target": [
+              0,
+              2,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "components": {
+      "name": "Ground",
+      "transform": {
+        "position": [
+          0,
+          -1.5,
+          0
+        ],
+        "scale": [
+          240,
+          3,
+          240
+        ]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [
+          1,
+          1,
+          1
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "gi_grass.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "gi_showcase/house.prefab",
+    "components": {
+      "name": "HouseA",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "gi_showcase/house.prefab",
+    "components": {
+      "name": "HouseB",
+      "transform": {
+        "position": [
+          16,
+          0,
+          -6
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "gi_showcase/house.prefab",
+    "components": {
+      "name": "HouseC",
+      "transform": {
+        "position": [
+          -15,
+          0,
+          4
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "HouseBLamp",
+      "transform": {
+        "position": [
+          16,
+          2.6,
+          -6.5
+        ]
+      },
+      "point_light": {
+        "color": [
+          1,
+          0.6,
+          0.28,
+          1
+        ],
+        "intensity": 5,
+        "radius": 7,
+        "startFallof": 0.4,
+        "hasShadows": false
+      },
+      "light_flicker": {
+        "amount": 0.2,
+        "speed": 7,
+        "jitter": 0.02,
+        "dimColor": [
+          1,
+          0.38,
+          0.12
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "gi_showcase/arcade.prefab",
+    "components": {
+      "name": "Arcade",
+      "transform": {
+        "position": [
+          6,
+          0,
+          22
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "TealWall",
+      "transform": {
+        "position": [
+          -6,
+          4,
+          -16
+        ],
+        "scale": [
+          22,
+          8,
+          1
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "gi_teal.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "RockA",
+      "transform": {
+        "position": [
+          46,
+          6,
+          -34
+        ],
+        "scale": [
+          22,
+          12,
+          16
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "gi_rock.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "RockB",
+      "transform": {
+        "position": [
+          -52,
+          9,
+          36
+        ],
+        "scale": [
+          18,
+          18,
+          24
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "gi_rock.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "RockC",
+      "transform": {
+        "position": [
+          -30,
+          4,
+          -60
+        ],
+        "scale": [
+          40,
+          8,
+          12
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "gi_rock.mat"
+          }
+        ]
+      }
+    }
+  }
+]

@@ -38,6 +38,7 @@ import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantiz
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { FogScatterComponent } from '../../components/render/FogScatterComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
+import { KeyCode } from '../../types/KeyCode.enum';
 import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
 import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
 import { VignetteComponent } from '../../components/render/VignetteComponent';
@@ -745,6 +746,11 @@ export class ModuleRender extends Module {
     // filtered arrays every frame while it is hidden was pure garbage.
     if (Engine.getGUI().getIsVisible()) this.updateDebugValues();
 
+    // F9 — realtime GI: off → realtime → compare (split screen against the baked probes).
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F9)) {
+      console.log(`[GI] mode: ${this.deferred.cycleGIMode()}`);
+    }
+
     this.deferred.update(dt);
     this.lastDt = dt;
   }
@@ -820,6 +826,7 @@ export class ModuleRender extends Module {
 
     this.renderLightingMenu(gui);
     this.renderAtmosphereMenu(gui);
+    this.renderGIMenu(gui);
     this.renderPostProcessingMenu(gui);
     this.renderStatsMenu(gui);
   }
@@ -861,6 +868,14 @@ export class ModuleRender extends Module {
     tryRender('god_rays');
     tryRender('atmospheric_fog');
     tryRender('fog_scatter');
+  }
+
+  private renderGIMenu(gui: any): void {
+    if (this.beginGUIWindow('Global Illumination')) {
+      this.endGUIWindow();
+    }
+    const giFolder = (gui as any).folders?.get('Global Illumination');
+    if (giFolder) this.deferred.renderGIInMenu(giFolder);
   }
 
   private renderPostProcessingMenu(gui: any): void {

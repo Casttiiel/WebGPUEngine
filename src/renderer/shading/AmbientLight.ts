@@ -107,11 +107,16 @@ export class AmbientLight {
     pass.end();
   }
 
+  /**
+   * @param giOverride realtime GI: the REALTIME_GI permutation of ambient_specular.fs and its
+   *   group 3 (RealtimeGI.getSpecularOverride). Omitted, the pass is unchanged.
+   */
   public renderSpecular(
     accLights: GPUTextureView,
     ssr: GPUTextureView,
     ao: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
+    giOverride?: { pipeline: GPURenderPipeline; bindGroup: GPUBindGroup } | null,
   ): void {
     if (!this.ambientSpecularUniformBuffer) return;
     const probes = ProbeManager.getInstance();
@@ -145,7 +150,12 @@ export class AmbientLight {
     GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
 
     // 1. Activate pipeline
-    this.ambientSpecularTechnique.activatePipeline(pass);
+    if (giOverride) {
+      pass.setPipeline(giOverride.pipeline);
+      pass.setBindGroup(3, giOverride.bindGroup);
+    } else {
+      this.ambientSpecularTechnique.activatePipeline(pass);
+    }
 
     // 2. Activate mesh data
     this.fullscreenQuadMesh.activate(pass);

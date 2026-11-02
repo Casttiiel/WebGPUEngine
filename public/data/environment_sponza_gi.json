@@ -1,0 +1,28 @@
+{
+  "ambient": {
+    "globalFactor": 4.0,
+    "diffuseFactor": 1.0,
+    "reflectionFactor": 0.6,
+    "irradianceCubemap": "ReflectionProbe_irradiance_cubemap_T.png"
+  },
+  "skybox": "qwantani_mid_morning_puresky_1k.hdr",
+  "skyboxType": "procedural",
+  "timeOfDay": 0.42,
+  "sun": {
+    "intensityScale": 1.0,
+    "latitude": 38,
+    "declination": 12,
+    "northAzimuth": 20
+  },
+  "clouds": {
+    "type": "volumetric",
+    "volumetric": {
+      "coverage": 0.35
+    }
+  },
+  "ssrEnvironment": "ReflectionProbe_cubemap_T.png",
+  "volumetrics": {
+    "anisotropy": 0.6,
+    "ambientIntensity": 0.2
+  }
+}

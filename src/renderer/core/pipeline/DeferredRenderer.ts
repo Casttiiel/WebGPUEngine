@@ -30,6 +30,7 @@ import { TiledLightManager } from '../managers/TiledLightManager';
 import { EngineTextureRegistry, ENGINE_TEXTURES } from '../utils/EngineTextureRegistry';
 import { ViewModelPass } from '../passes/ViewModelPass';
 import { VolumetricClouds } from '../../shading/VolumetricClouds';
+import { GIMode, GI_MODES, RealtimeGI } from '../../gi/RealtimeGI';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -110,6 +111,19 @@ export class DeferredRenderer {
 
   /** First-person view-model pass (dedicated depth, bypasses world frustum culling) */
   private viewModelPass: ViewModelPass = new ViewModelPass();
+
+  /**
+   * Realtime GI (src/renderer/gi). Exists only while the mode isn't 'off'; until it has loaded
+   * and built its scene BVH, the baked ambient keeps lighting the frame. Starts from the quality
+   * preset (realtimeGI); `?gi=off|realtime|compare` and F9 override it.
+   */
+  private giMode: GIMode =
+    GI_MODES.find((m) => m === new URLSearchParams(window.location.search).get('gi')) ??
+    (QualitySettings.getInstance().getSettings().realtimeGI ? 'realtime' : 'off');
+  private realtimeGI: RealtimeGI | null = null;
+  /** The GI traced this frame: its ambient lit accLight, so the specular uses its permutation. */
+  private giLitThisFrame = false;
+  private giMenu = { mode: this.giMode };
 
   /**
    * @param publishTextures register this renderer's outputs (linear depth, env cubemap) in
@@ -626,6 +640,7 @@ export class DeferredRenderer {
       ssr,
       this.aoResult,
       this.gBufferBindGroup,
+      this.giLitThisFrame ? this.realtimeGI?.getSpecularOverride() : null,
     );
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
@@ -640,7 +655,65 @@ export class DeferredRenderer {
       this.renderPassManager.executePass('particles', RenderCategory.PARTICLES);
     }
 
+    this.realtimeGI?.renderDebugOverlay(this.rtAccLight.getView(), this.gBufferComputeBindGroup);
+
     return this.rtAccLight.getView();
+  }
+
+  // ─── Realtime GI switch ───────────────────────────────────────────────────
+
+  public getGIMode(): GIMode {
+    return this.giMode;
+  }
+
+  /** 'off' destroys the GI module and its GPU resources; anything else creates it lazily. */
+  public setGIMode(mode: GIMode): void {
+    this.giMode = mode;
+    this.giMenu.mode = mode;
+    if (mode === 'off') {
+      this.realtimeGI?.destroy();
+      this.realtimeGI = null;
+    } else {
+      this.realtimeGI?.setMode(mode);
+    }
+  }
+
+  public cycleGIMode(): GIMode {
+    this.setGIMode(GI_MODES[(GI_MODES.indexOf(this.giMode) + 1) % GI_MODES.length]!);
+    return this.giMode;
+  }
+
+  public getRealtimeGI(): RealtimeGI | null {
+    return this.realtimeGI;
+  }
+
+  /** The GI module when it lights this frame (traced and integrated), otherwise null. */
+  private prepareRealtimeGI(): RealtimeGI | null {
+    this.giLitThisFrame = false;
+    if (this.giMode === 'off' || !this.publishTextures) return null;
+    if (!this.realtimeGI) {
+      RealtimeGI.settings.quality = QualitySettings.getInstance().getSettings().giQuality;
+      const gi = new RealtimeGI();
+      gi.setMode(this.giMode);
+      this.realtimeGI = gi;
+      gi.load().catch((e) => {
+        console.error('[GI] load failed, back to baked ambient:', e);
+        if (this.realtimeGI === gi) this.setGIMode('off');
+      });
+    }
+    this.giLitThisFrame = this.realtimeGI.update();
+    return this.giLitThisFrame ? this.realtimeGI : null;
+  }
+
+  public renderGIInMenu(folder: any): void {
+    if (folder._giControllers) return;
+    folder._giControllers = true;
+    folder
+      .add(this.giMenu, 'mode', GI_MODES)
+      .name('Mode (F9)')
+      .listen()
+      .onChange((mode: GIMode) => this.setGIMode(mode));
+    RealtimeGI.renderSettingsInMenu(folder);
   }
 
   /** Returns the ViewModelPass so ModuleRender can execute it after TAA/TSR. */
@@ -720,11 +793,21 @@ export class DeferredRenderer {
       (comp as DirectionalLightComponent).setContactShadowView(this.csResult);
     }
 
-    this.ambientLight.renderDiffuse(
-      this.rtAccLight.getView(),
-      this.gBufferBindGroup,
-      this.aoResult,
-    );
+    const gi = this.prepareRealtimeGI();
+    if (gi) {
+      gi.renderDiffuse(
+        this.rtAccLight.getView(),
+        this.gBufferBindGroup,
+        this.aoResult,
+        this.gBufferComputeBindGroup,
+      );
+    } else {
+      this.ambientLight.renderDiffuse(
+        this.rtAccLight.getView(),
+        this.gBufferBindGroup,
+        this.aoResult,
+      );
+    }
 
     // Directional lights: primary bind group (with contact shadows)
     for (const comp of Engine.getEntities()
@@ -971,6 +1054,9 @@ export class DeferredRenderer {
     }
 
     this.hzbBuilder?.dispose();
+
+    this.realtimeGI?.destroy();
+    this.realtimeGI = null;
 
     this.proceduralSkyCubemap?.dispose();
     this.proceduralSkyCubemap = null;

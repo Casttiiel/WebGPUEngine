@@ -1,0 +1,334 @@
+{
+  "components": {
+    "name": "Arcade",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "children": [
+    {
+      "components": {
+        "name": "ArcadeFloor",
+        "transform": {
+          "position": [
+            0,
+            0.05,
+            0
+          ],
+          "scale": [
+            4,
+            0.1,
+            24
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "ArcadeBackWall",
+        "transform": {
+          "position": [
+            -1.9,
+            2.5,
+            0
+          ],
+          "scale": [
+            0.2,
+            5,
+            24
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_ochre.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "ArcadeRoof",
+        "transform": {
+          "position": [
+            0,
+            5.1,
+            0
+          ],
+          "scale": [
+            4.4,
+            0.2,
+            24.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar0",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            -11.0
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar1",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            -8.25
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar2",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            -5.5
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar3",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            -2.75
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar4",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            0.0
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar5",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            2.75
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar6",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            5.5
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar7",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            8.25
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Pillar8",
+        "transform": {
+          "position": [
+            1.8,
+            2.5,
+            11.0
+          ],
+          "scale": [
+            0.4,
+            5,
+            0.4
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_rock.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "ArcadeGIVolume",
+        "transform": {
+          "position": [
+            0,
+            2.6,
+            0
+          ]
+        },
+        "gi_volume": {
+          "size": [
+            4.4,
+            5.4,
+            24.4
+          ],
+          "spacing": 0.5
+        }
+      }
+    }
+  ]
+}

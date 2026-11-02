@@ -1,0 +1,359 @@
+{
+  "components": {
+    "name": "House",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "children": [
+    {
+      "components": {
+        "name": "Floor",
+        "transform": {
+          "position": [
+            0,
+            0.05,
+            0
+          ],
+          "scale": [
+            8,
+            0.1,
+            6
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_wood.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WallBack",
+        "transform": {
+          "position": [
+            0,
+            2,
+            -2.9
+          ],
+          "scale": [
+            8,
+            4,
+            0.2
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WallLeft",
+        "transform": {
+          "position": [
+            -3.9,
+            2,
+            0
+          ],
+          "scale": [
+            0.2,
+            4,
+            6
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WallRightA",
+        "transform": {
+          "position": [
+            3.9,
+            2,
+            -1.875
+          ],
+          "scale": [
+            0.2,
+            4,
+            2.25
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WallRightB",
+        "transform": {
+          "position": [
+            3.9,
+            2,
+            1.875
+          ],
+          "scale": [
+            0.2,
+            4,
+            2.25
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WindowSill",
+        "transform": {
+          "position": [
+            3.9,
+            0.6,
+            0
+          ],
+          "scale": [
+            0.2,
+            1.2,
+            1.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WindowHead",
+        "transform": {
+          "position": [
+            3.9,
+            3.3,
+            0
+          ],
+          "scale": [
+            0.2,
+            1.4,
+            1.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WallFrontL",
+        "transform": {
+          "position": [
+            -2.4,
+            2,
+            2.9
+          ],
+          "scale": [
+            3.2,
+            4,
+            0.2
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "WallFrontR",
+        "transform": {
+          "position": [
+            2.4,
+            2,
+            2.9
+          ],
+          "scale": [
+            3.2,
+            4,
+            0.2
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "DoorLintel",
+        "transform": {
+          "position": [
+            0,
+            3.2,
+            2.9
+          ],
+          "scale": [
+            1.6,
+            1.6,
+            0.2
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_plaster.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Roof",
+        "transform": {
+          "position": [
+            0,
+            4.1,
+            0
+          ],
+          "scale": [
+            8.6,
+            0.2,
+            6.6
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_terracotta.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Carpet",
+        "transform": {
+          "position": [
+            -0.5,
+            0.11,
+            -0.6
+          ],
+          "scale": [
+            3.2,
+            0.02,
+            2.6
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_carpet.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Table",
+        "transform": {
+          "position": [
+            -2.6,
+            0.5,
+            -1.8
+          ],
+          "scale": [
+            1.2,
+            1.0,
+            0.8
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "gi_wood.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "HouseGIVolume",
+        "transform": {
+          "position": [
+            0,
+            2.1,
+            0
+          ]
+        },
+        "gi_volume": {
+          "size": [
+            8.4,
+            4.6,
+            6.4
+          ],
+          "spacing": 0.5
+        }
+      }
+    }
+  ]
+}

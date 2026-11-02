@@ -1,0 +1,40 @@
+[
+  {
+    "components": {
+      "name": "Sponza",
+      "transform": {
+        "rotation": [0, 90, 0]
+      }
+    },
+    "gltf": "sponza.gltf"
+  },
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "cameras/player_camera.prefab",
+    "components": {
+      "camera": {
+        "controllable": true,
+        "fov": 60,
+        "position": [4, 5.6, 9],
+        "target": [4, 5.6, -10]
+      },
+      "camera_bookmarks": {
+        "views": [
+          { "position": [0, 0.6, 12], "target": [0, 2.2, 0] },
+          { "position": [4.3, 0.9, 10.5], "target": [4.0, 0.2, 0] },
+          { "position": [4, 5.6, 9], "target": [4, 5.6, -10] },
+          { "position": [1.5, 0.4, 3], "target": [-5, 4.8, 1] },
+          { "position": [-4.3, 0.9, -10.5], "target": [-4.0, 0.2, 0] }
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  }
+]

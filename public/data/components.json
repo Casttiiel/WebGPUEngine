@@ -1,6 +1,10 @@
 {
   "update": [
     "point_light",
+    "light_flicker",
+    "light_sweep",
+    "path_mover",
+    "camera_bookmarks",
     "directional_light",
     "area_light",
     "particle_system",

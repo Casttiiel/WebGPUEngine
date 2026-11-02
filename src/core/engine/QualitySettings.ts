@@ -22,6 +22,10 @@ export interface GraphicsQualitySettings {
   useKTX2: boolean;
   meshTextureFilter: 'trilinear' | 'nearest';
   ditheringMode: 'off' | 'psx';
+  /** Realtime GI (src/renderer/gi) replaces the baked ambient diffuse. `?gi=` and F9 override it. */
+  realtimeGI: boolean;
+  /** Realtime GI quality: rays per probe and probes traced per frame. */
+  giQuality: 'high' | 'low';
 }
 
 export class QualitySettings {
@@ -55,6 +59,8 @@ export class QualitySettings {
       useKTX2: false,
       meshTextureFilter: 'trilinear',
       ditheringMode: 'off',
+      realtimeGI: false,
+      giQuality: 'low',
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -81,6 +87,8 @@ export class QualitySettings {
       useKTX2: false,
       meshTextureFilter: 'trilinear',
       ditheringMode: 'off',
+      realtimeGI: false,
+      giQuality: 'low',
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -107,6 +115,8 @@ export class QualitySettings {
       useKTX2: false,
       meshTextureFilter: 'trilinear',
       ditheringMode: 'off',
+      realtimeGI: true,
+      giQuality: 'low',
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -133,6 +143,8 @@ export class QualitySettings {
       useKTX2: false,
       meshTextureFilter: 'trilinear',
       ditheringMode: 'off',
+      realtimeGI: true,
+      giQuality: 'high',
     } as GraphicsQualitySettings,
   };
 
@@ -178,6 +190,8 @@ export class QualitySettings {
       useKTX2: false,
       meshTextureFilter: 'trilinear',
       ditheringMode: 'off',
+      realtimeGI: false,
+      giQuality: 'high',
     };
     this.mergedSettings = { ...defaults, ...this.settings };
     return this.mergedSettings;

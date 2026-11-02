@@ -779,6 +779,15 @@ export class Material extends GPUResource {
    * custom-slot file textures).  Used by RenderComponent to register streamable textures
    * with TextureStreamingManager.
    */
+  /** A PBR slot's texture and the view the G-buffer samples it through (sRGB view for albedo when the technique wants it). */
+  public getSlotTexture(
+    slot: 'albedo' | 'emissive',
+  ): { texture: Texture; view: GPUTextureView } | undefined {
+    const texture = this.textures.get(slot);
+    const view = texture && Material.getSlotView(texture, slot, this.technique);
+    return texture && view ? { texture, view } : undefined;
+  }
+
   public getAssetTextures(): Texture[] {
     const result: Texture[] = [];
     for (const tex of this.textures.values()) result.push(tex);

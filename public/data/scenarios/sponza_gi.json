@@ -1,0 +1,5 @@
+{
+  "description": "Banco de pruebas de la GI en tiempo real: Sponza con sol por el patio, braseros que parpadean, un orbe emisivo y un foco de color. F9 alterna off / realtime / compare.",
+  "scenes": ["sponza_gi.json"],
+  "environment": "environment_sponza_gi.json"
+}

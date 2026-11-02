@@ -11,6 +11,11 @@ import { TransformComponentDataType } from '../../types/TransformComponentData.t
 
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
+import { LightFlickerComponent } from '../../components/render/LightFlickerComponent';
+import { LightSweepComponent } from '../../components/render/LightSweepComponent';
+import { CameraBookmarksComponent } from '../../components/render/CameraBookmarksComponent';
+import { GIVolumeComponent } from '../../components/render/GIVolumeComponent';
+import { PathMoverComponent } from '../../components/core/PathMoverComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
@@ -399,6 +404,16 @@ export class Loader {
         return new AmbientOcclusionComponent();
       case 'point_light':
         return new PointLightComponent();
+      case 'light_flicker':
+        return new LightFlickerComponent();
+      case 'light_sweep':
+        return new LightSweepComponent();
+      case 'path_mover':
+        return new PathMoverComponent();
+      case 'camera_bookmarks':
+        return new CameraBookmarksComponent();
+      case 'gi_volume':
+        return new GIVolumeComponent();
       case 'spot_light':
         return new SpotLightComponent();
       case 'directional_light':
