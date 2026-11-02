@@ -28,6 +28,14 @@ export class TiledLightManager {
   /** Max lights stored per tile in the GPU tile list buffers. */
   public static readonly MAX_LIGHTS_PER_TILE = 64;
   public static readonly TILE_SIZE = 16;
+  /**
+   * The last PARTICLE_LIGHT_SLOTS entries of the point light buffer belong to particles: their
+   * update compute (ParticleSystemComponent, LIGHTS module) writes them on the GPU and counts
+   * them in particleLightCountBuffer, which the culling reads and clears every frame.
+   */
+  public static readonly PARTICLE_LIGHT_SLOTS = 256;
+  public static readonly PARTICLE_LIGHT_BASE =
+    TiledLightManager.MAX_POINT_LIGHTS - TiledLightManager.PARTICLE_LIGHT_SLOTS;
 
   // Struct sizes in floats (PointLightEntry = 3×vec4, SpotLightEntry = 4×vec4)
   private static readonly POINT_FLOATS = 12;
@@ -37,6 +45,7 @@ export class TiledLightManager {
   private paramsBuffer!: GPUBuffer; // TiledCullingParams  (16 bytes = 4×u32)
   private pointLightBuffer!: GPUBuffer; // PointLightEntry[]   (MAX × 48 bytes)
   private spotLightBuffer!: GPUBuffer; // SpotLightEntry[]    (MAX × 64 bytes)
+  private particleLightCountBuffer!: GPUBuffer; // u32: particle lights written this frame
 
   // ─── Resize-dependent GPU buffers (recreated on each resize) ──────────
   private tileLightCountBuffer!: GPUBuffer; // vec2<u32>[] per tile
@@ -83,6 +92,11 @@ export class TiledLightManager {
     this.spotLightBuffer = GPUUtils.createBuffer(
       'tiled_spot_lights',
       MAX_S * SF * 4,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    );
+    this.particleLightCountBuffer = GPUUtils.createBuffer(
+      'tiled_particle_light_count',
+      4,
       GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     );
 
@@ -162,7 +176,7 @@ export class TiledLightManager {
       []) {
       const pl = comp as PointLightComponent;
       if (pl.hasShadows() || !pl.isVisible()) continue;
-      if (pointCount >= TiledLightManager.MAX_POINT_LIGHTS) break;
+      if (pointCount >= TiledLightManager.PARTICLE_LIGHT_BASE) break;
 
       const o = pointCount * PF;
       const pos = pl.getWorldPosition();
@@ -265,6 +279,7 @@ export class TiledLightManager {
           { binding: 3, resource: { buffer: this.tileLightCountBuffer } },
           { binding: 4, resource: { buffer: this.tilePointListBuffer } },
           { binding: 5, resource: { buffer: this.tileSpotListBuffer } },
+          { binding: 6, resource: { buffer: this.particleLightCountBuffer } },
         ],
       );
     }
@@ -279,6 +294,8 @@ export class TiledLightManager {
     computePass.setBindGroup(1, this.computeDataBindGroup);
     computePass.dispatchWorkgroups(this.numTilesX, this.numTilesY, 1);
     computePass.end();
+    // Particle lights are rewritten every frame (their update runs before the next culling).
+    encoder.clearBuffer(this.particleLightCountBuffer);
   }
 
   /**
@@ -303,8 +320,18 @@ export class TiledLightManager {
     return this.renderDataBindGroup;
   }
 
+  /** Point light buffer the particles write their lights into (from PARTICLE_LIGHT_BASE). */
+  public getPointLightBuffer(): GPUBuffer | null {
+    return this.isLoaded ? this.pointLightBuffer : null;
+  }
+
+  public getParticleLightCountBuffer(): GPUBuffer | null {
+    return this.isLoaded ? this.particleLightCountBuffer : null;
+  }
+
   public dispose(): void {
     this.paramsBuffer?.destroy();
+    this.particleLightCountBuffer?.destroy();
     this.pointLightBuffer?.destroy();
     this.spotLightBuffer?.destroy();
     this.tileLightCountBuffer?.destroy();

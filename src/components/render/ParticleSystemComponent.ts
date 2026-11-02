@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Material } from '../../renderer/resources/Material';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -8,16 +8,28 @@ import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { ParticleSystemComponentData } from '../../types/ParticleSystemComponentData.type';
+import { MeshData } from '../../types/MeshData.type';
 import { Engine } from '../../core/engine/Engine';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { TiledLightManager } from '../../renderer/core/managers/TiledLightManager';
 import { DirectionalLightComponent } from './DirectionalLightComponent';
+import {
+  CURVE_SAMPLES,
+  FACINGS,
+  FLIPBOOK_MODES,
+  ParticleConfig,
+  SPAWN_SHAPES,
+  bakeParticleCurves,
+  normalizeParticleConfig,
+} from './particles/ParticleConfig';
+import { buildParticleEditor } from './particles/ParticleEditor';
 
 /** Ráfaga de partículas (burst). Lo que no se indica sale de la configuración del emisor. */
 export interface ParticleBurstOptions {
-  /** Velocidad base de esta ráfaga (en vez de baseVelocity): p.ej. la dirección de un golpe. */
+  /** Velocidad base de esta ráfaga (en vez de init.velocity): p.ej. la dirección de un golpe. */
   velocity?: vec3;
   /** Las partículas mueren al bajar de esta altura (el suelo donde caen). */
   floorY?: number;
@@ -33,363 +45,387 @@ interface QueuedBurst {
   sizeScale: number;
 }
 
+interface SimPipelines {
+  update: GPUComputePipeline;
+  spawn: GPUComputePipeline;
+}
+
 /** floorY de las partículas sin suelo. */
 const NO_FLOOR = -1e9;
+const PARTICLE_BYTES = 48;
+const SPAWN_PARAMS_BYTES = 160; // SpawnParams (particle_spawn.cs)
+const SIM_PARAMS_BYTES = 208; // SimParams (particle_update.cs)
+const RENDER_PARAMS_FLOATS = 28; // ParticleRenderParams (common/particles.wgsl), 112 bytes
+const CURVES_FLOATS = CURVE_SAMPLES * 4 + CURVE_SAMPLES; // ParticleCurves, 640 bytes
+const DEG = Math.PI / 180;
 
 /**
- * ParticleSystemComponent - GPU-driven particle system using indirect draw
- * for efficient rendering of dynamic particle counts
+ * Sistema de partículas en GPU, organizado en módulos como un emisor de Niagara
+ * (ParticleConfig): emitter → spawn (formas) → init → forces (gravedad, drag, curl noise,
+ * vórtice, atractor) → overLife (curvas de color y tamaño) → render (sprite con facing y
+ * flipbook, o ribbon) → lights (las partículas más grandes iluminan la escena, tiled).
+ *
+ * Los compute de spawn/update se compilan con los #define de los módulos activos (una
+ * pipeline por combinación, compartida). Todo es editable en vivo desde el F2: los valores
+ * se suben cada frame; los cambios de estructura (capacidad, material, ribbon, módulos
+ * compilados) reconstruyen el emisor.
  */
 export class ParticleSystemComponent extends Component {
-  // ── Capacidad (leída del prefab) ──────────────────────────────────────────────
-  private maxParticles: number = 1024;
+  private config!: ParticleConfig;
 
-  // ── GPU resources ──────────────────────────────────────────────────────────────
-  private quadMesh!: Mesh;
-  private particleMaterial!: Material;
+  // ── Recursos GPU ─────────────────────────────────────────────────────────────
+  private mesh!: Mesh;
+  private material!: Material;
   private transform!: TransformComponent;
-  private particleBuffer!: GPUBuffer;
-  private indirectDrawBuffer!: GPUBuffer;
-  private renderBindGroup!: GPUBindGroup;
+  private particleBuffer: GPUBuffer | null = null;
+  private indirectDrawBuffer: GPUBuffer | null = null;
+  private freeListBuffer: GPUBuffer | null = null;
+  private freeListCountBuffer: GPUBuffer | null = null;
+  private historyBuffer: GPUBuffer | null = null;
+  private curvesBuffer: GPUBuffer | null = null;
+  private renderParamsBuffer: GPUBuffer | null = null;
+  private simParamsBuffer: GPUBuffer | null = null;
+  private spawnParamsBuffer: GPUBuffer | null = null;
+  private emitterLightCountBuffer: GPUBuffer | null = null;
+  /** Sustitutos de los buffers de luces mientras no hay TiledLightManager (o sin módulo). */
+  private dummyLightsBuffer: GPUBuffer | null = null;
+  private dummyLightCountBuffer: GPUBuffer | null = null;
+  private pipelines: SimPipelines | null = null;
+  private updateBindGroup: GPUBindGroup | null = null;
+  private spawnBindGroup: GPUBindGroup | null = null;
+  private computeDeps: unknown[] = [];
+  private renderBindGroup: GPUBindGroup | null = null;
+  private renderDeps: unknown[] = [];
   private renderComponent: RenderComponent | null = null;
+  /** Técnica LIT (sol + sombras + probes + niebla por partícula). */
+  private lit = false;
+  /** Puntos de estela reservados por partícula (0 = sprite). */
+  private trailLength = 0;
+  private lightsCompiled = false;
+  private ready = false;
+  /** Cada build invalida a los anteriores que sigan cargando. */
+  private generation = 0;
+  private rebuilding: Promise<void> | null = null;
+  private rebuildQueued = false;
   /** dispose() ya llamado: si la carga asíncrona termina después, no se registra. */
   private disposed = false;
+  private curvesDirty = true;
 
-  // Compute shader resources (update particles)
-  private updatePipeline!: GPUComputePipeline;
-  private updateBindGroup!: GPUBindGroup;
-  private simulationParamsBuffer!: GPUBuffer;
-
-  // Spawn shader resources (compaction eliminada - ahora skip en vertex shader)
-  private spawnPipeline!: GPUComputePipeline;
-  private spawnCompactBindGroup!: GPUBindGroup;
-  private spawnParamsBuffer!: GPUBuffer;
-  private spawnCounterBuffer!: GPUBuffer;
-
-  // Render params uniform buffer (startSize, endSize, startColor, endColor → VS)
-  private particleRenderParamsBuffer!: GPUBuffer;
-
-  // OPTIMIZACIÓN: Dead Particle Free List
-  private freeListBuffer!: GPUBuffer;
-  private freeListCountBuffer!: GPUBuffer;
-
-  // ── Spawn timing ───────────────────────────────────────────────────────────────
-  private spawnTimer: number = 0;
-  private spawnInterval: number = 0.05; // Spawn 20 veces/segundo
-  private particlesPerSpawn: number = 5;
-
-  // ── Burst / oneShot ───────────────────────────────────────────────────────────
+  // ── Emisión ─────────────────────────────────────────────────────────────────
+  private spawnAccumulator = 0;
+  private trailTimer = 0;
+  private time = 0;
   /** Una por frame: comparten el uniform de spawn (cada una con su posición y velocidad). */
   private burstQueue: QueuedBurst[] = [];
-  private emitting: boolean = true;
-  private oneShot: boolean = false;
-  private oneShotBurstCount: number = 0;
-  private oneShotFired: boolean = false;
+  private emitting = true;
+  private oneShotFired = false;
 
-  // ── Parámetros de partícula (leídos del prefab) ────────────────────────────────
-  private worldSpace: boolean = false;
-  private spawnExtents: number[] = [2, 2, 2];
-  private startSize: number = 0.1;
-  private endSize: number = 0.1;
-  private startColor: number[] = [1, 1, 1, 1];
-  private endColor: number[] = [1, 1, 1, 1];
-  private baseVelocity: number[] = [0, 1, 0];
-  private gravity: number[] = [0, -9.81, 0];
-  private particleLife: number = 3.0;
-  private particleLifeVarMin: number = 0.0;
-  private particleLifeVarMax: number = 0.0;
-  private velocitySpread: number = 0.5;
-  private speedVariance: number = 0;
-  private drag: number = 0;
+  // ── Staging CPU (sin allocations por frame) ──────────────────────────────────
+  private spawnParams = new ArrayBuffer(SPAWN_PARAMS_BYTES);
+  private spawnF32 = new Float32Array(this.spawnParams);
+  private spawnU32 = new Uint32Array(this.spawnParams);
+  private simParams = new ArrayBuffer(SIM_PARAMS_BYTES);
+  private simF32 = new Float32Array(this.simParams);
+  private simU32 = new Uint32Array(this.simParams);
+  private renderParams = new Float32Array(RENDER_PARAMS_FLOATS);
+  private curves = new Float32Array(CURVES_FLOATS);
+  private zeroU32 = new Uint32Array(1);
+  private emitterMatrix = mat4.create();
+  private tmpMat = mat4.create();
+  private tmpMat2 = mat4.create();
+  private tmpVec = vec3.create();
 
-  // ── Reuse buffers CPU para evitar allocations ────────────────────────────────
-  private simParamsArray = new Float32Array(8); // 32 bytes: deltaTime + padding*3 + gravity(vec3) + padding
-  private spawnParamsArray = new ArrayBuffer(112); // 112 bytes: ver SpawnParams en shader
-  private spawnParamsFloat32View!: Float32Array;
-  private spawnParamsUint32View!: Uint32Array;
-  private counterDataArray = new Uint32Array(1);
-  // 96 bytes: startSize, endSize, spinSpeed, tumbleSpeed + startColor + endColor
-  //           + atlasCols, atlasRows, flutter, nearFade + fog, translucency, shape, stretch
-  //           + sizeVariance (ver ParticleRenderParams en particle_worldspace.vs)
-  private particleRenderParamsArray = new Float32Array(24);
-  /** LIT techniques (particle_ash.tech): sun + shadows + probes + fog per particle. */
-  private lit = false;
-  /** LIT: sunlight that goes through a flake seen against the sun (0 = none). */
-  private translucency = 0.6;
-  /** LIT: resources the bind group was built with — rebuilt when any changes. */
-  private litDeps: unknown[] = [];
-  // Aspecto de cada partícula (copos, hojas, ceniza): giro, volteo, variantes, aleteo.
-  private spinSpeed = 0;
-  private tumbleSpeed = 0;
-  private atlas: [number, number] = [1, 1];
-  private flutter = 0;
-  private nearFade = 0;
-  private shape = 0;
-  private stretch = 0;
-  private sizeVariance = 0;
+  private static computeLayout: GPUBindGroupLayout | null = null;
+  private static pipelineCache = new Map<string, Promise<SimPipelines>>();
+  private static ribbonMaterials = new Map<string, Promise<Material>>();
+  private static ribbonMeshes = new Map<number, Promise<Mesh>>();
 
-  constructor() {
-    super();
-    // Inicializar views reutilizables
-    this.spawnParamsFloat32View = new Float32Array(this.spawnParamsArray);
-    this.spawnParamsUint32View = new Uint32Array(this.spawnParamsArray);
+  public override async load(data: unknown): Promise<void> {
+    this.config = normalizeParticleConfig(data as ParticleSystemComponentData);
+    this.emitting = this.config.emitter.emitting && !this.config.emitter.oneShot;
+    this.transform = this.getOwner().getComponent('transform') as TransformComponent;
+    await this.build();
   }
 
-  /** Escribe los parámetros de renderizado (tamaño/color) al buffer GPU */
-  private writeRenderParamsBuffer(device: GPUDevice): void {
-    const a = this.particleRenderParamsArray;
-    a[0] = this.startSize;
-    a[1] = this.endSize;
-    a[2] = this.spinSpeed;
-    a[3] = this.tumbleSpeed;
-    a[4] = this.startColor[0];
-    a[5] = this.startColor[1];
-    a[6] = this.startColor[2];
-    a[7] = this.startColor[3];
-    a[8] = this.endColor[0];
-    a[9] = this.endColor[1];
-    a[10] = this.endColor[2];
-    a[11] = this.endColor[3];
-    a[12] = this.atlas[0];
-    a[13] = this.atlas[1];
-    a[14] = this.flutter;
-    a[15] = this.nearFade;
-    a[16] = Engine.getRender()?.getDeferredRenderer()?.getFroxelVolumetrics()?.isVolumetricEnabled() ? 1 : 0;
-    a[17] = this.translucency;
-    a[18] = this.shape;
-    a[19] = this.stretch;
-    a[20] = this.sizeVariance;
-    device.queue.writeBuffer(this.particleRenderParamsBuffer, 0, a);
+  /** Configuración viva (la edita el F2). */
+  public getConfig(): ParticleConfig {
+    return this.config;
   }
 
-  /** Escribe la gravedad (y el padding) al buffer de simulación */
-  private writeGravityToSimBuffer(device: GPUDevice): void {
-    // gravity va en offset 16 → indices 4,5,6 del Float32Array de 8 floats
-    this.simParamsArray[1] = this.drag;
-    this.simParamsArray[4] = this.gravity[0];
-    this.simParamsArray[5] = this.gravity[1];
-    this.simParamsArray[6] = this.gravity[2];
-    this.simParamsArray[7] = 0;
-    // Escribir los 8 floats completos (32 bytes)
-    device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray);
-  }
-
-  public override async load(_data: unknown): Promise<void> {
-    try {
-      // Leer configuración
-      const data = _data as ParticleSystemComponentData;
-      this.worldSpace = data?.worldSpace ?? false;
-      const rawRadius = data?.spawnRadius;
-      if (Array.isArray(rawRadius)) {
-        this.spawnExtents = rawRadius;
-      } else if (typeof rawRadius === 'number') {
-        this.spawnExtents = [rawRadius, rawRadius, rawRadius];
-      } else {
-        this.spawnExtents = [2, 2, 2];
-      }
-      this.maxParticles = data?.maxParticles ?? 1024;
-
-      // emissionRate → spawnInterval + particlesPerSpawn
-      // Si emissionRate <= 20: 1 partícula cada (1/emissionRate) segundos
-      // Si emissionRate >  20: múltiples partículas cada 0.05s (20 ticks/s)
-      const emissionRate = data?.emissionRate ?? 100;
-      const MAX_TICK_RATE = 20; // ticks/segundo máximo
-      if (emissionRate <= MAX_TICK_RATE) {
-        this.spawnInterval = 1 / emissionRate;
-        this.particlesPerSpawn = 1;
-      } else {
-        this.spawnInterval = 1 / MAX_TICK_RATE; // 0.05s
-        this.particlesPerSpawn = Math.round(emissionRate / MAX_TICK_RATE);
-      }
-
-      // Parámetros visuales
-      this.spinSpeed = data?.spinSpeed ?? 0;
-      this.tumbleSpeed = data?.tumbleSpeed ?? 0;
-      this.atlas = data?.atlas ? [data.atlas[0] ?? 1, data.atlas[1] ?? 1] : [1, 1];
-      this.flutter = data?.flutter ?? 0;
-      this.nearFade = data?.nearFade ?? 0;
-      this.translucency = data?.translucency ?? 0.6;
-      this.shape = data?.shape === 'mist' ? 1 : 0;
-      this.stretch = data?.stretch ?? 0;
-      this.sizeVariance = data?.sizeVariance ?? 0;
-      this.startSize = data?.startSize ?? 0.1;
-      this.endSize = data?.endSize ?? 0.1;
-      this.startColor = data?.startColor ?? [1, 1, 1, 1];
-      this.endColor = data?.endColor ?? [1, 1, 1, 1];
-
-      // Parámetros de movimiento
-      this.baseVelocity = data?.baseVelocity ?? [0, 1, 0];
-      this.gravity = data?.gravity ?? [0, -9.81, 0];
-      this.velocitySpread = data?.velocitySpread ?? 0.5;
-      this.speedVariance = data?.speedVariance ?? 0;
-      this.drag = data?.drag ?? 0;
-
-      // Vida de partícula
-      this.particleLife = data?.particleLife ?? 3.0;
-      this.particleLifeVarMin = data?.particleLifeVarianceMin ?? 0.0;
-      this.particleLifeVarMax = data?.particleLifeVarianceMax ?? 0.0;
-
-      // Burst / oneShot
-      this.emitting = data?.emitting !== false; // default true
-      this.oneShot = data?.oneShot ?? false;
-      this.oneShotBurstCount = data?.burstCount ?? this.maxParticles;
-      if (this.oneShot) this.emitting = false; // oneShot overrides continuous emission
-
-      // 1. Cargar mesh y material con la técnica apropiada según worldSpace
-      const meshPath = data?.mesh ?? 'quad.obj';
-      const materialPath =
-        data?.material ?? (this.worldSpace ? 'particle_worldspace.mat' : 'particle.mat');
-      this.quadMesh = await Mesh.get(meshPath);
-      this.particleMaterial = await Material.get(materialPath);
-
-      const device = GPUUtils.getDevice();
-
-      this.transform = this.getOwner().getComponent('transform') as TransformComponent;
-
-      // 2. Crear storage buffer para datos de partículas
-      // Estructura: position(vec3 + padding) + velocity(vec3) + lifetime(f32) + age(f32) + active(u32) + padding(u32 x2)
-      // Total: 48 bytes por partícula
-      const PARTICLE_SIZE_FLOATS = 12; // 48 bytes / 4 bytes por float
-      const particleData = new Float32Array(this.maxParticles * PARTICLE_SIZE_FLOATS);
-
-      // Inicializar TODAS las partículas como muertas (alive = 0)
-      const uint32View = new Uint32Array(particleData.buffer);
-      for (let i = 0; i < this.maxParticles; i++) {
-        const offset = i * PARTICLE_SIZE_FLOATS;
-        // position, velocity, lifetime, age = 0 por defecto (Float32Array inicia en 0)
-
-        // active = 0 (muerta)
-        const uint32Offset = offset + 9;
-        uint32View[uint32Offset + 0] = 0; // alive = 0
-      }
-
-      this.particleBuffer = device.createBuffer({
-        label: 'particle_storage_buffer',
-        size: particleData.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(this.particleBuffer, 0, particleData);
-
-      // 3. Crear buffer indirecto (indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
-      // instanceCount es FIJO = maxParticles; el VS descarta partículas muertas.
-      const indirectArgs = new Uint32Array([
-        6, // indexCount (quad)
-        this.maxParticles, // instanceCount FIJO - skip dead en VS
-        0, // firstIndex
-        0, // baseVertex
-        0, // firstInstance
-      ]);
-      this.indirectDrawBuffer = device.createBuffer({
-        label: 'particle_indirect_buffer',
-        size: indirectArgs.byteLength,
-        usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
-
-      // 4. Dead Particle Free List: inicialmente todos los índices están libres
-      const freeListData = new Uint32Array(this.maxParticles);
-      for (let i = 0; i < this.maxParticles; i++) {
-        freeListData[i] = i; // Índice de la partícula
-      }
-
-      this.freeListBuffer = device.createBuffer({
-        label: 'particle_free_list',
-        size: freeListData.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(this.freeListBuffer, 0, freeListData);
-
-      // Contador de slots libres (inicialmente = maxParticles)
-      const freeListCount = new Uint32Array([this.maxParticles]);
-      this.freeListCountBuffer = device.createBuffer({
-        label: 'particle_free_list_count',
-        size: 4, // 1 × u32 = 4 bytes
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(this.freeListCountBuffer, 0, freeListCount);
-
-      // 5. Crear ParticleRenderParams buffer (96 bytes; ver particleRenderParamsArray)
-      this.particleRenderParamsBuffer = device.createBuffer({
-        label: 'particle_render_params_buffer',
-        size: 96,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-
-      // 6. Crear bind group para el storage buffer (group 3)
-      //    binding 0: particle storage array (read by VS)
-      //    binding 1: ParticleRenderParams uniform (read by VS)
-      const renderBindGroupLayout = device.createBindGroupLayout({
-        entries: [
-          {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: { type: 'read-only-storage' },
-          },
-          {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: { type: 'uniform' },
-          },
-        ],
-      });
-
-      this.renderBindGroup = device.createBindGroup({
-        layout: renderBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.particleBuffer } },
-          { binding: 1, resource: { buffer: this.particleRenderParamsBuffer } },
-        ],
-      });
-
-      // Escribir render params iniciales (particleRenderParamsBuffer ya existe)
-      this.writeRenderParamsBuffer(device);
-
-      // 7. Crear compute shader pipeline y recursos
-      await this.createComputePipeline();
-
-      // Escribir gravedad inicial al buffer de simulación (creado en createComputePipeline)
-      this.writeGravityToSimBuffer(device);
-
-      // Destruido mientras cargaba (p.ej. un efecto de corta vida): liberar y no registrar.
-      if (this.disposed) {
-        this.destroyBuffers();
-        return;
-      }
-
-      // 8. Registrar la key instanciada en el RenderManagerV2. Las iluminadas esperan a que
-      //    existan el sol, sus sombras y la niebla (update → ensureLitBindGroup).
-      this.lit =
-        this.particleMaterial.getTechnique()?.usesLayout(PipelineBindGroupLayouts.PARTICLE_LIT_UNIFORMS) ??
-        false;
-      if (!this.lit) this.registerRenderKey();
-    } catch (error: any) {
-      throw error;
-    }
-  }
-
-  private registerRenderKey(): void {
-    if (this.renderComponent) RenderManagerV2.getInstance().delKeys(this.renderComponent);
-    this.renderComponent = new RenderComponent();
-    this.renderComponent.setOwner(this.getOwner());
-    RenderManagerV2.getInstance().addKey(
-      this.renderComponent,
-      this.quadMesh,
-      this.particleMaterial,
-      this.transform,
-      true, // Skip CPU frustum culling
-      this.maxParticles,
-      undefined, // instanceBindGroup no se usa
-      this.renderBindGroup, // @group(3) del sistema de partículas
-      this.indirectDrawBuffer,
-    );
+  /** Las curvas de vida cambiaron: se vuelven a hornear. */
+  public markCurvesDirty(): void {
+    this.curvesDirty = true;
   }
 
   /**
-   * LIT: builds the particle bind group with the lighting inputs (sun, shadow cascades,
-   * probes, froxel fog) and registers the key; rebuilds both when one of them is
-   * recreated (shadow resolution, resize). Not drawn until they all exist.
+   * Reconstruye el emisor con la configuración actual (capacidad, material, renderer o
+   * módulos compilados). Las partículas vivas se pierden.
    */
-  private ensureLitBindGroup(): void {
+  public rebuild(): void {
+    if (this.rebuilding) {
+      this.rebuildQueued = true;
+      return;
+    }
+    this.rebuilding = this.build()
+      .catch((e) => console.error('[particle_system] rebuild failed:', e))
+      .finally(() => {
+        this.rebuilding = null;
+        if (this.rebuildQueued) {
+          this.rebuildQueued = false;
+          this.rebuild();
+        }
+      });
+  }
+
+  /** Vuelve a disparar el oneShot / limpia las partículas (F2 → Restart). */
+  public restart(): void {
+    this.oneShotFired = false;
+    this.rebuild();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private simDefines(): string[] {
+    const f = this.config.forces;
+    const defines: string[] = [];
+    if (f.curlNoise.enabled) defines.push('CURL_NOISE');
+    if (f.vortex.enabled) defines.push('VORTEX');
+    if (f.attractor.enabled) defines.push('ATTRACTOR');
+    if (this.config.render.renderer === 'ribbon') defines.push('RIBBON');
+    if (this.config.lights.enabled) defines.push('LIGHTS');
+    return defines;
+  }
+
+  private async build(): Promise<void> {
+    const gen = ++this.generation;
+    const c = this.config;
+    const ribbon = c.render.renderer === 'ribbon';
+    const trailLength = ribbon ? c.render.ribbon.segments : 0;
+
+    const [material, mesh, pipelines] = await Promise.all([
+      ribbon ? ParticleSystemComponent.getRibbonMaterial(c.material) : Material.get(c.material),
+      ribbon ? ParticleSystemComponent.getRibbonMesh(trailLength) : Mesh.getAsync('quad.obj'),
+      ParticleSystemComponent.getPipelines(this.simDefines()),
+    ]);
+    if (gen !== this.generation || this.disposed) return;
+
+    // Lo anterior deja de dibujarse antes de destruir sus buffers.
+    this.releaseGPU();
+
+    const device = GPUUtils.getDevice();
+    const max = Math.max(1, Math.floor(c.maxParticles));
+    this.material = material;
+    this.mesh = mesh;
+    this.pipelines = pipelines;
+    this.trailLength = trailLength;
+    this.lightsCompiled = c.lights.enabled;
+    this.lit = material.getTechnique()?.usesLayout(PipelineBindGroupLayouts.PARTICLE_LIT_UNIFORMS) ?? false;
+
+    const storage = (label: string, size: number, usage = 0): GPUBuffer =>
+      device.createBuffer({ label, size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | usage });
+    const uniform = (label: string, size: number): GPUBuffer =>
+      device.createBuffer({ label, size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+
+    // Todas muertas al empezar (alive = 0): un buffer a ceros.
+    this.particleBuffer = storage('particle_storage_buffer', max * PARTICLE_BYTES);
+
+    // instanceCount fijo = capacidad: el VS descarta las muertas.
+    this.indirectDrawBuffer = device.createBuffer({
+      label: 'particle_indirect_buffer',
+      size: 20,
+      usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(this.indirectDrawBuffer, 0, new Uint32Array([mesh.getIndexCount() || 6, max, 0, 0, 0]));
+
+    // Free list: al principio todos los huecos están libres.
+    this.freeListBuffer = storage('particle_free_list', max * 4);
+    device.queue.writeBuffer(this.freeListBuffer, 0, Uint32Array.from({ length: max }, (_, i) => i));
+    this.freeListCountBuffer = storage('particle_free_list_count', 4);
+    device.queue.writeBuffer(this.freeListCountBuffer, 0, new Uint32Array([max]));
+
+    this.historyBuffer = storage('particle_trail_history', Math.max(16, max * trailLength * 16));
+    this.curvesBuffer = uniform('particle_curves', CURVES_FLOATS * 4);
+    this.renderParamsBuffer = uniform('particle_render_params', RENDER_PARAMS_FLOATS * 4);
+    this.simParamsBuffer = uniform('particle_sim_params', SIM_PARAMS_BYTES);
+    this.spawnParamsBuffer = uniform('particle_spawn_params', SPAWN_PARAMS_BYTES);
+    this.emitterLightCountBuffer = storage('particle_emitter_light_count', 4);
+    this.dummyLightsBuffer = storage('particle_dummy_lights', 48);
+    this.dummyLightCountBuffer = storage('particle_dummy_light_count', 4);
+    this.curvesDirty = true;
+    this.computeDeps = [];
+    this.renderDeps = [];
+    this.spawnAccumulator = 0;
+    this.trailTimer = 0;
+    this.ready = true;
+    // La key se registra en update(), cuando existen todos los recursos que lee (profundidad,
+    // sol, niebla…).
+  }
+
+  private static async getPipelines(defines: string[]): Promise<SimPipelines> {
+    const key = [...defines].sort().join(',');
+    let promise = this.pipelineCache.get(key);
+    if (!promise) {
+      promise = (async () => {
+        const device = GPUUtils.getDevice();
+        const layout = device.createPipelineLayout({
+          label: 'particle_sim_pipeline_layout',
+          bindGroupLayouts: [this.getComputeLayout()],
+        });
+        const [updateCode, spawnCode] = await Promise.all([
+          ResourceManager.loadShader('particles/particle_update.cs', defines),
+          ResourceManager.loadShader('particles/particle_spawn.cs'),
+        ]);
+        const [update, spawn] = await Promise.all([
+          device.createComputePipelineAsync({
+            label: `particle_update${key ? `#${key}` : ''}`,
+            layout,
+            compute: { module: device.createShaderModule({ label: 'particle_update_cs', code: updateCode }), entryPoint: 'main' },
+          }),
+          device.createComputePipelineAsync({
+            label: 'particle_spawn',
+            layout,
+            compute: { module: device.createShaderModule({ label: 'particle_spawn_cs', code: spawnCode }), entryPoint: 'spawn' },
+          }),
+        ]);
+        return { update, spawn };
+      })();
+      promise.catch(() => this.pipelineCache.delete(key));
+      this.pipelineCache.set(key, promise);
+    }
+    return promise;
+  }
+
+  /** Bindings de los compute (particle_spawn.cs / particle_update.cs). */
+  private static getComputeLayout(): GPUBindGroupLayout {
+    if (!this.computeLayout) {
+      const C = GPUShaderStage.COMPUTE;
+      const rw: GPUBufferBindingLayout = { type: 'storage' };
+      this.computeLayout = GPUUtils.getDevice().createBindGroupLayout({
+        label: 'particle_sim_layout',
+        entries: [
+          { binding: 0, visibility: C, buffer: rw }, // particles
+          { binding: 1, visibility: C, buffer: { type: 'uniform' } }, // SpawnParams / SimParams
+          { binding: 2, visibility: C, buffer: rw }, // free list
+          { binding: 3, visibility: C, buffer: rw }, // free list count
+          { binding: 4, visibility: C, buffer: { type: 'uniform' } }, // ParticleCurves
+          { binding: 5, visibility: C, buffer: rw }, // ribbon history
+          { binding: 6, visibility: C, buffer: rw }, // tiled point lights
+          { binding: 7, visibility: C, buffer: rw }, // particle light count (global)
+          { binding: 8, visibility: C, buffer: rw }, // light count of this emitter
+        ],
+      });
+    }
+    return this.computeLayout;
+  }
+
+  /** El material con la permutación RIBBON de su técnica (uno por material base). */
+  private static getRibbonMaterial(path: string): Promise<Material> {
+    let promise = this.ribbonMaterials.get(path);
+    if (!promise) {
+      promise = (async () => {
+        const data = await ResourceManager.loadMaterialData(path);
+        return Material.get({ ...data, features: [...(data.features ?? []), 'RIBBON'] });
+      })();
+      promise.catch(() => this.ribbonMaterials.delete(path));
+      this.ribbonMaterials.set(path, promise);
+    }
+    return promise;
+  }
+
+  /**
+   * Tira de `segments` tramos: un par de vértices por punto de la estela. position.x = lado
+   * (±0.5), position.y = índice del punto; uv = (largo, lado).
+   */
+  private static getRibbonMesh(segments: number): Promise<Mesh> {
+    let promise = this.ribbonMeshes.get(segments);
+    if (!promise) {
+      const points = segments + 1;
+      const positions = new Float32Array(points * 2 * 3);
+      const normals = new Float32Array(points * 2 * 3);
+      const uvs = new Float32Array(points * 2 * 2);
+      const tangents = new Float32Array(points * 2 * 4);
+      for (let k = 0; k < points; k++) {
+        for (let s = 0; s < 2; s++) {
+          const v = k * 2 + s;
+          positions.set([s - 0.5, k, 0], v * 3);
+          normals.set([0, 0, 1], v * 3);
+          uvs.set([k / segments, s], v * 2);
+          tangents.set([1, 0, 0, 1], v * 4);
+        }
+      }
+      const indices = new Uint32Array(segments * 6);
+      for (let k = 0; k < segments; k++) {
+        const a = k * 2;
+        indices.set([a, a + 1, a + 2, a + 2, a + 1, a + 3], k * 6);
+      }
+      promise = Mesh.getAsync({
+        attributes: { POSITION: positions, NORMAL: normals, TEXCOORD_0: uvs, TANGENT: tangents },
+        indices,
+      } as unknown as MeshData);
+      this.ribbonMeshes.set(segments, promise);
+    }
+    return promise;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Bind groups (se rehacen cuando cambia un recurso externo: resize, sombras, luces)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private ensureComputeBindGroups(): void {
+    const tiled = this.lightsCompiled ? Engine.getRender()?.getDeferredRenderer()?.getTiledLightManager() : undefined;
+    const lights = tiled?.getPointLightBuffer() ?? this.dummyLightsBuffer!;
+    const lightCount = tiled?.getParticleLightCountBuffer() ?? this.dummyLightCountBuffer!;
+    const deps = [lights, lightCount];
+    if (this.updateBindGroup && deps.every((d, i) => d === this.computeDeps[i])) return;
+    this.computeDeps = deps;
+    const device = GPUUtils.getDevice();
+    const entries = (params: GPUBuffer): GPUBindGroupEntry[] => [
+      { binding: 0, resource: { buffer: this.particleBuffer! } },
+      { binding: 1, resource: { buffer: params } },
+      { binding: 2, resource: { buffer: this.freeListBuffer! } },
+      { binding: 3, resource: { buffer: this.freeListCountBuffer! } },
+      { binding: 4, resource: { buffer: this.curvesBuffer! } },
+      { binding: 5, resource: { buffer: this.historyBuffer! } },
+      { binding: 6, resource: { buffer: lights } },
+      { binding: 7, resource: { buffer: lightCount } },
+      { binding: 8, resource: { buffer: this.emitterLightCountBuffer! } },
+    ];
+    const layout = ParticleSystemComponent.getComputeLayout();
+    this.updateBindGroup = device.createBindGroup({ label: 'particle_update_bg', layout, entries: entries(this.simParamsBuffer!) });
+    this.spawnBindGroup = device.createBindGroup({ label: 'particle_spawn_bg', layout, entries: entries(this.spawnParamsBuffer!) });
+  }
+
+  /**
+   * @group(3) del render: partículas, parámetros, profundidad de la escena (soft particles),
+   * historial y curvas; las LIT además sol + cascadas, probes y niebla. Registra la key la
+   * primera vez y la rehace si alguno de esos recursos se recrea (resize, sombras).
+   */
+  private ensureRenderBindGroup(): void {
+    const depthView = Engine.getRender()?.getDeferredRenderer()?.getLinearDepthView();
+    if (!depthView) return;
+    const common: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: this.particleBuffer! } },
+      { binding: 1, resource: { buffer: this.renderParamsBuffer! } },
+      { binding: 11, resource: depthView },
+      { binding: 12, resource: { buffer: this.historyBuffer! } },
+      { binding: 13, resource: { buffer: this.curvesBuffer! } },
+    ];
+    const device = GPUUtils.getDevice();
+
+    if (!this.lit) {
+      if (this.renderBindGroup && this.renderDeps[0] === depthView) return;
+      this.renderDeps = [depthView];
+      this.renderBindGroup = device.createBindGroup({
+        label: 'particle_bindgroup',
+        layout: BindGroupFactory.getParticleUniformsLayout(),
+        entries: common,
+      });
+      this.registerRenderKey();
+      return;
+    }
+
     const sun = (Engine.getEntities().getObjectManagerByName('directional_light')?.getList() ?? [])[0] as
       | DirectionalLightComponent
       | undefined;
@@ -399,6 +435,7 @@ export class ParticleSystemComponent extends Component {
     if (!sun || !fogView || !fogParams) return;
     const probes = ProbeManager.getInstance();
     const deps: unknown[] = [
+      depthView,
       sun.getUniformBuffer(),
       sun.getShadowDepthView(0),
       sun.getShadowDepthView(1),
@@ -407,14 +444,13 @@ export class ParticleSystemComponent extends Component {
       fogView,
       fogParams,
     ];
-    if (deps.every((d, i) => d === this.litDeps[i])) return;
-    this.litDeps = deps;
-    this.renderBindGroup = GPUUtils.getDevice().createBindGroup({
+    if (this.renderBindGroup && deps.every((d, i) => d === this.renderDeps[i])) return;
+    this.renderDeps = deps;
+    this.renderBindGroup = device.createBindGroup({
       label: 'particle_lit_bindgroup',
       layout: BindGroupFactory.getParticleLitUniformsLayout(),
       entries: [
-        { binding: 0, resource: { buffer: this.particleBuffer } },
-        { binding: 1, resource: { buffer: this.particleRenderParamsBuffer } },
+        ...common,
         { binding: 2, resource: { buffer: sun.getUniformBuffer() } },
         { binding: 3, resource: sun.getShadowDepthView(0) },
         { binding: 4, resource: sun.getShadowDepthView(1) },
@@ -429,173 +465,159 @@ export class ParticleSystemComponent extends Component {
     this.registerRenderKey();
   }
 
-  private async createComputePipeline(): Promise<void> {
-    const device = GPUUtils.getDevice();
-
-    // 1. Crear buffers para parámetros de simulación y spawn
-    this.simulationParamsBuffer = device.createBuffer({
-      label: 'simulation_params_buffer',
-      size: 32, // deltaTime + padding
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    this.spawnParamsBuffer = device.createBuffer({
-      label: 'spawn_params_buffer',
-      size: 112, // SpawnParams struct: ver comentario de layout en particle_spawn_compact.cs
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    this.spawnCounterBuffer = device.createBuffer({
-      label: 'spawn_counter_buffer',
-      size: 4, // atomic<u32>
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-
-    // 2. Crear SHARED bind group layout explícito para evitar incompatibilidades
-    // ACTUALIZADO: Ahora incluye free list buffers para O(1) spawn lookups
-    const sharedBindGroupLayout = device.createBindGroupLayout({
-      label: 'shared_particle_layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // read_write particles
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // read_write indirectArgs
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' }, // spawn/sim params (dual purpose)
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // spawnCounter (atomic)
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // freeList (array<u32>)
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // freeListCount (atomic<u32>)
-        },
-      ],
-    });
-
-    // 3. Crear pipeline layout compartido
-    const sharedPipelineLayout = device.createPipelineLayout({
-      label: 'shared_particle_pipeline_layout',
-      bindGroupLayouts: [sharedBindGroupLayout],
-    });
-
-    // 4. Cargar shaders
-    const updateShaderCode = await ResourceManager.loadShader('particles/particle_update.cs');
-    const spawnCompactShaderCode = await ResourceManager.loadShader(
-      'particles/particle_spawn_compact.cs',
+  private registerRenderKey(): void {
+    if (this.renderComponent) RenderManagerV2.getInstance().delKeys(this.renderComponent);
+    this.renderComponent = new RenderComponent();
+    this.renderComponent.setOwner(this.getOwner());
+    RenderManagerV2.getInstance().addKey(
+      this.renderComponent,
+      this.mesh,
+      this.material,
+      this.transform,
+      true, // Skip CPU frustum culling
+      Math.max(1, Math.floor(this.config.maxParticles)),
+      undefined, // instanceBindGroup no se usa
+      this.renderBindGroup!, // @group(3) del sistema de partículas
+      this.indirectDrawBuffer!,
     );
-
-    const updateShader = device.createShaderModule({
-      label: 'particle_update_cs',
-      code: updateShaderCode,
-    });
-
-    const spawnCompactShader = device.createShaderModule({
-      label: 'particle_spawn_compact_cs',
-      code: spawnCompactShaderCode,
-    });
-
-    // 5. Crear pipelines con el layout compartido
-    this.updatePipeline = device.createComputePipeline({
-      label: 'particle_update_pipeline',
-      layout: sharedPipelineLayout,
-      compute: {
-        module: updateShader,
-        entryPoint: 'main',
-      },
-    });
-
-    this.spawnPipeline = device.createComputePipeline({
-      label: 'particle_spawn_pipeline',
-      layout: sharedPipelineLayout,
-      compute: {
-        module: spawnCompactShader,
-        entryPoint: 'spawn',
-      },
-    });
-
-    // NOTA: compactPipeline ELIMINADA - compaction ahora se hace en vertex shader
-    // El vertex shader skip partículas muertas (alive == 0) generando triángulos degenerados.
-    // Esto es 10-50% más rápido que compactar el array cada frame.
-
-    // 6. Crear bind groups (uno para update, otro para spawn)
-    // ACTUALIZADO: Ahora incluye free list buffers
-    this.updateBindGroup = device.createBindGroup({
-      layout: sharedBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.particleBuffer },
-        },
-        {
-          binding: 1,
-          resource: { buffer: this.indirectDrawBuffer },
-        },
-        {
-          binding: 2,
-          resource: { buffer: this.simulationParamsBuffer },
-        },
-        {
-          binding: 3,
-          resource: { buffer: this.spawnCounterBuffer },
-        },
-        {
-          binding: 4,
-          resource: { buffer: this.freeListBuffer },
-        },
-        {
-          binding: 5,
-          resource: { buffer: this.freeListCountBuffer },
-        },
-      ],
-    });
-
-    this.spawnCompactBindGroup = device.createBindGroup({
-      layout: sharedBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.particleBuffer },
-        },
-        {
-          binding: 1,
-          resource: { buffer: this.indirectDrawBuffer },
-        },
-        {
-          binding: 2,
-          resource: { buffer: this.spawnParamsBuffer }, // Usa spawnParams en lugar de simParams
-        },
-        {
-          binding: 3,
-          resource: { buffer: this.spawnCounterBuffer },
-        },
-        {
-          binding: 4,
-          resource: { buffer: this.freeListBuffer },
-        },
-        {
-          binding: 5,
-          resource: { buffer: this.freeListCountBuffer },
-        },
-      ],
-    });
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Uniforms
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private writeRenderParams(device: GPUDevice): void {
+    const r = this.config.render;
+    const a = this.renderParams;
+    a[0] = this.config.init.sizeVariance;
+    a[1] = r.spinSpeed;
+    a[2] = r.tumbleSpeed;
+    a[3] = r.flutter;
+    a[4] = Math.max(1, Math.round(r.flipbook.grid[0]));
+    a[5] = Math.max(1, Math.round(r.flipbook.grid[1]));
+    a[6] = Math.max(0, FLIPBOOK_MODES.indexOf(r.flipbook.mode));
+    a[7] = r.flipbook.fps;
+    a[8] = r.nearFade;
+    a[9] = Engine.getRender()?.getDeferredRenderer()?.getFroxelVolumetrics()?.isVolumetricEnabled() ? 1 : 0;
+    a[10] = r.translucency;
+    a[11] = r.shape === 'mist' ? 1 : 0;
+    a[12] = r.stretch;
+    a[13] = Math.max(0, FACINGS.indexOf(r.facing));
+    a[14] = r.softDistance;
+    a[15] = this.config.overLife.brightness;
+    a[16] = r.axis[0];
+    a[17] = r.axis[1];
+    a[18] = r.axis[2];
+    a[19] = this.config.worldSpace ? 0 : 1;
+    a[20] = this.trailLength;
+    a[21] = r.ribbon.interval;
+    a[22] = r.ribbon.widthTail;
+    a[23] = r.ribbon.alphaTail;
+    a[24] = r.flipbook.blend ? 1 : 0;
+    device.queue.writeBuffer(this.renderParamsBuffer!, 0, a);
+  }
+
+  /** Matriz mundo ← emisor (con la posición de la ráfaga si la trae). */
+  private computeEmitterMatrix(position: vec3 | null): mat4 {
+    const m = this.transform.getTransform().getWorldMatrix(this.emitterMatrix);
+    if (position) {
+      m[12] = position[0];
+      m[13] = position[1];
+      m[14] = position[2];
+    }
+    return m;
+  }
+
+  private writeSimParams(device: GPUDevice, dt: number, recordTrail: boolean): void {
+    const c = this.config;
+    const f = this.simF32;
+    const u = this.simU32;
+    const world = this.computeEmitterMatrix(null);
+    // Espacio de las partículas → mundo: identidad si ya viven en el mundo.
+    if (c.worldSpace) mat4.identity(this.tmpMat);
+    else mat4.copy(this.tmpMat, world);
+    f.set(this.tmpMat, 0);
+    f[16] = c.forces.gravity[0];
+    f[17] = c.forces.gravity[1];
+    f[18] = c.forces.gravity[2];
+    f[19] = dt;
+    f[20] = c.forces.drag;
+    f[21] = this.time;
+    u[22] = recordTrail ? 1 : 0;
+    u[23] = this.trailLength;
+    f[24] = c.forces.curlNoise.strength;
+    f[25] = c.forces.curlNoise.frequency;
+    f[26] = c.forces.curlNoise.speed;
+    f[27] = 0;
+    // Vórtice y atractor: definidos en el espacio del emisor → espacio de las partículas.
+    const toParticles = c.worldSpace ? world : mat4.identity(this.tmpMat2);
+    const v = this.tmpVec;
+    vec3.transformMat4(v, [0, 0, 0], toParticles);
+    f.set(v, 28);
+    f[31] = c.forces.vortex.strength;
+    vec3.set(v, c.forces.vortex.axis[0], c.forces.vortex.axis[1], c.forces.vortex.axis[2]);
+    vec3.transformMat4(v, v, toParticles);
+    vec3.sub(v, v, [f[28]!, f[29]!, f[30]!]);
+    if (vec3.length(v) < 1e-6) vec3.set(v, 0, 1, 0);
+    vec3.normalize(v, v);
+    f.set(v, 32);
+    f[35] = c.forces.vortex.pull;
+    const ap = c.forces.attractor.position;
+    vec3.set(v, ap[0], ap[1], ap[2]);
+    vec3.transformMat4(v, v, toParticles);
+    f.set(v, 36);
+    f[39] = c.forces.attractor.strength;
+    f[40] = c.forces.attractor.radius;
+    const l = c.lights;
+    f[41] = l.fraction;
+    u[42] = Math.max(0, Math.floor(l.max));
+    f[43] = l.radius;
+    f[44] = l.color[0];
+    f[45] = l.color[1];
+    f[46] = l.color[2];
+    f[47] = l.intensity;
+    f[48] = l.useParticleColor ? 1 : 0;
+    u[49] = TiledLightManager.PARTICLE_LIGHT_BASE;
+    u[50] = TiledLightManager.PARTICLE_LIGHT_SLOTS;
+    f[51] = 0.15;
+    device.queue.writeBuffer(this.simParamsBuffer!, 0, this.simParams);
+  }
+
+  private writeSpawnParams(device: GPUDevice, count: number, batch: QueuedBurst | null): void {
+    const c = this.config;
+    const f = this.spawnF32;
+    const u = this.spawnU32;
+    // World space: nacen en el mundo según el emisor; local: en su espacio (el VS lo transforma).
+    if (c.worldSpace) f.set(this.computeEmitterMatrix(batch?.position ?? null), 0);
+    else f.set(mat4.identity(this.tmpMat), 0);
+    u[16] = count;
+    u[17] = (Math.random() * 0xffffffff) >>> 0;
+    u[18] = Math.max(0, SPAWN_SHAPES.indexOf(c.spawn.shape));
+    u[19] = this.trailLength;
+    f[20] = c.spawn.size[0];
+    f[21] = c.spawn.size[1];
+    f[22] = c.spawn.size[2];
+    f[23] = c.spawn.radius;
+    f[24] = Math.min(1, Math.max(0, c.spawn.innerRadius));
+    f[25] = c.spawn.angle * DEG;
+    f[26] = c.spawn.radialSpeed;
+    f[27] = c.init.velocitySpread;
+    const velocity = batch?.velocity ?? c.init.velocity;
+    f[28] = velocity[0]!;
+    f[29] = velocity[1]!;
+    f[30] = velocity[2]!;
+    f[31] = c.init.life;
+    f[32] = c.init.lifeVariance[0];
+    f[33] = c.init.lifeVariance[1];
+    f[34] = batch?.floorY ?? NO_FLOOR;
+    f[35] = batch?.sizeScale ?? 1;
+    f[36] = c.init.speedVariance;
+    device.queue.writeBuffer(this.spawnParamsBuffer!, 0, this.spawnParams);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // API
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /**
    * Emite `count` partículas en la siguiente GPU frame (si hay varias ráfagas en cola, una
@@ -624,165 +646,129 @@ export class ParticleSystemComponent extends Component {
     this.emitting = false;
   }
 
+  public isEmitting(): boolean {
+    return this.emitting;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Frame
+  // ─────────────────────────────────────────────────────────────────────────────
+
   public override update(deltaTime: number): void {
+    if (!this.ready || !this.pipelines) return;
     const device = GPUUtils.getDevice();
-    if (this.lit && this.particleRenderParamsBuffer) {
-      this.ensureLitBindGroup();
-      this.writeRenderParamsBuffer(device); // fog on/off can change at runtime
-    }
+    const c = this.config;
+    this.time += deltaTime;
 
-    // OneShot: dispara una sola vez en el primer update
-    if (this.oneShot && !this.oneShotFired) {
+    this.ensureRenderBindGroup();
+    this.ensureComputeBindGroups();
+
+    if (this.curvesDirty) {
+      this.curvesDirty = false;
+      bakeParticleCurves(c, this.curves);
+      device.queue.writeBuffer(this.curvesBuffer!, 0, this.curves);
+    }
+    this.writeRenderParams(device);
+
+    // OneShot: dispara una sola vez en el primer update.
+    if (c.emitter.oneShot && !this.oneShotFired) {
       this.oneShotFired = true;
-      this.burst(this.oneShotBurstCount);
+      this.burst(c.emitter.burstCount);
     }
 
-    // 1. Actualizar timer de spawn
-    if (this.emitting) this.spawnTimer += deltaTime;
-
-    // 2. Actualizar deltaTime en el buffer de simulación (gravity se escribe una sola vez en load)
-    this.simParamsArray[0] = deltaTime;
-    device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray, 0, 1);
-
-    // Determinar cuántas partículas spawnar este frame: una ráfaga en cola o, si no hay,
-    // la emisión continua (que espera a que se vacíe la cola).
+    // Una ráfaga en cola o, si no hay, la emisión continua (acumula las fracciones).
+    const max = Math.max(1, Math.floor(c.maxParticles));
+    if (this.emitting && !c.emitter.oneShot) this.spawnAccumulator += c.emitter.rate * deltaTime;
     const batch = this.burstQueue.shift() ?? null;
-    const regularSpawn = !batch && this.emitting && this.spawnTimer >= this.spawnInterval;
-    const totalSpawnCount = batch ? batch.count : regularSpawn ? this.particlesPerSpawn : 0;
-
-    if (regularSpawn) this.spawnTimer = 0;
-
-    const shouldRunSpawnPass = totalSpawnCount > 0;
-
-    if (shouldRunSpawnPass) {
-      // Preparar parámetros de spawn según SpawnParams en particle_spawn_compact.cs (112 bytes)
-      this.spawnParamsUint32View[0] = totalSpawnCount; // [0]  spawnCount
-      this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // [1]  randomSeed
-      this.spawnParamsUint32View[2] = this.worldSpace ? 1 : 0; // [2]  worldSpace
-      this.spawnParamsFloat32View[3] = 0; // [3]  padding1
-
-      const worldPos = batch?.position ?? this.transform.getTransform().getWorldPosition();
-      this.spawnParamsFloat32View[4] = worldPos[0]; // [4]  emitterWorldPos.x
-      this.spawnParamsFloat32View[5] = worldPos[1]; // [5]  emitterWorldPos.y
-      this.spawnParamsFloat32View[6] = worldPos[2]; // [6]  emitterWorldPos.z
-      this.spawnParamsFloat32View[7] = 0; // [7]  padding2
-
-      const worldScale = this.transform.getTransform().getWorldScale();
-      this.spawnParamsFloat32View[8] = worldScale[0]; // [8]  emitterWorldScale.x
-      this.spawnParamsFloat32View[9] = worldScale[1]; // [9]  emitterWorldScale.y
-      this.spawnParamsFloat32View[10] = worldScale[2]; // [10] emitterWorldScale.z
-      this.spawnParamsFloat32View[11] = 0; // [11] padding3
-
-      // spawnExtents (vec3) at offset 48 → float index 12,13,14 (16-byte aligned)
-      this.spawnParamsFloat32View[12] = this.spawnExtents[0]; // [12] spawnExtents.x
-      this.spawnParamsFloat32View[13] = this.spawnExtents[1]; // [13] spawnExtents.y
-      this.spawnParamsFloat32View[14] = this.spawnExtents[2]; // [14] spawnExtents.z
-      this.spawnParamsFloat32View[15] = this.velocitySpread; // [15] velocitySpread (offset 60)
-
-      // baseVelocity (vec3) at offset 64 → float index 16,17,18 (auto-aligned to 16 ✓)
-      const velocity = batch?.velocity ?? this.baseVelocity;
-      this.spawnParamsFloat32View[16] = velocity[0]!; // [16] baseVelocity.x
-      this.spawnParamsFloat32View[17] = velocity[1]!; // [17] baseVelocity.y
-      this.spawnParamsFloat32View[18] = velocity[2]!; // [18] baseVelocity.z
-      this.spawnParamsFloat32View[19] = this.particleLife; // [19] particleLife (offset 76)
-      this.spawnParamsFloat32View[20] = this.particleLifeVarMin; // [20] particleLifeVarMin (offset 80)
-      this.spawnParamsFloat32View[21] = this.particleLifeVarMax; // [21] particleLifeVarMax (offset 84)
-      this.spawnParamsFloat32View[22] = batch?.floorY ?? NO_FLOOR; // [22] floorY (offset 88)
-      this.spawnParamsFloat32View[23] = batch?.sizeScale ?? 1; // [23] sizeMul (offset 92)
-      this.spawnParamsFloat32View[24] = this.speedVariance; // [24] speedVariance (offset 96)
-
-      device.queue.writeBuffer(this.spawnParamsBuffer, 0, this.spawnParamsArray);
-
-      this.counterDataArray[0] = totalSpawnCount;
-      device.queue.writeBuffer(this.spawnCounterBuffer, 0, this.counterDataArray);
-
-      // Actualizar render params si cambiaron (p.ej. debug UI)
-      this.writeRenderParamsBuffer(device);
+    let spawnCount = 0;
+    if (batch) {
+      spawnCount = Math.min(batch.count, max);
+    } else if (this.spawnAccumulator >= 1) {
+      spawnCount = Math.min(Math.floor(this.spawnAccumulator), max);
+      this.spawnAccumulator -= Math.floor(this.spawnAccumulator);
     }
 
-    // OPTIMIZACIÓN CRÍTICA: Batch Command Submissions + Eliminar Compaction
-    // ANTES (3 passes):
-    //   - UPDATE:  100μs
-    //   - SPAWN:    50μs (condicional)
-    //   - COMPACT: 50-500μs (SERIAL, single-threaded bottleneck)
-    //   Total: 200-650μs
-    //
-    // AHORA (2 passes):
-    //   - UPDATE: 100μs
-    //   - SPAWN:   50μs (condicional)
-    //   Total: 150μs (sin spawn) / 200μs (con spawn)
-    //   Ganancia: 25-77% (50-450μs saved)
-    //
-    // El vertex shader ahora skip dead particles generando triángulos degenerados.
-    // Overhead: ~1-2 ciclos GPU × dead particles (~5-50μs) vs 50-500μs de compaction.
+    // RIBBON: un punto de estela cada `interval` s.
+    let recordTrail = false;
+    if (this.trailLength > 0) {
+      this.trailTimer += deltaTime;
+      const interval = Math.max(1e-3, c.render.ribbon.interval);
+      if (this.trailTimer >= interval) {
+        recordTrail = true;
+        this.trailTimer %= interval;
+      }
+    }
+
+    this.writeSimParams(device, deltaTime, recordTrail);
+    if (this.lightsCompiled) device.queue.writeBuffer(this.emitterLightCountBuffer!, 0, this.zeroU32);
+    if (spawnCount > 0) this.writeSpawnParams(device, spawnCount, batch);
+
     const encoder = device.createCommandEncoder({ label: 'Particle System' });
-
-    // Pass 1: UPDATE (actualiza física y lifetime)
-    const updatePass = encoder.beginComputePass({ label: 'Update Pass' });
-    updatePass.setPipeline(this.updatePipeline);
-    updatePass.setBindGroup(0, this.updateBindGroup);
-    const updateWorkgroups = Math.ceil(this.maxParticles / 64);
-    updatePass.dispatchWorkgroups(updateWorkgroups);
-    updatePass.end();
-
-    // Pass 2: SPAWN (solo si toca) - crea nuevas partículas
-    if (shouldRunSpawnPass) {
-      const spawnPass = encoder.beginComputePass({ label: 'Spawn Pass' });
-      spawnPass.setPipeline(this.spawnPipeline);
-      spawnPass.setBindGroup(0, this.spawnCompactBindGroup);
-      const spawnWorkgroups = Math.ceil(this.maxParticles / 64);
-      spawnPass.dispatchWorkgroups(spawnWorkgroups);
-      spawnPass.end();
+    const pass = encoder.beginComputePass({ label: 'Particle Update + Spawn' });
+    pass.setPipeline(this.pipelines.update);
+    pass.setBindGroup(0, this.updateBindGroup!);
+    pass.dispatchWorkgroups(Math.ceil(max / 64));
+    if (spawnCount > 0) {
+      pass.setPipeline(this.pipelines.spawn);
+      pass.setBindGroup(0, this.spawnBindGroup!);
+      pass.dispatchWorkgroups(Math.ceil(spawnCount / 64));
     }
-
-    // COMPACTION ELIMINADA: Ya no necesitamos compactar el array
-    // El vertex shader hace skip de partículas muertas directamente
-
-    // SINGLE SUBMISSION - todos los passes en un solo command buffer
+    pass.end();
     device.queue.submit([encoder.finish()]);
   }
 
-
   public override renderInMenu(folder?: any): void {
-    if (!folder) return;
+    if (!folder || !this.config) return;
     if (this._editorFolder) return;
     this._editorFolder = folder.addFolder('Particle System');
     this._editorFolder.close();
-    this._editorFolder
-      .add(this, 'spawnInterval', 0.1, 5.0, 0.1)
-      .name('Spawn Interval (s)')
-      .listen();
-    this._editorFolder
-      .add(this, 'particlesPerSpawn', 1, 50, 1)
-      .name('Particles per Spawn')
-      .listen();
-    this._editorFolder
-      .add({ maxParticles: this.maxParticles }, 'maxParticles')
-      .name('Max Particles')
-      .disable();
+    buildParticleEditor(this._editorFolder, this);
   }
 
-  public override renderDebug(): void {
-    // TODO: Add visualization of particle positions and movement paths
-  }
-
-  public dispose(): void {
+  public override dispose(): void {
     this.disposed = true;
-    // Primero dejar de dibujarlo: si no, el siguiente frame usa buffers destruidos y la
-    // GPU rechaza el submit entero (pantalla en negro).
+    this.generation++;
+    this.releaseGPU();
+  }
+
+  /**
+   * Deja de dibujarlo y libera sus buffers. Primero la key: si no, el siguiente frame usa
+   * buffers destruidos y la GPU rechaza el submit entero (pantalla en negro).
+   */
+  private releaseGPU(): void {
+    this.ready = false;
     if (this.renderComponent) RenderManagerV2.getInstance().delKeys(this.renderComponent);
     this.renderComponent = null;
-    this.destroyBuffers();
-  }
-
-  private destroyBuffers(): void {
-    this.particleBuffer?.destroy();
-    this.indirectDrawBuffer?.destroy();
-    this.simulationParamsBuffer?.destroy();
-    this.spawnParamsBuffer?.destroy();
-    this.spawnCounterBuffer?.destroy();
-    this.freeListBuffer?.destroy();
-    this.freeListCountBuffer?.destroy();
-    this.particleRenderParamsBuffer?.destroy();
+    this.renderBindGroup = null;
+    this.updateBindGroup = null;
+    this.spawnBindGroup = null;
+    for (const buffer of [
+      this.particleBuffer,
+      this.indirectDrawBuffer,
+      this.freeListBuffer,
+      this.freeListCountBuffer,
+      this.historyBuffer,
+      this.curvesBuffer,
+      this.renderParamsBuffer,
+      this.simParamsBuffer,
+      this.spawnParamsBuffer,
+      this.emitterLightCountBuffer,
+      this.dummyLightsBuffer,
+      this.dummyLightCountBuffer,
+    ]) {
+      buffer?.destroy();
+    }
+    this.particleBuffer = null;
+    this.indirectDrawBuffer = null;
+    this.freeListBuffer = null;
+    this.freeListCountBuffer = null;
+    this.historyBuffer = null;
+    this.curvesBuffer = null;
+    this.renderParamsBuffer = null;
+    this.simParamsBuffer = null;
+    this.spawnParamsBuffer = null;
+    this.emitterLightCountBuffer = null;
+    this.dummyLightsBuffer = null;
+    this.dummyLightCountBuffer = null;
   }
 }

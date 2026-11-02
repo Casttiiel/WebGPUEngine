@@ -1081,6 +1081,11 @@ export class DeferredRenderer {
   }
 
   /** Returns the G-Buffer linear depth texture view (R = linear depth [0,1]). */
+  /** Tiled point/spot lights (particles append their lights to its point light buffer). */
+  public getTiledLightManager(): TiledLightManager | undefined {
+    return this.tiledLightManager;
+  }
+
   public getLinearDepthView(): GPUTextureView {
     return this.gBufferPass.getRenderTargets().linearDepth.getView()!;
   }

@@ -1,7 +1,10 @@
 {
     "vs": "particles/particle_worldspace.vs",
     "fs": "particles/particle_blood.fs",
-    "defines": ["LIT", "BLOOD"],
+    "defines": [
+        "LIT",
+        "BLOOD"
+    ],
     "writesOn": "texture",
     "z": "greater_no_write",
     "blend": "combinative",
@@ -11,5 +14,6 @@
         "ObjectUniforms",
         "ParticleLitUniforms"
     ],
-    "instanced": true
+    "instanced": true,
+    "rs": "double_sided"
 }

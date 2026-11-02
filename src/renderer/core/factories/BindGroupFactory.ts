@@ -1499,35 +1499,36 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * Bindings every particle bind group has (ParticleSystemComponent, common/particles.wgsl):
+   * the particles, their render params, the scene's linear depth (soft particles), the
+   * ribbon history and the baked over-life curves.
+   */
+  private static particleCommonEntries(): GPUBindGroupLayoutEntry[] {
+    const V = GPUShaderStage.VERTEX;
+    const F = GPUShaderStage.FRAGMENT;
+    return [
+      { binding: 0, visibility: V, buffer: { type: 'read-only-storage' } }, // particles
+      { binding: 1, visibility: V | F, buffer: { type: 'uniform' } }, // ParticleRenderParams
+      { binding: 11, visibility: F, texture: { sampleType: 'unfilterable-float' } }, // linear depth
+      { binding: 12, visibility: V, buffer: { type: 'read-only-storage' } }, // ribbon history
+      { binding: 13, visibility: V, buffer: { type: 'uniform' } }, // ParticleCurves
+    ];
+  }
+
   public static getParticleUniformsLayout(): GPUBindGroupLayout {
-    return this.getLayout('particle_uniforms', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: {
-          type: 'read-only-storage',
-          hasDynamicOffset: false,
-        },
-      },
-      {
-        // ParticleRenderParams: startSize, endSize, startColor, endColor
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: 'uniform' },
-      },
-    ]);
+    return this.getLayout('particle_uniforms', this.particleCommonEntries());
   }
 
   /**
-   * Lit particles (particles/particle_lit.vs): the particle data plus everything the per-
-   * particle lighting reads — sun + its 3 shadow cascades, the probe set (ambient) and the
-   * froxel fog volume. All read in the vertex stage (one evaluation per particle).
+   * Lit particles (particle_worldspace.vs + LIT): the common particle bindings plus everything
+   * the per-particle lighting reads — sun + its 3 shadow cascades, the probe set (ambient) and
+   * the froxel fog volume. All read in the vertex stage (one evaluation per particle).
    */
   public static getParticleLitUniformsLayout(): GPUBindGroupLayout {
     const V = GPUShaderStage.VERTEX;
     return this.getLayout('particle_lit_uniforms', [
-      { binding: 0, visibility: V, buffer: { type: 'read-only-storage' } }, // particles
-      { binding: 1, visibility: V, buffer: { type: 'uniform' } }, // ParticleRenderParams
+      ...this.particleCommonEntries(),
       { binding: 2, visibility: V, buffer: { type: 'uniform' } }, // DirectionalLightCSMUniforms
       { binding: 3, visibility: V, texture: { sampleType: 'depth' } }, // cascade 0
       { binding: 4, visibility: V, texture: { sampleType: 'depth' } }, // cascade 1
@@ -1907,6 +1908,8 @@ export class BindGroupFactory {
       { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      // Particle lights written this frame (TiledLightManager.PARTICLE_LIGHT_BASE onwards)
+      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
     ]);
   }
 

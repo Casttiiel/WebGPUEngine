@@ -1,29 +1,10 @@
 #include "common/uniforms"
-
-struct Particle {
-    position: vec3<f32>,
-    padding1: f32,
-    velocity: vec3<f32>,
-    lifetime: f32,
-    age:      f32,
-    alive:    u32,
-    padding2: u32,
-    padding3: u32,
-};
-
-struct ParticleRenderParams {
-    startSize:  f32,
-    endSize:    f32,
-    padding1:   f32,
-    padding2:   f32,
-    startColor: vec4<f32>,
-    endColor:   vec4<f32>,
-};
+#include "common/particles"
 
 @group(0) @binding(0) var<uniform> camera:       CameraUniforms;
 @group(2) @binding(0) var<uniform> object:       ObjectUniforms;
 @group(3) @binding(0) var<storage, read> particles: array<Particle>;
-@group(3) @binding(1) var<uniform> renderParams: ParticleRenderParams;
+@group(3) @binding(13) var<uniform> curves: ParticleCurves;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -55,8 +36,8 @@ fn vs(input: VertexInput) -> VertexOutput {
     }
 
     let t     = clamp(particle.age / max(particle.lifetime, 0.0001), 0.0, 1.0);
-    let size  = mix(renderParams.startSize, renderParams.endSize, t);
-    let color = mix(renderParams.startColor, renderParams.endColor, t);
+    let size  = curveSize(curves, t);
+    let color = curveColor(curves, t);
 
     // Velocity-aligned billboard:
     //   velDir  = normalised velocity (down by default when particle is still)

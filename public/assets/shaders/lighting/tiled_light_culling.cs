@@ -3,6 +3,9 @@
 // Keep in sync with TiledLightManager.MAX_LIGHTS_PER_TILE
 const MAX_LIGHTS_PER_TILE: u32 = 64u;
 const TILE_SIZE:            u32 = 16u;
+// Keep in sync with TiledLightManager.PARTICLE_LIGHT_BASE / PARTICLE_LIGHT_SLOTS
+const PARTICLE_LIGHT_BASE:  u32 = 768u;
+const PARTICLE_LIGHT_SLOTS: u32 = 256u;
 
 struct PointLightEntry {
     colorIntensity: vec4<f32>,  // xyz = color, w = intensity
@@ -32,6 +35,8 @@ struct TiledCullingParams {
 @group(1) @binding(3) var<storage, read_write>    tileLightCounts:  array<vec2<u32>>;
 @group(1) @binding(4) var<storage, read_write>    tilePointLists:   array<u32>;
 @group(1) @binding(5) var<storage, read_write>    tileSpotLists:    array<u32>;
+// Lights the particles wrote this frame, from PARTICLE_LIGHT_BASE (ParticleSystemComponent)
+@group(1) @binding(6) var<storage, read>          particleLightCount: u32;
 
 var<workgroup> wgPointCount: atomic<u32>;
 var<workgroup> wgSpotCount:  atomic<u32>;
@@ -106,6 +111,19 @@ fn cs_tileLight(
     // --- Point lights ---
     let pCount = cullingParams.pointCount;
     for (var i = localIdx; i < pCount; i += numThreads) {
+        let light = pointLights[i];
+        if (sphereInsideTile(light.posRadius.xyz, light.posRadius.w, pL, pR, pT, pB)) {
+            let slot = atomicAdd(&wgPointCount, 1u);
+            if (slot < MAX_LIGHTS_PER_TILE) {
+                wgPointList[slot] = i;
+            }
+        }
+    }
+
+    // --- Particle lights (same buffer, reserved tail) ---
+    let gpuCount = min(particleLightCount, PARTICLE_LIGHT_SLOTS);
+    for (var j = localIdx; j < gpuCount; j += numThreads) {
+        let i = PARTICLE_LIGHT_BASE + j;
         let light = pointLights[i];
         if (sphereInsideTile(light.posRadius.xyz, light.posRadius.w, pL, pR, pT, pB)) {
             let slot = atomicAdd(&wgPointCount, 1u);

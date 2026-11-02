@@ -1,4 +1,4 @@
-﻿{
+{
     "vs": "particles/particle_worldspace.vs",
     "fs": "particles/particle.fs",
     "writesOn": "texture",
@@ -10,5 +10,6 @@
         "ObjectUniforms",
         "ParticleWorldSpaceUniforms"
     ],
-    "instanced": true
+    "instanced": true,
+    "rs": "double_sided"
 }

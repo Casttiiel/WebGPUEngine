@@ -1,5 +1,5 @@
-﻿{
-    "vs": "particles/particle.vs",
+{
+    "vs": "particles/particle_worldspace.vs",
     "fs": "particles/particle.fs",
     "writesOn": "texture",
     "z": "greater_no_write",
@@ -10,5 +10,6 @@
         "ObjectUniforms",
         "ParticleUniforms"
     ],
-    "instanced": true
+    "instanced": true,
+    "rs": "double_sided"
 }
