@@ -133,6 +133,10 @@ server.registerTool(
         .optional()
         .describe('Scenario name from public/data/scenarios (without .json)'),
       seed: z.number().int().optional().describe('Seed for Math.random (reproducible rolls)'),
+      params: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Extra URL query parameters for dev modes, e.g. {"animLoop":"Spear_Combo"}'),
       headless: z
         .boolean()
         .optional()
@@ -165,6 +169,10 @@ server.registerTool(
       scene: z.string().optional(),
       scenario: z.string().optional(),
       seed: z.number().int().optional(),
+      params: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Extra URL query parameters (replaces the previous ones; {} clears them)'),
       clear: z.boolean().optional().describe('Drop all previous scene/scenario/seed options'),
       timeoutSeconds: z.number().optional(),
       waitNavMesh: z.boolean().optional(),
@@ -509,7 +517,9 @@ server.registerTool(
         .min(0)
         .max(60)
         .optional()
-        .describe('Wait before recording so loading/streaming does not pollute the capture (default 0)'),
+        .describe(
+          'Wait before recording so loading/streaming does not pollute the capture (default 0)',
+        ),
     },
   },
   safe(async (a) => {

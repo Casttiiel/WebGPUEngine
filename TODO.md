@@ -239,18 +239,31 @@ Escenario `phase15_voice`. Autoataque: solo la **pistola ligera** (el estoque se
 - [ ] Encender el ánimo (asistencia: BAJA o CRÍTICO de un aliado → 1 Acción adicional) va con
       las asistencias, en la fase 16.
 
-### Fase 16 — Zonas genéricas (burbujas, nubes y lo que necesita la Artificiera)
+### Fase 16 — Zonas ✓ (hecha por partes; sin sistema genérico)
 
-- [ ] **14.1 Zonas genéricas**: círculo con duración y eventos al entrar, al salir, al empezar
-      el turno dentro y al cruzar el borde un proyectil. Ampliar `Surfaces` o crear `Zones` con
-      código compartido.
-      _Hecho cuando:_ una zona de prueba aplica un estado al entrar y se deshace al caducar.
-- [ ] **14.2 Bloqueo de proyectiles en el borde** de una zona (ataques a distancia y
-      habilidades `unit` que cruzan el borde = desviados, sin daño). La vista previa lo enseña.
-- [x] **14.3 Burbuja de bendaleo** del Deslizador: hecha en la fase 11 (`Zones`), con su borde
-      que bloquea proyectiles. Al hacer las zonas genéricas, que pase a usarlas.
-- [ ] **14.4 Nube de cobre** de la Voz: inmunidad a los estados mentales y ocultación frente al
-      bronce.
+Las zonas que pide el diseño ya existen, cada una con su sistema: `Zones` (burbujas de tiempo),
+`SpiritZones` (zonas espirituales y relicarios), `CopperClouds` (Nube de cobre), `Surfaces`
+(fuego, aceite) y `ResonanceAuras` (el aro de la Resonancia). Un sistema genérico con eventos
+(al entrar, al salir, al empezar el turno, al cruzar un proyectil) no hace falta: ninguna
+habilidad del diseño actual los necesita, y la Artificiera ya no crea zonas.
+
+- [x] **Borde que bloquea proyectiles**: `Zones.blocksProjectile` entra en la línea de visión
+      de ataques y habilidades, y así lo enseña la vista previa.
+- [x] **Burbuja de bendaleo** del Deslizador (fase 11) y **burbuja de cadmio** de la
+      Artificiera (fase 13), en `Zones`.
+- [x] **Nube de cobre** de la Voz (fase 15, `CopperClouds`), rediseñada: la alomancia enemiga
+      lanzada desde fuera no alcanza a los aliados de dentro.
+- ~~Zonas genéricas con eventos~~: descartado.
+
+Para cuando lleguen enemigos que creen zonas (p.ej. el Ahumador):
+
+- [ ] **Base común de las zonas**: círculo, decal y duración en rondas compartidos, y un solo
+      sitio en EncounterComponent donde caducan (hoy cada tipo nuevo toca el inicio de turno,
+      el cambio de ronda, el fin de combate y el reinicio).
+- [ ] **La IA valora todas las zonas** al elegir dónde acabar el turno (hoy solo las
+      espirituales): acabar en una burbuja de bendaleo (turno extra), no empezar en una de
+      cadmio (lo pierde), refugiarse en una Nube de cobre de su bando, quedarse en el aro de
+      una Resonancia aliada.
 
 ### Fase 17 — Reacciones y asistencias (GDD §7) ⚠️ el sistema más arriesgado
 

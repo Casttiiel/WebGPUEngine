@@ -204,9 +204,11 @@ export class AnimatorComponent extends Component {
   private rootMotionMode: RootMotionMode = 'none';
   private rootMotionIncludeY: boolean = false;
   private rootMotionDelta: vec3 = vec3.create();
-  private prevRootLocalT: Float32Array = new Float32Array(3);
   private _rootMotionFirstFrame: boolean = true;
-  private _rootMotionDidLoop: boolean = false;
+  /** Active-clip time of the last 'extract' sample. */
+  private _rmPrevClipTime: number = 0;
+  /** Clip time the active clip was started at (root motion counts from there). */
+  private _rmClipStartTime: number = 0;
   // 'apply' mode — drives parent entity's KCC directly
   private _rmKCC: any = null;
   private _rmKCCSearched: boolean = false;
@@ -363,6 +365,8 @@ export class AnimatorComponent extends Component {
   }
 
   public update(dt: number): void {
+    // Root motion is per evaluated frame: nothing moves while paused or stopped
+    vec3.set(this.rootMotionDelta, 0, 0, 0);
     if (this.paused) return; // hit stop: GPU keeps last uploaded pose, time frozen
     if (!this.playing || this.clips.length === 0) return;
 
@@ -391,7 +395,6 @@ export class AnimatorComponent extends Component {
     if (this.playbackTime > clip.duration) {
       if (this.loop) {
         this.playbackTime = this.playbackTime % clip.duration;
-        this._rootMotionDidLoop = true;
       } else {
         this.playbackTime = clip.duration;
         this.playing = false;
@@ -451,6 +454,7 @@ export class AnimatorComponent extends Component {
 
     this.evaluateAnimation(this.playbackTime, dt);
     this.skeletalMesh.uploadPose(this.jointPalette);
+    for (const fn of this.poseListeners) fn();
   }
 
   private evaluateStateMachine(): void {
@@ -503,8 +507,32 @@ export class AnimatorComponent extends Component {
 
     this.activeClipIndex = targetIndex;
     this.playbackTime = 0;
+    this._rmClipStartTime = 0;
     this.playing = true;
     this._rootMotionFirstFrame = true;
+  }
+
+  /** Plays a clip on the base layer outside the state machine (combo sequences, dev previews). */
+  public playClip(
+    name: string,
+    opts: { blendTime?: number; loop?: boolean; startTime?: number } = {},
+  ): void {
+    this.play(name, opts.blendTime ?? 0.2);
+    this.loop = opts.loop ?? false;
+    this.playbackSpeed = 1.0;
+    // Start partway in (a chained attack entering at the pose the previous one ended on)
+    this.playbackTime = opts.startTime ?? 0;
+    this._rmClipStartTime = this.playbackTime;
+  }
+
+  /** Time into the base-layer clip. */
+  public getPlaybackTime(): number {
+    return this.playbackTime;
+  }
+
+  /** Loads extra glTF animation files after attach (same as `extraAnimations`). */
+  public async loadAnimations(paths: string[]): Promise<void> {
+    await this.loadExtraAnimations(paths);
   }
 
   public addLayer(clipIndexOrName: number | string, options?: AnimLayerOptions): number {
@@ -717,6 +745,32 @@ export class AnimatorComponent extends Component {
     if (idx >= 0) this.preIkOffsets.set(idx, offset);
   }
 
+  private findRootTranslationChannel(clipIndex: number): AnimationChannel | undefined {
+    const clip = this.clips[clipIndex];
+    if (!clip) return undefined;
+    for (const ch of clip.channels) {
+      if (ch.jointIndex === this.rootJointIndex && ch.path === 'translation') return ch;
+    }
+    return undefined;
+  }
+
+  // ─── Pose listeners ─────────────────────────────────────────────────────────
+
+  private readonly poseListeners: (() => void)[] = [];
+
+  /**
+   * Called right after each pose evaluation, so things pinned to bones (BoneAttachment) follow
+   * the pose of THIS frame — 'animator' updates after 'transform', so polling lags a frame.
+   */
+  public addPoseListener(fn: () => void): void {
+    this.poseListeners.push(fn);
+  }
+
+  public removePoseListener(fn: () => void): void {
+    const i = this.poseListeners.indexOf(fn);
+    if (i >= 0) this.poseListeners.splice(i, 1);
+  }
+
   // ─── Animation evaluation ────────────────────────────────────────────────────
 
   private evaluateClip(
@@ -834,18 +888,49 @@ export class AnimatorComponent extends Component {
       this._rootZeroLingerTime = Math.max(0, this._rootZeroLingerTime - dt);
     }
     if ((isExtracting || this._rootZeroLingerTime > 0) && this.rootJointIndex >= 0) {
-      // 'extract' mode: delta from blended pose (used by external consumers via getRootMotionDelta).
+      // 'extract' mode: delta of the ACTIVE clip's root channel (used by external consumers via
+      // getRootMotionDelta). Sampled from the clip, not the blended pose: a crossfade from a clip
+      // that ended far from its origin would otherwise read as root motion backwards.
       if (this.rootMotionMode === 'extract') {
-        const rootT = this.localT[this.rootJointIndex]!;
-        if (this._rootMotionFirstFrame || this._rootMotionDidLoop) {
-          this.prevRootLocalT.set(rootT);
-          vec3.set(this.rootMotionDelta, 0, 0, 0);
+        const rootCh = this.findRootTranslationChannel(this.activeClipIndex);
+        const clipDuration = this.clips[this.activeClipIndex]?.duration ?? 0;
+        if (!rootCh || this._rootMotionFirstFrame) {
+          this._rmPrevClipTime = this._rootMotionFirstFrame ? this._rmClipStartTime : time;
           this._rootMotionFirstFrame = false;
-          this._rootMotionDidLoop = false;
-        } else {
-          const dx = rootT[0]! - this.prevRootLocalT[0]!;
-          const dy = this.rootMotionIncludeY ? rootT[1]! - this.prevRootLocalT[1]! : 0;
-          const dz = rootT[2]! - this.prevRootLocalT[2]!;
+        }
+        vec3.set(this.rootMotionDelta, 0, 0, 0);
+        if (rootCh) {
+          const cur = this._rmCurT;
+          const prev = this._rmPrevT;
+          const sampleRoot = (t: number, out: Float32Array): void => {
+            out[0] = bpRoot[0]!;
+            out[1] = bpRoot[1]!;
+            out[2] = bpRoot[2]!;
+            sampleVec3(rootCh.times, rootCh.values, t, 'LINEAR', out);
+          };
+          const bpRoot = this.skeleton.bindPoseLocal.subarray(
+            this.rootJointIndex * 10,
+            this.rootJointIndex * 10 + 3,
+          );
+          let dx = 0,
+            dy = 0,
+            dz = 0;
+          const accumulate = (from: number, to: number): void => {
+            sampleRoot(from, prev);
+            sampleRoot(to, cur);
+            dx += cur[0]! - prev[0]!;
+            dy += cur[1]! - prev[1]!;
+            dz += cur[2]! - prev[2]!;
+          };
+          if (time < this._rmPrevClipTime) {
+            // Looped: the rest of the previous pass plus the start of this one
+            accumulate(this._rmPrevClipTime, clipDuration);
+            accumulate(0, time);
+          } else {
+            accumulate(this._rmPrevClipTime, time);
+          }
+          this._rmPrevClipTime = time;
+          if (!this.rootMotionIncludeY) dy = 0;
           const delta = vec3.set(this._rmDeltaScratch, dx, dy, dz);
           vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
           const ownerTransform = (
@@ -855,7 +940,6 @@ export class AnimatorComponent extends Component {
             vec3.transformQuat(delta, delta, ownerTransform.getWorldRotation());
           }
           vec3.copy(this.rootMotionDelta, delta);
-          this.prevRootLocalT.set(rootT);
         }
       }
 

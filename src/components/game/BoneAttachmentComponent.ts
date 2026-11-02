@@ -39,37 +39,44 @@ export class BoneAttachmentComponent extends Component {
 
     const rotOff: quat = quat.create();
     if (data.rotationOffset) {
-      quat.fromEuler(rotOff, data.rotationOffset[0], data.rotationOffset[1], data.rotationOffset[2]);
+      quat.fromEuler(
+        rotOff,
+        data.rotationOffset[0],
+        data.rotationOffset[1],
+        data.rotationOffset[2],
+      );
     }
 
     mat4.fromRotationTranslation(this.offsetMat, rotOff, posOff);
   }
 
   public update(_dt: number): void {
+    // Normal path: the animator calls syncToBone() right after evaluating its pose (see
+    // resolve()); polling here would read the previous frame's pose.
     this.resolve();
-    if (!this.animator || this.jointIndex < 0) return;
+  }
 
+  private readonly syncToBone = (): void => {
+    if (!this.animator || this.jointIndex < 0) return;
     const jointModelMat = this.animator.getJointModelMatrix(this.jointIndex);
     if (!jointModelMat) return;
-
-    // The sword is a child of the mesh entity, so mesh-local space == local space.
-    // globalMats[i] is already in mesh-local space — use it directly as local transform.
-    const finalMat = mat4.mul(mat4.create(), jointModelMat as mat4, this.offsetMat);
-
     const myTc = this.getOwner().getComponent('transform') as TransformComponent | null;
     if (!myTc) return;
 
-    const pos = vec3.create();
-    const rot = quat.create();
-    mat4.getTranslation(pos, finalMat);
-    mat4.getRotation(rot, finalMat);
-    quat.normalize(rot, rot);
-
-    // Set LOCAL transform — TransformComponent (which runs after this) will
-    // compute and upload the correct world matrix to the GPU.
-    myTc.getTransform().setLocalPosition(pos);
-    myTc.getTransform().setLocalRotation(rot);
-  }
+    // This entity is a child of the mesh entity, so mesh-local space == local space.
+    // globalMats[i] is already in mesh-local space — use it directly as local transform.
+    const finalMat = mat4.mul(this._mat, jointModelMat as mat4, this.offsetMat);
+    mat4.getTranslation(this._pos, finalMat);
+    mat4.getRotation(this._rot, finalMat);
+    quat.normalize(this._rot, this._rot);
+    myTc.getTransform().setLocalPosition(this._pos);
+    myTc.getTransform().setLocalRotation(this._rot);
+    // 'transform' already ran this frame: recompute world + GPU matrix (and children) now.
+    myTc.update();
+  };
+  private readonly _mat = mat4.create();
+  private readonly _pos = vec3.create();
+  private readonly _rot = quat.create();
 
   private resolve(): void {
     if (this.resolved) return;
@@ -80,11 +87,18 @@ export class BoneAttachmentComponent extends Component {
     this.animator = anim;
     this.jointIndex = anim.getJointIndex(this.boneName);
     if (this.jointIndex < 0) {
-      console.warn(`[BoneAttachment] Bone "${this.boneName}" not found. Available:\n${anim.getAllJointNames().join(', ')}`);
+      console.warn(
+        `[BoneAttachment] Bone "${this.boneName}" not found. Available:\n${anim.getAllJointNames().join(', ')}`,
+      );
     } else {
       console.log(`[BoneAttachment] All bones:\n${anim.getAllJointNames().join('\n')}`);
     }
     this.resolved = true;
+    anim.addPoseListener(this.syncToBone);
+  }
+
+  public override dispose(): void {
+    this.animator?.removePoseListener(this.syncToBone);
   }
 
   public renderDebug(): void {}

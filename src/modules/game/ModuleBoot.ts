@@ -4,6 +4,7 @@ import { Module } from '../core/Module';
 import { InstanceManager } from '../../renderer/core/managers/InstanceManager';
 import { Engine } from '../../core/engine/Engine';
 import { Logger } from '../../core/debug/Logger';
+import { applyAnimLoopPreview } from '../../core/debug/AnimLoopPreview';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
@@ -81,6 +82,12 @@ export class ModuleBoot extends Module {
     LoadingStatus.updateStatus('Loading entities...');
     await Loader.loadSceneFromJSON(flaggedJson);
 
+    // Dev: `?animLoop=Clip` — every animated character loops that clip (tools/anim previews)
+    if (import.meta.env.DEV) {
+      const animLoop = new URLSearchParams(window.location.search).get('animLoop');
+      if (animLoop) await applyAnimLoopPreview(animLoop);
+    }
+
     // Teleport player to spawn point if a player_spawn marker was found in the scene's GLTF
     const spawnPos = PlayerSpawnComponent.pendingPosition;
     const spawnYawDeg = PlayerSpawnComponent.pendingYawDeg;
@@ -136,10 +143,13 @@ export class ModuleBoot extends Module {
         'fps_camera_controller',
       ) as FPSCameraControllerComponent;
     } else if (player?.hasComponent('camera_arm')) {
-      this.playerCameraControllerComponent = player.getComponent('camera_arm') as CameraArmComponent;
+      this.playerCameraControllerComponent = player.getComponent(
+        'camera_arm',
+      ) as CameraArmComponent;
     } else {
       const tactical = entities.getObjectManagerByName('tactical_camera_controller')?.getList()[0];
-      if (tactical) this.playerCameraControllerComponent = tactical as TacticalCameraControllerComponent;
+      if (tactical)
+        this.playerCameraControllerComponent = tactical as TacticalCameraControllerComponent;
     }
 
     if (player?.hasComponent('player_controller')) {

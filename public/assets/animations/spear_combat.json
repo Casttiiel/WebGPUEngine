@@ -1,0 +1,68 @@
+{
+  "clips": [
+    {
+      "name": "Spear_Thrust",
+      "tempo": "agile",
+      "duration": 0.86,
+      "hit": 0.34,
+      "cancel": 0.52,
+      "range": 2.6
+    },
+    {
+      "name": "Spear_Sweep",
+      "tempo": "agile",
+      "duration": 0.94,
+      "hit": 0.37,
+      "cancel": 0.58,
+      "range": 2.3
+    },
+    {
+      "name": "Spear_ButtStrike",
+      "tempo": "agile",
+      "duration": 0.86,
+      "hit": 0.32,
+      "cancel": 0.5,
+      "range": 1.2
+    },
+    {
+      "name": "Spear_Slam",
+      "tempo": "agile",
+      "duration": 1.36,
+      "hit": 0.7,
+      "cancel": 1.36,
+      "range": 1.9
+    },
+    {
+      "name": "Spear_Thrust_Heavy",
+      "tempo": "heavy",
+      "duration": 1.361,
+      "hit": 0.519,
+      "cancel": 0.783,
+      "range": 2.6
+    },
+    {
+      "name": "Spear_Sweep_Heavy",
+      "tempo": "heavy",
+      "duration": 1.481,
+      "hit": 0.565,
+      "cancel": 0.869,
+      "range": 2.3
+    },
+    {
+      "name": "Spear_ButtStrike_Heavy",
+      "tempo": "heavy",
+      "duration": 1.354,
+      "hit": 0.48,
+      "cancel": 0.742,
+      "range": 1.2
+    },
+    {
+      "name": "Spear_Slam_Heavy",
+      "tempo": "heavy",
+      "duration": 2.136,
+      "hit": 1.077,
+      "cancel": 2.136,
+      "range": 1.9
+    }
+  ]
+}

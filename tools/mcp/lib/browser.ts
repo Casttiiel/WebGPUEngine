@@ -6,6 +6,8 @@ export interface LaunchOptions {
   scene?: string | undefined;
   scenario?: string | undefined;
   seed?: number | undefined;
+  /** Extra URL query parameters for dev modes, e.g. { animLoop: 'Spear_Combo' }. */
+  params?: Record<string, string> | undefined;
   headless?: boolean | undefined;
 }
 
@@ -61,6 +63,7 @@ export class BrowserSession {
     if (opts.scene) url.searchParams.set('scene', opts.scene);
     if (opts.scenario) url.searchParams.set('scenario', opts.scenario);
     if (opts.seed !== undefined) url.searchParams.set('seed', String(opts.seed));
+    for (const [k, v] of Object.entries(opts.params ?? {})) url.searchParams.set(k, v);
     return url.toString();
   }
 
@@ -101,7 +104,10 @@ export class BrowserSession {
     }
 
     if (!this.context) {
-      this.context = await this.browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE });
+      this.context = await this.browser.newContext({
+        viewport: VIEWPORT,
+        deviceScaleFactor: DEVICE_SCALE,
+      });
     }
     if (!this.page || this.page.isClosed()) {
       this.page = await this.context.newPage();
@@ -121,6 +127,7 @@ export class BrowserSession {
     if (opts.scene !== undefined) next.scene = opts.scene || undefined;
     if (opts.scenario !== undefined) next.scenario = opts.scenario || undefined;
     if (opts.seed !== undefined) next.seed = opts.seed;
+    if (opts.params !== undefined) next.params = opts.params;
     this.launchOpts = next;
     const url = this.buildUrl(next);
     await page.goto(url, { waitUntil: 'domcontentloaded' });

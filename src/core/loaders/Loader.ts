@@ -107,6 +107,8 @@ import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { SkeletalMeshComponent } from '../../components/render/SkeletalMeshComponent';
 import { EdgeDecalComponent } from '../../components/render/EdgeDecalComponent';
+import { AnimSequenceComponent } from '../../components/render/AnimSequenceComponent';
+import { CapeComponent } from '../../components/render/CapeComponent';
 import { AnimatorComponent } from '../../components/render/AnimatorComponent';
 import { FootIKComponent } from '../../components/render/FootIKComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
@@ -359,6 +361,10 @@ export class Loader {
         return new EdgeDecalComponent();
       case 'animator':
         return new AnimatorComponent();
+      case 'anim_sequence':
+        return new AnimSequenceComponent();
+      case 'cape':
+        return new CapeComponent();
       case 'foot_ik':
         return new FootIKComponent();
       case 'camera':

@@ -43,3 +43,4 @@ examples/
 bin/
 # MCP outputs (screenshots, scenario captures)
 .mcp-out/
+.anim-out/

@@ -77,6 +77,8 @@
     "skeletal_mesh",
     "foot_ik",
     "animator",
+    "anim_sequence",
+    "cape",
     "view_model",
     "trail_renderer",
     "far_reach_tentacle",
