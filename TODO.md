@@ -97,32 +97,6 @@ Depende de la fase 30. HLOD solo merece la pena con niveles grandes; hacer prime
 
 ### Bloque C — Trazado con el BVH (sigue `docs/realtime-gi-plan.md`)
 
-#### Fase 33 — GI fase 3: radiance cache y light grid
-
-- [x] **33.1 Light grid** en espacio de mundo: celdas con su lista de luces (sustituye al límite
-      de 32 luces cercanas); muestreo con varios candidatos pesados por contribución
-      (reservoir con más de una muestra) y rayo de sombra a la elegida.
-- [x] **33.2 Radiance cache** (tabla hash en espacio de mundo): guarda la radiancia en los puntos
-      de impacto de los rayos de las sondas y se actualiza unos pocos rayos por frame; los rayos
-      que impactan leen de la caché en lugar de sombrear desde cero.
-      _Hecho cuando:_ `sponza_gi` con 64 luces puntuales: sin ruido de luces en las sondas
-      (captura) y Trace ≤ coste actual. ✓ `sponza_gi_lights`: Trace 1,1 ms (antes 2,2 ms
-      sombreando en línea con 64 luces; 1,09 con ≤ 32), sondas sin ruido (diferencia media
-      entre frames 0,9/255).
-
-#### Fase 34 — GI fase 4: final gather por píxel
-
-- [x] **34.1** Rayos por píxel a media resolución que leen de la radiance cache (fase 33); las
-      sondas quedan para lo lejano y como respaldo.
-- [x] **34.2 Denoise** espacial y temporal (reutilizar el patrón de `ssr_denoise` y
-      `ssr_temporal`).
-- [x] **34.3** Integración pendiente de la fase 5: froxels, agua y transparentes
-      (`sponza_gi_fx`). Transparentes = partículas `LIT`; el resto no usa ambiente.
-- [x] **34.4 Fase 6 (skinned en el BVH)**: refit de los BLAS de los personajes a partir del
-      skinning; requisito de las fases 35 y 36 para los personajes (`sponza_gi_chars`).
-      _Hecho cuando:_ `sponza_gi`: GI de detalle en esquinas y bajo los objetos (comparar con F9
-      `compare`), estable al mover la cámara. ✓ ver `docs/realtime-gi-plan.md`.
-
 #### Fase 28 — Resolución dinámica
 
 - [ ] **28.1 Controlador**: tiempo de GPU del frame (`GPUProfiler`, mediana de N frames) contra un
@@ -134,22 +108,10 @@ Depende de la fase 30. HLOD solo merece la pena con niveles grandes; hacer prime
       _Hecho cuando:_ en `sponza_gi` con GI activa, el frame se mantiene en presupuesto y la escala
       se ve en el overlay del profiler; la escala vuelve a 1 cuando sobra GPU.
 
-#### Fase 29 — Caché de sombras estáticas
-
-- [ ] **29.1 Movilidad** en `RenderComponent`: `static | movable` (por defecto static si no tiene
-      física ni animación).
-- [ ] **29.2 Atlas de sombras** para focos y puntos (cubo como 6 caras del atlas), tamaño por luz
-      según su tamaño en pantalla.
-- [ ] **29.3 Caché**: los estáticos se dibujan una vez en una copia cacheada; cada frame se copia
-      la caché y se añaden solo los dinámicos. Se invalida si la luz se mueve o cambia un estático.
-- [ ] **29.4 (opcional)** cascada lejana de la CSM cacheada mientras la cámara táctica no se mueva.
-      _Hecho cuando:_ escena con 8 luces con sombra y personajes moviéndose: coste de sombras
-      ≥ 50 % menor (perf_capture antes/después) e imagen idéntica.
-
-Optimice everything
 Culling of particles?
 Particle optimice
 Scene change? Editor? Spawn prefabs?
+Optimice everything
 
 #### Fase 35 — Reflejos trazados como respaldo del SSR
 

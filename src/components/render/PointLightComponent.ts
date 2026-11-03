@@ -14,6 +14,7 @@ import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/R
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
+import { ShadowCache } from '../../renderer/core/managers/ShadowCache';
 
 // WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
 // Up vectors match the WebGPU/Vulkan cubemap sampling convention (v=0 at top).
@@ -62,6 +63,10 @@ export class PointLightComponent extends Component {
   private falloffBuffer = new Float32Array(4);
 
   private aabb: AABB = new AABB();
+
+  /** Static casters of the 6 faces drawn once (ShadowCache); signature = position, range, resolution. */
+  private shadowCache = new ShadowCache('point_shadow', 6);
+  private shadowSignature = new Float32Array(6);
 
   constructor() {
     super();
@@ -130,7 +135,7 @@ export class PointLightComponent extends Component {
       size: [res, res, 6],
       dimension: '2d',
       format: 'depth32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
 
     // One face view per layer for rendering
@@ -201,6 +206,31 @@ export class PointLightComponent extends Component {
       this.shadowCameras[face].lookAt(this.position, this._shadowTarget, setup.up);
       this.shadowCameras[face].setIsDirty(true); // ← garantizar escritura al buffer
       this.shadowCameras[face].updateUniforms(0);
+    }
+
+    // Static casters from the cache (redrawn only when the light moves / changes range or the
+    // static scene changes); movable casters on top only when one is inside the light's sphere.
+    if (ShadowCache.enabled) {
+      const sig = this.shadowSignature;
+      sig[0] = this.position[0]!;
+      sig[1] = this.position[1]!;
+      sig[2] = this.position[2]!;
+      sig[3] = this.radius;
+      sig[4] = this.shadowNear;
+      sig[5] = res;
+      const staticDirty = this.shadowCache.begin(this.shadowCubeTexture, sig);
+      const movables = RenderManager.getInstance().movableShadowCastersTouch(this.aabb.min, this.aabb.max);
+      for (let face = 0; face < 6; face++) {
+        this.shadowCache.renderLayer(
+          face,
+          this.shadowCameras[face]!,
+          this.shadowCubeFaceViews[face]!,
+          staticDirty,
+          movables,
+          'Point Shadow',
+        );
+      }
+      return;
     }
 
     // One render pass per face
@@ -350,6 +380,10 @@ export class PointLightComponent extends Component {
   }
 
   public debugInMenu(): void {}
+
+  public override dispose(): void {
+    this.shadowCache.destroy();
+  }
 
   public override renderDebug(filter?: string): void {
     if (!filter || (filter !== 'all' && !filter.includes('lights'))) return;

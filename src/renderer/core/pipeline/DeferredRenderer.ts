@@ -480,6 +480,8 @@ export class DeferredRenderer {
   }
 
   public generateShadowMaps(): void {
+    // Static casters that moved turn movable before any ShadowCache decides what to redraw.
+    RenderManagerV2.getInstance().updateShadowMobility();
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {

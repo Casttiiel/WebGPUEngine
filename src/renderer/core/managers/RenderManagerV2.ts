@@ -13,6 +13,10 @@ import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
 import { Render } from '../pipeline/Render';
 import { HZBBuilder } from '../culling/HZBBuilder';
+import { mat4 } from 'gl-matrix';
+
+/** Frames after a shadow key appears during which moving doesn't make it movable (spawn placement). */
+const SHADOW_SPAWN_GRACE_FRAMES = 30;
 
 export class RenderManagerV2 {
   private static instance: RenderManagerV2 | null = null;
@@ -60,6 +64,19 @@ export class RenderManagerV2 {
   private sortedShadowKeys: RenderKey[] | null = null;
   // Indirect buffer written by the last dispatchShadow() call; consumed by renderKeys()
   private currentShadowIndirectBuffer: GPUBuffer | null = null;
+
+  // ---- Shadow caster mobility (ShadowCache) ------------------------------------
+  /** Which shadow casters render() draws: ShadowCache draws static and movable separately. */
+  public shadowCasterFilter: 'all' | 'static' | 'movable' = 'all';
+  /** Bumped whenever the set of static casters changes (added, removed, one moved). */
+  private staticShadowVersion = 0;
+  /** Shadow keys that turned movable by moving (sticky). */
+  private movedShadowKeys = new WeakSet<RenderKey>();
+  private shadowKeyFirstFrame = new WeakMap<RenderKey, number>();
+  private shadowMobilityFrame = 0;
+  /** Movable shadow keys this frame (updateShadowMobility). */
+  private movableShadowKeys: RenderKey[] = [];
+  private readonly _boxMatrix = mat4.create();
 
   /**
    * Cached bind group compatible with the standard MaterialTextures pipeline layout.
@@ -171,13 +188,116 @@ export class RenderManagerV2 {
     this.gpuCuller?.markDirty();
     this.cachedShadowKeys = null; // Invalidate shadow key cache
     this.sortedShadowKeys = null;
+    if (material.getCastsShadows()) this.staticShadowVersion++;
   }
 
   public delKeys(owner: RenderComponent): void {
+    // Only losing a static caster invalidates the shadow caches (particles re-key often).
+    if (this.getShadowKeys().some((k) => k.owner === owner && this.isStaticShadowCaster(k))) {
+      this.staticShadowVersion++;
+    }
     this.keyManager.removeKeys(owner);
     this.gpuCuller?.markDirty();
     this.cachedShadowKeys = null; // Invalidate shadow key cache
     this.sortedShadowKeys = null;
+  }
+
+  // ─── Shadow caster mobility ─────────────────────────────────────────────────
+
+  /** Shadow-category keys (rebuilt when keys are added or removed). */
+  private getShadowKeys(): RenderKey[] {
+    if (this.cachedShadowKeys === null) {
+      const allKeys = this.keyManager.getAllKeys();
+      this.cachedShadowKeys = [];
+      for (let i = 0; i < allKeys.length; i++) {
+        if (allKeys[i]!.material.getCategory() === RenderCategory.SHADOWS) {
+          this.cachedShadowKeys.push(allKeys[i]!);
+        }
+      }
+    }
+    return this.cachedShadowKeys;
+  }
+
+  /**
+   * A shadow caster that can live in a ShadowCache: not skinned, its owner says it is static
+   * (RenderComponent mobility; instanced groups only hold static entities) and it never moved.
+   */
+  public isStaticShadowCaster(key: RenderKey): boolean {
+    if (this.movedShadowKeys.has(key)) return false;
+    if (key.material.getTechnique()?.getIsSkinned()) return false;
+    const owner = key.owner as unknown as { isStaticShadowCaster?: () => boolean } | null;
+    if (owner && typeof owner.isStaticShadowCaster === 'function')
+      return owner.isStaticShadowCaster();
+    return key.isInstanced;
+  }
+
+  /**
+   * Once per frame before the shadow maps: a static caster that moved becomes movable for
+   * good (its owner too, so re-added keys stay movable) and invalidates every ShadowCache;
+   * refreshes the list of movable casters.
+   */
+  public updateShadowMobility(): void {
+    const frame = ++this.shadowMobilityFrame;
+    const keys = this.getShadowKeys();
+    this.movableShadowKeys.length = 0;
+    for (const key of keys) {
+      let first = this.shadowKeyFirstFrame.get(key);
+      if (first === undefined) {
+        first = frame;
+        this.shadowKeyFirstFrame.set(key, frame);
+      }
+      if (this.isStaticShadowCaster(key)) {
+        if (!key.transform.hasMovedThisFrame()) continue;
+        this.staticShadowVersion++;
+        if (frame - first < SHADOW_SPAWN_GRACE_FRAMES) continue; // still being placed
+        this.movedShadowKeys.add(key);
+        const owner = key.owner as unknown as { markMovedForShadows?: () => void } | null;
+        owner?.markMovedForShadows?.();
+      }
+      this.movableShadowKeys.push(key);
+    }
+  }
+
+  public getStaticShadowVersion(): number {
+    return this.staticShadowVersion;
+  }
+
+  /** Whether any movable shadow caster's world box overlaps [min, max] (null = anywhere). */
+  public movableShadowCastersTouch(
+    min: ArrayLike<number> | null,
+    max: ArrayLike<number> | null,
+  ): boolean {
+    if (this.movableShadowKeys.length === 0) return false;
+    if (!min || !max) return true;
+    for (const key of this.movableShadowKeys) {
+      if (!key.aabb) return true;
+      const t = key.transform.getTransform();
+      const m = mat4.fromRotationTranslationScale(
+        this._boxMatrix,
+        t.getWorldRotation(),
+        t.getWorldPosition(),
+        t.getWorldScale(),
+      );
+      const a = key.aabb;
+      // Skinned bounds are the bind pose: pad them for the animated limbs.
+      const pad = key.material.getTechnique()?.getIsSkinned() ? 1.0 : 0.0;
+      let overlaps = true;
+      for (let k = 0; k < 3 && overlaps; k++) {
+        const lc =
+          (a.min[0]! + a.max[0]!) * 0.5 * m[k]! +
+          (a.min[1]! + a.max[1]!) * 0.5 * m[4 + k]! +
+          (a.min[2]! + a.max[2]!) * 0.5 * m[8 + k]! +
+          m[12 + k]!;
+        const h =
+          Math.abs(m[k]!) * (a.max[0]! - a.min[0]!) * 0.5 +
+          Math.abs(m[4 + k]!) * (a.max[1]! - a.min[1]!) * 0.5 +
+          Math.abs(m[8 + k]!) * (a.max[2]! - a.min[2]!) * 0.5 +
+          pad;
+        overlaps = lc + h >= min[k]! && lc - h <= max[k]!;
+      }
+      if (overlaps) return true;
+    }
+    return false;
   }
 
   public performCulling(camera: Camera, category?: RenderCategory): void {
@@ -186,14 +306,7 @@ export class RenderManagerV2 {
     if (category !== undefined) {
       // Shadow / light camera path.
       // The shadow key list is cached and rebuilt only when keys are added/removed.
-      if (this.cachedShadowKeys === null) {
-        this.cachedShadowKeys = [];
-        for (let i = 0; i < allKeys.length; i++) {
-          if (allKeys[i]!.material.getCategory() === category) {
-            this.cachedShadowKeys.push(allKeys[i]!);
-          }
-        }
-      }
+      const shadowKeys = this.getShadowKeys();
 
       if (this.gpuCuller?.isShadowReady()) {
         // GPU path: one compute dispatch per shadow camera, no CPU array alloc.
@@ -202,7 +315,7 @@ export class RenderManagerV2 {
         this.currentShadowIndirectBuffer = this.gpuCuller.dispatchShadow(encoder, camera);
         // Sort shadow keys once per key-change — same order for all cascades
         if (this.sortedShadowKeys === null) {
-          this.sortedShadowKeys = [...this.cachedShadowKeys!];
+          this.sortedShadowKeys = [...shadowKeys];
           this.keyManager.sortKeys(this.sortedShadowKeys, RenderCategory.SHADOWS, undefined);
         }
         // Hand sorted keys to the camera — GPU zeros instanceCount for culled ones
@@ -210,7 +323,7 @@ export class RenderManagerV2 {
       } else {
         // CPU fallback (GPU culler not yet ready)
         this.currentShadowIndirectBuffer = null;
-        const culledKeys = this.cpuCuller!.performCulling(this.cachedShadowKeys, camera);
+        const culledKeys = this.cpuCuller!.performCulling(shadowKeys, camera);
         camera.setCulledKeys(culledKeys);
       }
       return;
@@ -557,6 +670,12 @@ export class RenderManagerV2 {
         (key.material.getTechnique()?.getIsSkinned() ||
           key.material.getCategory() === RenderCategory.TRANSPARENT ||
           key.material.getCategory() === RenderCategory.PARTICLES)
+      ) {
+        continue;
+      }
+      if (
+        this.shadowCasterFilter !== 'all' &&
+        this.isStaticShadowCaster(key) !== (this.shadowCasterFilter === 'static')
       ) {
         continue;
       }

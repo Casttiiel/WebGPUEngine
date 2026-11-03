@@ -12,6 +12,7 @@ import { MeshData } from '../../types/MeshData.type';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
+import { ColliderComponent, RigidBodyType } from '../physics/ColliderComponent';
 
 export class RenderComponent extends Component {
   private _isVisible: boolean = true;
@@ -20,6 +21,9 @@ export class RenderComponent extends Component {
   // Instancing support
   private isInstanced: boolean = false;
   private instanceGroup: string = '';
+
+  /** Shadow caster mobility: from the data, else decided on first use (see isStaticShadowCaster). */
+  private mobility: 'static' | 'movable' | null = null;
 
   /** Cached position getter shared across all textures loaded by this component. */
   private streamingPosGetter: (() => import('gl-matrix').vec3) | null = null;
@@ -36,6 +40,7 @@ export class RenderComponent extends Component {
       this.isInstanced = true;
       this.instanceGroup = data.instanceGroup;
     }
+    if (data.mobility) this.mobility = data.mobility;
 
     if (data.meshes) {
       await Promise.all(data.meshes.map((meshData) => this.readMesh(meshData)));
@@ -134,6 +139,29 @@ export class RenderComponent extends Component {
         skipPrepass || undefined,
       );
     }
+  }
+
+  /**
+   * Whether this object's shadow can be cached (RenderManagerV2 / ShadowCache). Without an
+   * explicit `mobility` it's static unless the entity animates (animator, skeletal mesh, path
+   * mover, cape) or has a dynamic or kinematic collider.
+   */
+  public isStaticShadowCaster(): boolean {
+    if (this.mobility === null) {
+      const entity = this.getOwner();
+      const animated = ['animator', 'skeletal_mesh', 'path_mover', 'cape'].some((c) => entity.hasComponent(c));
+      const physical = ['box_collider', 'sphere_collider', 'capsule_collider'].some((c) => {
+        const collider = entity.getComponent(c) as ColliderComponent | null;
+        return !!collider && collider.getBodyType() !== RigidBodyType.STATIC;
+      });
+      this.mobility = animated || physical ? 'movable' : 'static';
+    }
+    return this.mobility === 'static';
+  }
+
+  /** A static object moved: from now on its shadow is drawn every frame. */
+  public markMovedForShadows(): void {
+    this.mobility = 'movable';
   }
 
   // Getters para acceso público (necesarios para InstanceManager)

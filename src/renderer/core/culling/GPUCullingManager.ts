@@ -24,8 +24,8 @@ const INDIRECT_STRIDE = 20;
 const FRUSTUM_SIZE = 96;
 
 /**
- * Maximum concurrent shadow dispatches per frame
- * (e.g. 3 cascades + 6×point-face + 2 spotlights = 11; 20 gives comfortable headroom).
+ * Shadow culling slots created up front (3 cascades + 6 × point faces + spots…); a frame with
+ * more shadow cameras adds slots — one per camera per frame, see dispatchShadow().
  */
 const SHADOW_POOL = 20;
 
@@ -299,45 +299,13 @@ export class GPUCullingManager {
       this.cpuShadowU32 = new Uint32Array(this.cpuShadowObjectData);
     }
 
-    // Grow pool if needed (SHADOW_POOL slots, each has its own indirect + frustum + bind group)
-    if (this.shadowIndirectPool.length < SHADOW_POOL) {
-      // Destroy any existing pool buffers
-      for (const buf of this.shadowIndirectPool) buf.destroy();
-      for (const buf of this.shadowFrustumPool) buf.destroy();
-      this.shadowIndirectPool = [];
-      this.shadowFrustumPool = [];
-      this.shadowBindGroupPool = [];
-
-      for (let s = 0; s < SHADOW_POOL; s++) {
-        const indirect = this.device.createBuffer({
-          label: `gpu_culling_shadow_indirect_slot${s}`,
-          size: n * INDIRECT_STRIDE,
-          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
-        });
-        const frustum = this.device.createBuffer({
-          label: `gpu_culling_shadow_frustum_slot${s}`,
-          size: FRUSTUM_SIZE,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        const bg = this.device.createBindGroup({
-          label: `gpu_culling_shadow_bind_group_slot${s}`,
-          layout: this.bindGroupLayout,
-          entries: [
-            { binding: 0, resource: { buffer: frustum } },
-            {
-              binding: 1,
-              resource: { buffer: this.shadowObjectDataBuffer, size: n * OBJECT_STRIDE },
-            },
-            { binding: 2, resource: { buffer: indirect, size: n * INDIRECT_STRIDE } },
-          ],
-        });
-        this.shadowIndirectPool.push(indirect);
-        this.shadowFrustumPool.push(frustum);
-        this.shadowBindGroupPool.push(bg);
-      }
+    // Start with SHADOW_POOL slots (each has its own indirect + frustum + bind group);
+    // dispatchShadow() adds more when a frame needs them.
+    if (this.shadowIndirectPool.length === 0) {
+      for (let s = 0; s < SHADOW_POOL; s++) this.addShadowSlot();
     } else if (n * INDIRECT_STRIDE > this.shadowIndirectPool[0]!.size) {
       // More shadow keys than before — grow all pool indirect buffers
-      for (let s = 0; s < SHADOW_POOL; s++) {
+      for (let s = 0; s < this.shadowIndirectPool.length; s++) {
         this.shadowIndirectPool[s]!.destroy();
         this.shadowIndirectPool[s] = this.device.createBuffer({
           label: `gpu_culling_shadow_indirect_slot${s}`,
@@ -391,8 +359,11 @@ export class GPUCullingManager {
    */
   public dispatchShadow(commandEncoder: GPUCommandEncoder, camera: Camera): GPUBuffer {
     const n = this.shadowKeys.length;
-    const slot = this.shadowSlotIndex % SHADOW_POOL;
-    this.shadowSlotIndex++;
+    // One slot per shadow camera per frame, never reused within the frame: the frustum is
+    // uploaded with queue.writeBuffer, which lands before the whole frame's command buffer —
+    // a reused slot would cull every earlier dispatch with the last camera's frustum.
+    const slot = this.shadowSlotIndex++;
+    if (slot >= this.shadowIndirectPool.length) this.addShadowSlot();
 
     // Write shadow model matrices once per frame (same world matrices for all cameras)
     if (this.shadowMatricesDirty) {
@@ -421,6 +392,34 @@ export class GPUCullingManager {
     computePass.end();
 
     return this.shadowIndirectPool[slot]!;
+  }
+
+  /** Appends one shadow culling slot sized for the current shadow keys. */
+  private addShadowSlot(): void {
+    const n = Math.max(1, this.shadowKeys.length);
+    const s = this.shadowIndirectPool.length;
+    const indirect = this.device.createBuffer({
+      label: `gpu_culling_shadow_indirect_slot${s}`,
+      size: n * INDIRECT_STRIDE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+    });
+    const frustum = this.device.createBuffer({
+      label: `gpu_culling_shadow_frustum_slot${s}`,
+      size: FRUSTUM_SIZE,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const bg = this.device.createBindGroup({
+      label: `gpu_culling_shadow_bind_group_slot${s}`,
+      layout: this.bindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: frustum } },
+        { binding: 1, resource: { buffer: this.shadowObjectDataBuffer!, size: n * OBJECT_STRIDE } },
+        { binding: 2, resource: { buffer: indirect, size: n * INDIRECT_STRIDE } },
+      ],
+    });
+    this.shadowIndirectPool.push(indirect);
+    this.shadowFrustumPool.push(frustum);
+    this.shadowBindGroupPool.push(bg);
   }
 
   // ------------------------------------------------------------------

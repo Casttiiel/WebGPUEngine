@@ -12,6 +12,7 @@ import { Texture } from '../../renderer/resources/Texture';
 import { AABB } from '../../core/math/AABB';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
+import { ShadowCache } from '../../renderer/core/managers/ShadowCache';
 
 const ndcCorners = [
   [-1, -1, -1, 1],
@@ -58,6 +59,10 @@ export class SpotLightComponent extends CameraComponent {
   private extraPaddingBuffer = new Float32Array(1);
 
   private aabb: AABB = new AABB();
+
+  /** Static casters drawn once (ShadowCache); signature = shadow view-projection + resolution. */
+  private shadowCache = new ShadowCache('spot_shadow', 18);
+  private shadowSignature = new Float32Array(18);
 
   constructor() {
     super();
@@ -124,7 +129,9 @@ export class SpotLightComponent extends CameraComponent {
       this.shadowWidth,
       this.shadowHeight,
       'depth32float',
-      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST,
     );
 
     this.shadowDepthView = this.shadowDepthTexture.createView({
@@ -258,7 +265,36 @@ export class SpotLightComponent extends CameraComponent {
     );
   }
 
+  /**
+   * Static casters come from the ShadowCache (redrawn only when this light's frustum or the
+   * static scene changes); movable casters are drawn on top only when one is inside the cone.
+   */
   public generateShadowMap(): void {
+    if (!ShadowCache.enabled) {
+      this.renderShadowMapUncached();
+      return;
+    }
+    const sig = this.shadowSignature;
+    sig.set(this.camera.getViewProjection() as Float32Array, 0);
+    sig[16] = this.shadowWidth;
+    sig[17] = this.shadowHeight;
+    const staticDirty = this.shadowCache.begin(this.shadowDepthTexture, sig);
+    if (staticDirty) this.calculateWorldAABB();
+    const movables = RenderManager.getInstance().movableShadowCastersTouch(
+      this.aabb.min,
+      this.aabb.max,
+    );
+    this.shadowCache.renderLayer(
+      0,
+      this.camera,
+      this.shadowDepthView,
+      staticDirty,
+      movables,
+      'Spot Shadow',
+    );
+  }
+
+  private renderShadowMapUncached(): void {
     RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();
 
@@ -320,6 +356,10 @@ export class SpotLightComponent extends CameraComponent {
   }
 
   public override update(dt: number): void {}
+
+  public override dispose(): void {
+    this.shadowCache.destroy();
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public override renderInMenu(folder?: any): void {

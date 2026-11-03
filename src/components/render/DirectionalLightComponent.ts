@@ -16,6 +16,7 @@ import { Texture } from '../../renderer/resources/Texture';
 import { CameraComponent } from './CameraComponent';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
+import { ShadowCache } from '../../renderer/core/managers/ShadowCache';
 
 interface AABB {
   minX: number;
@@ -35,6 +36,9 @@ export class DirectionalLightComponent extends Component {
   private shadowDepthViews!: GPUTextureView[]; // Una por cascada
   private shadowSampler!: GPUSampler;
   private shadowCameras!: Camera[]; // Una por cascada
+  /** Static-caster cache per cascade (ShadowCache); signature = view-projection + resolution. */
+  private shadowCaches: ShadowCache[] = [];
+  private shadowSignature = new Float32Array(17);
   private hasShadows!: boolean;
   private color!: number[];
   private intensity!: number;
@@ -126,7 +130,7 @@ export class DirectionalLightComponent extends Component {
         res,
         res,
         'depth32float',
-        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       );
       this.shadowDepthTextures.push(shadowTexture);
       this.shadowDepthViews.push(shadowTexture.createView({ aspect: 'depth-only' }));
@@ -496,7 +500,24 @@ export class DirectionalLightComponent extends Component {
     GPUUtils.writeBuffer(this.uniformBuffer, 0, d);
   }
 
+  /**
+   * Per cascade, static casters come from a ShadowCache: redrawn only when the cascade's
+   * matrix changes (the camera moved enough to re-snap it, or the sun moved) or the static
+   * scene changes — a still tactical camera reuses all of them. Movable casters on top.
+   */
   public generateShadowMap(): void {
+    if (ShadowCache.enabled) {
+      const movables = RenderManager.getInstance().movableShadowCastersTouch(null, null);
+      for (let i = 0; i < this.cascadeCount; i++) {
+        const cache = (this.shadowCaches[i] ??= new ShadowCache(`directional_shadow_${i}`, 17));
+        const sig = this.shadowSignature;
+        sig.set(this.shadowCameras[i]!.getViewProjection() as Float32Array, 0);
+        sig[16] = this.getCascadeResolution(i);
+        const staticDirty = cache.begin(this.shadowDepthTextures[i]!, sig);
+        cache.renderLayer(0, this.shadowCameras[i]!, this.shadowDepthViews[i]!, staticDirty, movables, `Directional Shadow ${i}`);
+      }
+      return;
+    }
     const render = Render.getInstance();
 
     // Renderizar cada cascada
@@ -759,5 +780,10 @@ export class DirectionalLightComponent extends Component {
       this.color[1] = parseInt(result[2], 16) / 255;
       this.color[2] = parseInt(result[3], 16) / 255;
     }
+  }
+
+  public override dispose(): void {
+    this.shadowCaches.forEach((c) => c.destroy());
+    this.shadowCaches = [];
   }
 }
