@@ -169,10 +169,14 @@ export class Loader {
     // Cargar entidades raíz en paralelo, con log por entidad
     await Promise.all(
       json.map(async (e) => {
-        await this.loadEntityFromJSON(e);
+        const entity = await this.loadEntityFromJSON(e);
+        entity.sourceData = this.unparsedRoots.get(e) ?? null;
       }),
     );
   }
+
+  /** Entrada de escena sin parsear de cada raíz parseada (Entity.sourceData, duplicar en el F2). */
+  private static unparsedRoots = new WeakMap<EntityDataType, EntityDataType>();
 
   public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {
     // Contar GLTFs antes de empezar para mostrar progreso real
@@ -186,7 +190,9 @@ export class Loader {
 
     // Procesar todas las entidades en paralelo para acelerar el parsing
     const parsePromises = json.map(async (entityJson) => {
+      const source = structuredClone(entityJson); // el parseo lo modifica in place
       const result = await this.parseEntityFromJSON(entityJson);
+      this.unparsedRoots.set(result, source);
       return result;
     });
     const parsedEntities = await Promise.all(parsePromises);
@@ -261,7 +267,9 @@ export class Loader {
    */
   public static async spawnFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
     const parsed = await this.parseEntityFromJSON(structuredClone(json));
-    return this.loadEntityFromJSON(parsed, parent, false);
+    const entity = await this.loadEntityFromJSON(parsed, parent, false);
+    entity.sourceData = structuredClone(json);
+    return entity;
   }
 
   public static async loadEntityFromJSON(

@@ -1,5 +1,6 @@
-import { vec3, vec4, mat4 } from 'gl-matrix';
+import { vec3, vec4, mat4, quat } from 'gl-matrix';
 import { CameraComponent } from './CameraComponent';
+import { TransformComponent } from '../core/TransformComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
@@ -29,6 +30,12 @@ const ndcCorners = [
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
   private position = vec3.create();
+  /** Transform del frame anterior: lo que se mueva/gire desde ahí se aplica a la luz. */
+  private lastTransformPos: vec3 | null = null;
+  private lastTransformRot = quat.create();
+  private tmpRot = quat.create();
+  private tmpEye = vec3.create();
+  private tmpTarget = vec3.create();
   private intensity = 1.0;
   private radius = 1.0;
   private startFallof = 0.0;
@@ -122,6 +129,7 @@ export class SpotLightComponent extends CameraComponent {
     }
 
     this.camera.lookAt(data.position ?? [0, 0, 0], data.target ?? [0, 0, 1]);
+    vec3.copy(this.position, this.camera.getPosition()); // light.position del pase con sombras
 
     // Crear textura de profundidad para shadow mapping
     this.shadowDepthTexture = GPUUtils.createTexture(
@@ -355,7 +363,58 @@ export class SpotLightComponent extends CameraComponent {
     this.aabb.max = max;
   }
 
-  public override update(dt: number): void {}
+  /**
+   * La luz se define con position/target propios; su transform la desplaza y la gira a partir
+   * de ahí (editor, path_mover…): el cambio respecto al frame anterior se aplica al cono.
+   */
+  public override update(_dt: number): void {
+    const t = (this.getOwner().getComponent('transform') as TransformComponent | null)?.getTransform();
+    if (!t) return;
+    const pos = t.getWorldPosition();
+    const rot = t.getWorldRotation();
+    if (!this.lastTransformPos) {
+      this.lastTransformPos = vec3.clone(pos);
+      quat.copy(this.lastTransformRot, rot);
+      return;
+    }
+    if (vec3.exactEquals(pos, this.lastTransformPos) && quat.exactEquals(rot, this.lastTransformRot)) return;
+
+    const eye = vec3.sub(this.tmpEye, pos, this.lastTransformPos);
+    vec3.add(eye, eye, this.camera.getPosition());
+    const delta = quat.invert(this.tmpRot, this.lastTransformRot);
+    quat.multiply(delta, rot, delta);
+    const front = vec3.transformQuat(this.tmpTarget, this.camera.getFront(), delta);
+    vec3.copy(this.lastTransformPos, pos);
+    quat.copy(this.lastTransformRot, rot);
+    this.setPose(eye, front);
+  }
+
+  /** Coloca el cono en `eye` mirando hacia `front` y re-sube uniforms y AABB. */
+  private setPose(eye: vec3, front: vec3): void {
+    const target = vec3.add(vec3.create(), eye, front);
+    this.camera.lookAt(eye, target);
+    this.camera.updateUniforms(0);
+    vec3.copy(this.position, this.camera.getPosition());
+    this.updateLightUniforms();
+    this.calculateWorldAABB();
+  }
+
+  /** Orientación en grados: yaw alrededor de Y (0 = +Z), pitch hacia arriba. */
+  private getAim(): { yaw: number; pitch: number } {
+    const f = this.camera.getFront();
+    return {
+      yaw: (Math.atan2(f[0]!, f[2]!) * 180) / Math.PI,
+      pitch: (Math.asin(Math.max(-1, Math.min(1, f[1]!))) * 180) / Math.PI,
+    };
+  }
+
+  private setAim(yawDeg: number, pitchDeg: number): void {
+    // Sin llegar a la vertical exacta: lookAt usa +Y como up.
+    const pitch = (Math.max(-89.9, Math.min(89.9, pitchDeg)) * Math.PI) / 180;
+    const yaw = (yawDeg * Math.PI) / 180;
+    const front = vec3.fromValues(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw));
+    this.setPose(vec3.clone(this.camera.getPosition()), front);
+  }
 
   public override dispose(): void {
     this.shadowCache.destroy();
@@ -411,6 +470,43 @@ export class SpotLightComponent extends CameraComponent {
 
     const slFolder = folder.addFolder('Spot Light');
     slFolder.close();
+
+    // Pose: el cono vive en su cámara (position/target del JSON), no en el transform. Los
+    // valores se leen de la cámara cada vez (light_sweep la gira).
+    const pose = {} as { x: number; y: number; z: number; yaw: number; pitch: number };
+    const axis = (i: number) => ({
+      get: () => this.camera.getPosition()[i]!,
+      set: (v: number) => {
+        const eye = vec3.clone(this.camera.getPosition());
+        eye[i] = v;
+        this.setPose(eye, vec3.clone(this.camera.getFront()));
+      },
+      enumerable: true,
+    });
+    Object.defineProperties(pose, {
+      x: axis(0),
+      y: axis(1),
+      z: axis(2),
+      yaw: {
+        get: () => this.getAim().yaw,
+        set: (v: number) => this.setAim(v, this.getAim().pitch),
+        enumerable: true,
+      },
+      pitch: {
+        get: () => this.getAim().pitch,
+        set: (v: number) => this.setAim(this.getAim().yaw, v),
+        enumerable: true,
+      },
+    });
+    const posStep = { v: 0.1 };
+    slFolder.add(posStep, 'v').step(0.001).name('± Step (position)');
+    addAxisControls(slFolder, pose, 'x', 'X', posStep, () => {});
+    addAxisControls(slFolder, pose, 'y', 'Y', posStep, () => {});
+    addAxisControls(slFolder, pose, 'z', 'Z', posStep, () => {});
+    const aimStep = { v: 5.0 };
+    slFolder.add(aimStep, 'v').step(0.1).name('± Step (aim°)');
+    addAxisControls(slFolder, pose, 'yaw', 'Yaw °', aimStep, () => {});
+    addAxisControls(slFolder, pose, 'pitch', 'Pitch °', aimStep, () => {});
 
     const applyColor = () => this.setColor(p.r, p.g, p.b);
     const colorStep = { v: 0.05 };

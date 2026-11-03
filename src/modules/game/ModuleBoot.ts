@@ -16,9 +16,8 @@ import { CapsuleColliderComponent } from '../../components/physics/CapsuleCollid
 import { LinearInterpolator } from '../../core/math/Interpolators';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { GUIManager } from '../../core/debug/GUIManager';
-import GUI from 'lil-gui';
-import { Time } from '../../core/engine/Time';
 import { DebugRenderState } from '../../core/debug/DebugRenderState';
+import { EditorToolbar } from './EditorToolbar';
 
 /** Component that controls the player camera — FPS, TPS arm or tactical rig. */
 type PlayerCameraController =
@@ -239,24 +238,9 @@ export class ModuleBoot extends Module {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    if (this.beginGUIWindow('Time Control')) {
-      const folder = (gui as any).folders?.get('Time Control') as GUI | undefined;
-      if (folder) {
-        const proxy = {} as { timeScale: number };
-        Object.defineProperty(proxy, 'timeScale', {
-          get: () => Time.getTimeScale(),
-          set: (v: number) => Time.setTimeScale(v),
-          enumerable: true,
-          configurable: true,
-        });
-        folder.add(proxy, 'timeScale', 0, 3, 0.01).name('Time Scale').listen();
-        folder.add({ fn: () => Time.setTimeScale(0) }, 'fn').name('Pause');
-        folder.add({ fn: () => Time.setTimeScale(0.1) }, 'fn').name('0.1x  Bullet Time');
-        folder.add({ fn: () => Time.setTimeScale(0.25) }, 'fn').name('0.25x');
-        folder.add({ fn: () => Time.setTimeScale(0.5) }, 'fn').name('0.5x');
-        folder.add({ fn: () => Time.setTimeScale(1.0) }, 'fn').name('1x  Normal');
-        folder.add({ fn: () => Time.setTimeScale(2.0) }, 'fn').name('2x  Fast');
-      }
+    if (this.beginGUIWindow('Toolbar')) {
+      const folder = gui.getFolder('Toolbar');
+      if (folder) void EditorToolbar.build(folder);
       this.endGUIWindow();
     }
   }

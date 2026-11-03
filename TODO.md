@@ -108,7 +108,6 @@ Depende de la fase 30. HLOD solo merece la pena con niveles grandes; hacer prime
       _Hecho cuando:_ en `sponza_gi` con GI activa, el frame se mantiene en presupuesto y la escala
       se ve en el overlay del profiler; la escala vuelve a 1 cuando sobra GPU.
 
-Scene change? Editor? Spawn prefabs?
 Optimice everything
 
 #### Fase 35 — Reflejos trazados como respaldo del SSR

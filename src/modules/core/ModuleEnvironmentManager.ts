@@ -434,15 +434,12 @@ export class ModuleEnvironmentManager extends Module {
       .name('Env Reflection Intensity')
       .listen();
 
-    // Time of Day slider with .listen() for automatic updates
-    folder.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
-
-    // ── Clouds ──
-    folder.add(this, 'cloudsType', ['volumetric', 'flat', 'none']).name('Clouds').listen();
-
-    // ── Wind ──
-    folder.add(Wind, 'speed', 0.0, 0.5).name('Wind Speed').listen();
-    folder.add(Wind, 'dirAngle', 0.0, 360.0).name('Wind Direction (°)').listen();
+    // Hora del día, nubes y viento: en World (junto al sol, la niebla y las nubes volumétricas).
+    const world = gui.getFolder('World') ?? folder;
+    world.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
+    world.add(this, 'cloudsType', ['volumetric', 'flat', 'none']).name('Clouds').listen();
+    world.add(Wind, 'speed', 0.0, 0.5).name('Wind Speed').listen();
+    world.add(Wind, 'dirAngle', 0.0, 360.0).name('Wind Direction (°)').listen();
 
     gui.endWindow();
   }

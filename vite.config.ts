@@ -173,9 +173,54 @@ function bakeSavePlugin(): Plugin {
   };
 }
 
+/**
+ * Dev-only listings for the F2 editor (scene / scenario selectors, prefab spawner):
+ * GET .../__editor/list?kind=scenes|scenarios|prefabs → JSON array of relative paths.
+ */
+function editorListPlugin(): Plugin {
+  const roots: Record<string, { dir: string; ext: string }> = {
+    scenes: { dir: 'assets/scenes', ext: '.json' },
+    scenarios: { dir: 'data/scenarios', ext: '.json' },
+    prefabs: { dir: 'assets/prefabs', ext: '.prefab' },
+  };
+  const walk = (dir: string, ext: string, prefix = ''): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      if (e.isDirectory()) return walk(path.join(dir, e.name), ext, rel);
+      return e.name.endsWith(ext) ? [rel] : [];
+    });
+  return {
+    name: 'editor-list',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = new URL(req.url ?? '', 'http://localhost');
+        if (req.method !== 'GET' || !url.pathname.endsWith('/__editor/list')) return next();
+        const root = roots[url.searchParams.get('kind') ?? ''];
+        if (!root) {
+          res.statusCode = 400;
+          res.end('bad kind');
+          return;
+        }
+        const dir = path.join(server.config.root, 'public', root.dir);
+        const files = fs.existsSync(dir) ? walk(dir, root.ext).sort() : [];
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end(JSON.stringify(files));
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/WebGPUEngine/', // Ajusta esto si cambias el nombre del repo
-  plugins: [bakeSavePlugin(), wgslIncludePlugin(), no404FallbackPlugin(), wasm(), topLevelAwait()],
+  plugins: [
+    bakeSavePlugin(),
+    editorListPlugin(),
+    wgslIncludePlugin(),
+    no404FallbackPlugin(),
+    wasm(),
+    topLevelAwait(),
+  ],
   worker: {
     // ES module workers: the default 'iife' format makes vite-plugin-top-level-await
     // re-bundle the worker and crash on an undefined assetsDir. Every WebGPU-capable

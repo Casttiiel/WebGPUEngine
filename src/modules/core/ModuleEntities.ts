@@ -95,17 +95,25 @@ export class ModuleEntities extends Module {
     this.debugValues.numberEntities.value = this.omEntities.length;
   }
 
+  /** Editor tools at the top of the Scene folder (registered by ModuleEditorSelection). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static sceneTools: ((folder: any) => void) | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public static setSceneTools(build: (folder: any) => void): void {
+    ModuleEntities.sceneTools = build;
+  }
+
   public override renderInMenu(): void {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    gui.beginWindow('Scene'); // no-op on subsequent calls
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sceneFolder = (gui as any).folders?.get('Scene');
+    const created = gui.beginWindow('Scene');
+    const sceneFolder = gui.getFolder('Scene');
     if (!sceneFolder) return;
+    if (created) ModuleEntities.sceneTools?.(sceneFolder);
 
     for (const entity of this.omEntities) {
-      if (entity.isPoolEntity) continue;
+      if (entity.isPoolEntity || entity.getParent()) continue; // los hijos, dentro de su padre
       entity.renderInMenu(sceneFolder);
     }
   }
@@ -161,9 +169,12 @@ export class ModuleEntities extends Module {
   }
 
   public destroyEntity(entity: Entity): void {
-    for (const child of entity.getChildren()) {
+    for (const child of [...entity.getChildren()]) {
       this.destroyEntity(child);
     }
+    const siblings = entity.getParent()?.getChildren();
+    const at = siblings?.indexOf(entity) ?? -1;
+    if (at !== -1) siblings!.splice(at, 1);
 
     for (const [, om] of this.omGeneral) om.removeByOwner(entity);
     for (const [, om] of this.omToUpdate) om.removeByOwner(entity);
@@ -172,6 +183,7 @@ export class ModuleEntities extends Module {
     for (const component of entity.getAllComponents()) {
       component.dispose();
     }
+    entity.disposeEditorFolder();
 
     const idx = this.omEntities.indexOf(entity);
     if (idx !== -1) this.omEntities.splice(idx, 1);
@@ -179,12 +191,7 @@ export class ModuleEntities extends Module {
 
   public stop(): void {
     // Clean up Scene GUI folder
-    const gui = Engine.getGUI();
-    const sceneFolder = gui.getFolder('Scene');
-    if (sceneFolder) {
-      (sceneFolder as any).destroy();
-      gui.unregisterFolder('Scene');
-    }
+    Engine.getGUI().clearWindow('Scene');
 
     // Clear entities array (entities will be recreated on restart)
     this.omEntities = [];

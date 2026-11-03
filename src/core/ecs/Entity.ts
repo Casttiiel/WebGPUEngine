@@ -2,6 +2,7 @@ import { NameComponent } from '../../components/core/NameComponent';
 import { Component } from './Component';
 import { MsgDispatcher } from './MsgDispatcher';
 import type { IMsg } from './Msg';
+import type { EntityDataType } from '../../types/SceneData.type';
 
 export class Entity {
   private static nextId = 0;
@@ -81,6 +82,38 @@ export class Entity {
   private _editorFolder: any = null;
   /** Set by pool systems (e.g. BulletPoolComponent) to hide this entity from the editor. */
   public isPoolEntity: boolean = false;
+  /**
+   * JSON sin parsear con el que se creó (entrada de la escena o spawnFromJSON), para
+   * duplicarla desde el editor. null en hijos de glTF/prefab y entidades creadas por código.
+   */
+  public sourceData: EntityDataType | null = null;
+
+  /** Registered by ModuleEditorSelection: opening the entity's folder selects it. */
+  private static _onGuiSelect: ((entity: Entity) => void) | null = null;
+  public static registerGuiSelectCallback(cb: (entity: Entity) => void): void {
+    Entity._onGuiSelect = cb;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public getEditorFolder(): any {
+    return this._editorFolder;
+  }
+
+  /** Abre su carpeta del F2 (y las de sus padres) y la desplaza a la vista. */
+  public revealInEditor(): void {
+    if (!this._editorFolder) this.parent?.revealInEditor(); // los hijos se construyen al abrir al padre
+    const folder = this._editorFolder;
+    if (!folder) return;
+    for (let p = folder.parent; p; p = p.parent) p.open();
+    folder.open();
+    folder.domElement.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** Quita su carpeta del F2 (al destruirla). */
+  public disposeEditorFolder(): void {
+    this._editorFolder?.destroy();
+    this._editorFolder = null;
+  }
 
   public renderDebug(filter?: string): void {
     for (const component of this.components.values()) {
@@ -119,7 +152,9 @@ export class Entity {
     const folder = this._editorFolder;
     let built = false;
     folder.onOpenClose((changed: any) => {
-      if (built || changed !== folder || changed._closed) return;
+      if (changed !== folder || changed._closed) return;
+      Entity._onGuiSelect?.(this);
+      if (built) return;
       built = true;
       for (const component of this.components.values()) {
         component.renderInEntityPanel(folder);

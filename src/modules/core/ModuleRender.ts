@@ -831,17 +831,17 @@ export class ModuleRender extends Module {
     this.renderStatsMenu(gui);
   }
 
-  // Adds directional lights as sub-folders inside the "Lighting" folder created by ModuleEnvironmentManager.
+  // Directional lights (the sun) as sub-folders of "World", next to time of day and the sky.
   private renderLightingMenu(gui: any): void {
     const lights = Engine.getEntities().getObjectManagerByName('directional_light')?.getList();
     if (!lights?.length) return;
 
-    const lightingFolder = (gui as any).folders?.get('Lighting');
-    if (!lightingFolder) return;
+    const worldFolder = gui.getFolder('World');
+    if (!worldFolder) return;
 
     for (const light of lights) {
       const dirLight = light as DirectionalLightComponent;
-      dirLight.renderInMenu(lightingFolder);
+      dirLight.renderInMenu(worldFolder);
     }
   }
 
@@ -887,26 +887,28 @@ export class ModuleRender extends Module {
     }
 
     const ppFolder = (gui as any).folders?.get('Post Processing');
-    if (!ppFolder) return;
+    const lightingFolder = gui.getFolder('Lighting');
+    if (!ppFolder || !lightingFolder) return;
 
-    // Camera component controls — each guards itself via _editorFolder.
-    this.deferred.renderSSRInMenu(ppFolder);
+    // Camera component controls — each guards itself via _editorFolder. Screen-space lighting
+    // (SSR, AO, contact shadows) goes to Lighting; the rest is post.
+    this.deferred.renderSSRInMenu(lightingFolder);
 
-    const tryRender = (key: string) => {
+    const tryRender = (key: string, folder = ppFolder) => {
       if (!mainCamera.hasComponent(key)) return;
       const c = mainCamera.getComponent(key) as any;
-      if (c?.hasLoaded?.() ?? true) c?.renderInMenu(ppFolder);
+      if (c?.hasLoaded?.() ?? true) c?.renderInMenu(folder);
     };
 
+    tryRender('ambient_occlusion', lightingFolder);
+    tryRender('contact_shadows', lightingFolder);
+    tryRender('tsr');
+    tryRender('fsr');
+    tryRender('taa');
     tryRender('auto_exposure');
     tryRender('bloom');
     tryRender('tone_mapping');
     tryRender('lens_flare');
-    tryRender('fsr');
-    tryRender('tsr');
-    tryRender('taa');
-    tryRender('ambient_occlusion');
-    tryRender('contact_shadows');
     tryRender('vignette');
     tryRender('chromatic_aberration');
     tryRender('film_grain');

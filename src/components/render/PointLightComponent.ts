@@ -263,9 +263,11 @@ export class PointLightComponent extends Component {
   }
 
   public update(_dt: number): void {
+    const entity = this.getOwner();
+    const transform = entity.getComponent('transform') as TransformComponent;
+    // Movida desde fuera (editor, path_mover…): re-sube posición, AABB y sombras.
+    if (!vec3.exactEquals(transform.getTransform().getWorldPosition(), this.position)) this.isDirty = true;
     if (this.isDirty) {
-      const entity = this.getOwner();
-      const transform = entity.getComponent('transform') as TransformComponent;
       transform
         .getTransform()
         .setLocalScale(vec3.fromValues(this.radius * 2.0, this.radius * 2.0, this.radius * 2.0));

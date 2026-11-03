@@ -1,13 +1,29 @@
 import GUI from 'lil-gui';
 
-const FOLDER_CONFIG: Record<string, { open: boolean; cssClass?: string }> = {
-  'Scene':           { open: false, cssClass: 'gui-cat-scene' },
-  'Lighting':        { open: false, cssClass: 'gui-cat-lighting' },
-  'Atmosphere':      { open: false, cssClass: 'gui-cat-atmosphere' },
-  'Global Illumination': { open: false, cssClass: 'gui-cat-lighting' },
-  'Post Processing': { open: false, cssClass: 'gui-cat-postprocessing' },
-  'Time Control':    { open: false, cssClass: 'gui-cat-time' },
-  'Statistics':      { open: false, cssClass: 'gui-cat-statistics' },
+/**
+ * Top-level folders, in display order. They exist from the start (empty) so the panel order
+ * doesn't depend on which module fills its folder first.
+ */
+const CATEGORIES: { name: string; open: boolean; cssClass: string }[] = [
+  { name: 'Toolbar',  open: true,  cssClass: 'gui-cat-time' },
+  { name: 'Scene',    open: false, cssClass: 'gui-cat-scene' },
+  { name: 'World',    open: false, cssClass: 'gui-cat-atmosphere' },
+  { name: 'Lighting', open: false, cssClass: 'gui-cat-lighting' },
+  { name: 'Post',     open: false, cssClass: 'gui-cat-postprocessing' },
+  { name: 'Stats',    open: false, cssClass: 'gui-cat-statistics' },
+];
+
+/**
+ * Windows that live inside a category: the category folder itself (alias) or a child folder
+ * of it. Anything else becomes a new top-level folder at the end.
+ */
+const WINDOWS: Record<string, { category: string; child?: boolean }> = {
+  'Atmosphere':          { category: 'World' },
+  'Grass Colors':        { category: 'World', child: true },
+  'Global Illumination': { category: 'Lighting', child: true },
+  'Post Processing':     { category: 'Post' },
+  'Statistics':          { category: 'Stats' },
+  'Time Control':        { category: 'Toolbar' },
 };
 
 // lil-gui v0.21 uses "lil-" prefix on ALL class names.
@@ -140,6 +156,10 @@ export class GUIManager {
   // Lil-GUI instances
   private gui: GUI | null = null;
   private folders: Map<string, GUI> = new Map();
+  /** Windows already handed out by beginWindow (their owner fills them once). */
+  private populated = new Set<string>();
+  /** Folder the add* helpers write into (last beginWindow / beginFolder). */
+  private context: GUI | null = null;
 
   private constructor() {
     // Private constructor for singleton
@@ -178,6 +198,14 @@ export class GUIManager {
       this.gui.domElement.style.left = '10px';
       this.gui.domElement.style.right = 'auto';
       this.gui.domElement.style.top = '10px';
+
+      for (const category of CATEGORIES) {
+        const folder = this.gui.addFolder(category.name);
+        folder.domElement.classList.add(category.cssClass);
+        if (category.open) folder.open();
+        else folder.close();
+        this.folders.set(category.name, folder);
+      }
 
       // Start hidden (will be shown when entering editor mode)
       this.gui.hide();
@@ -219,18 +247,38 @@ export class GUIManager {
    */
   public beginWindow(name: string, _defaultOpen: boolean = true): boolean {
     if (!this.initialized || !this.isVisible || !this.gui) return false;
+    if (this.populated.has(name)) return false;
 
-    const existing = this.folders.get(name);
-    if (existing) return false;
+    let folder = this.folders.get(name);
+    if (!folder) {
+      const placement = WINDOWS[name];
+      const category = placement ? this.folders.get(placement.category) : undefined;
+      if (category && !placement!.child) {
+        folder = category;
+      } else {
+        folder = (category ?? this.gui).addFolder(name);
+        if (category || !_defaultOpen) folder.close();
+        else folder.open();
+      }
+      this.folders.set(name, folder);
+    }
 
-    const folder = this.gui.addFolder(name);
-    const config = FOLDER_CONFIG[name];
-
-    if (config?.cssClass) folder.domElement.classList.add(config.cssClass);
-    if (config ? config.open : _defaultOpen) folder.open(); else folder.close();
-
-    this.folders.set(name, folder);
+    this.populated.add(name);
+    this.context = folder;
     return true;
+  }
+
+  /**
+   * Empties a window's folder (keeps it in place) so its owner can fill it again on the next
+   * beginWindow, e.g. the Scene list when the entities are reloaded.
+   */
+  public clearWindow(name: string): void {
+    const folder = this.folders.get(name);
+    if (folder) {
+      for (const child of [...folder.folders]) child.destroy();
+      for (const controller of [...folder.controllers]) controller.destroy();
+    }
+    this.populated.delete(name);
   }
 
   /**
@@ -260,6 +308,7 @@ export class GUIManager {
     const folder = parent.addFolder(label);
     folder.close(); // Start collapsed by default
     this.folders.set(label, folder);
+    this.context = folder;
 
     return true;
   }
@@ -569,6 +618,8 @@ export class GUIManager {
       }
 
       this.folders.clear();
+      this.populated.clear();
+      this.context = null;
       this.initialized = false;
       this.isVisible = false;
 
@@ -579,14 +630,10 @@ export class GUIManager {
   }
 
   /**
-   * Get current GUI context (last added folder or main GUI)
+   * Get current GUI context (last beginWindow / beginFolder, or the main GUI)
    */
   private getCurrentContext(): GUI | null {
-    if (!this.gui) return null;
-
-    // Return the last folder in the stack, or the main GUI
-    const folders = Array.from(this.folders.values());
-    return folders.length > 0 ? folders[folders.length - 1] : this.gui;
+    return this.context ?? this.gui;
   }
 
   /**
