@@ -3,6 +3,7 @@
 //   CURL_NOISE, VORTEX, ATTRACTOR — fuerzas
 //   RIBBON — guarda el historial de posiciones (estela de cada partícula)
 //   LIGHTS — las partículas escogidas escriben point lights en la cola del buffer del tiled
+// Siempre: caja y cuenta de las vivas (culling y emisores dormidos, ParticleSystemComponent).
 #include "common/particles"
 
 struct SimParams {
@@ -55,6 +56,23 @@ struct PointLightEntry {
 @group(0) @binding(8) var<storage, read_write> emitterLightCount: atomic<u32>;
 #endif
 
+// Caja de las vivas en el espacio de las partículas, cuenta y rapidez máxima. Solo atomicMax:
+// los mínimos se guardan negados (~) y el cero inicial es el neutro. Las posiciones van como
+// u32 ordenables (orderedBits); la rapidez es ≥ 0 y sus bits ya ordenan.
+struct EmitterBounds {
+    count: atomic<u32>,
+    maxSpeed: atomic<u32>,
+    maxP: array<atomic<u32>, 3>,
+    negMinP: array<atomic<u32>, 3>,
+};
+@group(0) @binding(9) var<storage, read_write> bounds: EmitterBounds;
+var<workgroup> wgBounds: EmitterBounds;
+
+fn orderedBits(x: f32) -> u32 {
+    let b = bitcast<u32>(x);
+    return select(b | 0x80000000u, ~b, (b & 0x80000000u) != 0u);
+}
+
 #ifdef CURL_NOISE
 fn hash3i(p: vec3<i32>) -> f32 {
     var v = vec3<u32>(p) * vec3<u32>(1664525u) + vec3<u32>(1013904223u);
@@ -106,12 +124,38 @@ fn curlNoise(p: vec3<f32>) -> vec3<f32> {
 #endif
 
 @compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn main(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+    @builtin(local_invocation_index) local: u32,
+) {
     let index = global_id.x;
-    if (index >= arrayLength(&particles)) { return; }
+    if (index < arrayLength(&particles)) {
+        var particle = particles[index];
+        if (particle.alive != 0u && simulate(index, &particle)) {
+            atomicAdd(&wgBounds.count, 1u);
+            atomicMax(&wgBounds.maxSpeed, bitcast<u32>(length(particle.velocity)));
+            for (var i = 0u; i < 3u; i++) {
+                let b = orderedBits(particle.position[i]);
+                atomicMax(&wgBounds.maxP[i], b);
+                atomicMax(&wgBounds.negMinP[i], ~b);
+            }
+        }
+    }
 
-    var particle = particles[index];
-    if (particle.alive == 0u) { return; }
+    workgroupBarrier();
+    if (local == 0u && atomicLoad(&wgBounds.count) > 0u) {
+        atomicAdd(&bounds.count, atomicLoad(&wgBounds.count));
+        atomicMax(&bounds.maxSpeed, atomicLoad(&wgBounds.maxSpeed));
+        for (var i = 0u; i < 3u; i++) {
+            atomicMax(&bounds.maxP[i], atomicLoad(&wgBounds.maxP[i]));
+            atomicMax(&bounds.negMinP[i], atomicLoad(&wgBounds.negMinP[i]));
+        }
+    }
+}
+
+/// Avanza una partícula viva y la guarda; false si ha muerto este frame.
+fn simulate(index: u32, p: ptr<function, Particle>) -> bool {
+    var particle = *p;
 
     let dt = sim.deltaTime;
     particle.age += dt;
@@ -162,7 +206,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             freeList[freeSlot] = index;
         }
         particles[index] = particle;
-        return;
+        return false;
     }
 
 #ifdef RIBBON
@@ -193,4 +237,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 #endif
 
     particles[index] = particle;
+    *p = particle;
+    return true;
 }

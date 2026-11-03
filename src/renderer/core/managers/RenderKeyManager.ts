@@ -25,6 +25,11 @@ export interface RenderKey {
   skipDepthPrepass?: boolean;
   /** Override technique used only during the depth prepass for this key. */
   customPrepassTechnique?: Technique;
+  /**
+   * Own visibility test against the pass camera, for keys the frustum/GPU cullers let through
+   * (instanced keys with their own indirect draw, e.g. particle emitters). false = not drawn.
+   */
+  cullTest?: (camera: Camera) => boolean;
   id: number;
 }
 

@@ -191,6 +191,13 @@ export class RenderManagerV2 {
     if (material.getCastsShadows()) this.staticShadowVersion++;
   }
 
+  /** Own visibility test for every key of `owner` (see RenderKey.cullTest). */
+  public setCullTest(owner: RenderComponent, test: (camera: Camera) => boolean): void {
+    for (const key of this.keyManager.getAllKeys()) {
+      if (key.owner === owner) key.cullTest = test;
+    }
+  }
+
   public delKeys(owner: RenderComponent): void {
     // Only losing a static caster invalidates the shadow caches (particles re-key often).
     if (this.getShadowKeys().some((k) => k.owner === owner && this.isStaticShadowCaster(k))) {
@@ -462,9 +469,10 @@ export class RenderManagerV2 {
     }
     keysToDraw.length = 0;
     for (let i = 0; i < keys.length; i++) {
-      if (keys[i]!.material.getCategory() === category) {
-        keysToDraw.push(keys[i]!);
-      }
+      const key = keys[i]!;
+      if (key.material.getCategory() !== category) continue;
+      if (key.cullTest && !key.cullTest(this.camera)) continue;
+      keysToDraw.push(key);
     }
 
     // Sort keys for optimal rendering

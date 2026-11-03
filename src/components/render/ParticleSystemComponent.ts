@@ -17,6 +17,8 @@ import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { TiledLightManager } from '../../renderer/core/managers/TiledLightManager';
 import { DirectionalLightComponent } from './DirectionalLightComponent';
+import { Camera } from '../../core/math/Camera';
+import { CPUCullingManager } from '../../renderer/core/culling/CPUCullingManager';
 import {
   CURVE_SAMPLES,
   FACINGS,
@@ -46,6 +48,15 @@ interface QueuedBurst {
   sizeScale: number;
 }
 
+/** Copia de EmitterBounds (particle_update.cs) que se lee en CPU unos frames después. */
+interface BoundsReadback {
+  buffer: GPUBuffer;
+  busy: boolean;
+  /** Frame y tiempo del emisor en que se copió. */
+  frame: number;
+  time: number;
+}
+
 interface SimPipelines {
   update: GPUComputePipeline;
   spawn: GPUComputePipeline;
@@ -58,6 +69,12 @@ const SPAWN_PARAMS_BYTES = 160; // SpawnParams (particle_spawn.cs)
 const SIM_PARAMS_BYTES = 208; // SimParams (particle_update.cs)
 const RENDER_PARAMS_FLOATS = 28; // ParticleRenderParams (common/particles.wgsl), 112 bytes
 const CURVES_FLOATS = CURVE_SAMPLES * 4 + CURVE_SAMPLES; // ParticleCurves, 640 bytes
+const BOUNDS_BYTES = 32; // EmitterBounds (particle_update.cs)
+/** Copias de la caja en vuelo: la GPU va 1-3 frames por detrás. */
+const BOUNDS_READBACKS = 3;
+/** Ráfagas recordadas hasta que la caja leída ya las incluye. */
+const MAX_PENDING_SPAWNS = 16;
+const PENDING_FLOATS = 6; // frame, tiempo, origen xyz, rapidez inicial
 const DEG = Math.PI / 180;
 
 /**
@@ -88,6 +105,8 @@ export class ParticleSystemComponent extends Component {
   private simParamsBuffer: GPUBuffer | null = null;
   private spawnParamsBuffer: GPUBuffer | null = null;
   private emitterLightCountBuffer: GPUBuffer | null = null;
+  private boundsBuffer: GPUBuffer | null = null;
+  private boundsReadbacks: BoundsReadback[] = [];
   /** Sustitutos de los buffers de luces mientras no hay TiledLightManager (o sin módulo). */
   private dummyLightsBuffer: GPUBuffer | null = null;
   private dummyLightCountBuffer: GPUBuffer | null = null;
@@ -120,6 +139,31 @@ export class ParticleSystemComponent extends Component {
   private burstQueue: QueuedBurst[] = [];
   private emitting = true;
   private oneShotFired = false;
+
+  // ── Culling (caja de las vivas leída de la GPU + ráfagas que aún no incluye) ───
+  private frame = 0;
+  /** Frame de la última caja leída (-1 = ninguna todavía: se dibuja siempre). */
+  private boundsFrame = -1;
+  private boundsTime = 0;
+  private boundsCount = 0;
+  private boundsSpeed = 0;
+  private boundsMin = vec3.create();
+  private boundsMax = vec3.create();
+  private lastSpawnFrame = -1;
+  private pendingSpawns = new Float64Array(MAX_PENDING_SPAWNS * PENDING_FLOATS);
+  private pendingCount = 0;
+  /** Se perdieron ráfagas (cola llena): visible hasta que la caja leída llegue a este frame. */
+  private pendingOverflowFrame = -1;
+  /** Mayor tamaño de la curva y mayor escala de ráfaga vistos (margen de la caja). */
+  private maxCurveSize = 0;
+  private maxBurstScale = 1;
+  private cullFrame = -1;
+  private cullVisible = true;
+  private cullMin = vec3.create();
+  private cullMax = vec3.create();
+  private readonly cullTest = (camera: Camera): boolean => this.isVisibleTo(camera);
+  private decodeU32 = new Uint32Array(1);
+  private decodeF32 = new Float32Array(this.decodeU32.buffer);
 
   // ── Staging CPU (sin allocations por frame) ──────────────────────────────────
   private spawnParams = new ArrayBuffer(SPAWN_PARAMS_BYTES);
@@ -252,6 +296,17 @@ export class ParticleSystemComponent extends Component {
     this.simParamsBuffer = uniform('particle_sim_params', SIM_PARAMS_BYTES);
     this.spawnParamsBuffer = uniform('particle_spawn_params', SPAWN_PARAMS_BYTES);
     this.emitterLightCountBuffer = storage('particle_emitter_light_count', 4);
+    this.boundsBuffer = storage('particle_bounds', BOUNDS_BYTES, GPUBufferUsage.COPY_SRC);
+    this.boundsReadbacks = Array.from({ length: BOUNDS_READBACKS }, () => ({
+      buffer: device.createBuffer({
+        label: 'particle_bounds_readback',
+        size: BOUNDS_BYTES,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      }),
+      busy: false,
+      frame: 0,
+      time: 0,
+    }));
     this.dummyLightsBuffer = storage('particle_dummy_lights', 48);
     this.dummyLightCountBuffer = storage('particle_dummy_light_count', 4);
     this.curvesDirty = true;
@@ -259,6 +314,12 @@ export class ParticleSystemComponent extends Component {
     this.renderDeps = [];
     this.spawnAccumulator = 0;
     this.trailTimer = 0;
+    this.boundsFrame = -1;
+    this.lastSpawnFrame = -1;
+    this.pendingCount = 0;
+    this.pendingOverflowFrame = -1;
+    this.maxBurstScale = 1;
+    this.cullFrame = -1;
     this.ready = true;
     // La key se registra en update(), cuando existen todos los recursos que lee (profundidad,
     // sol, niebla…).
@@ -315,6 +376,7 @@ export class ParticleSystemComponent extends Component {
           { binding: 6, visibility: C, buffer: rw }, // tiled point lights
           { binding: 7, visibility: C, buffer: rw }, // particle light count (global)
           { binding: 8, visibility: C, buffer: rw }, // light count of this emitter
+          { binding: 9, visibility: C, buffer: rw }, // bounds of the alive particles
         ],
       });
     }
@@ -392,6 +454,7 @@ export class ParticleSystemComponent extends Component {
       { binding: 6, resource: { buffer: lights } },
       { binding: 7, resource: { buffer: lightCount } },
       { binding: 8, resource: { buffer: this.emitterLightCountBuffer! } },
+      { binding: 9, resource: { buffer: this.boundsBuffer! } },
     ];
     const layout = ParticleSystemComponent.getComputeLayout();
     this.updateBindGroup = device.createBindGroup({ label: 'particle_update_bg', layout, entries: entries(this.simParamsBuffer!) });
@@ -483,6 +546,7 @@ export class ParticleSystemComponent extends Component {
       this.renderBindGroup!, // @group(3) del sistema de partículas
       this.indirectDrawBuffer!,
     );
+    RenderManagerV2.getInstance().setCullTest(this.renderComponent, this.cullTest);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -662,6 +726,7 @@ export class ParticleSystemComponent extends Component {
     const device = GPUUtils.getDevice();
     const c = this.config;
     this.time += deltaTime;
+    this.frame++;
 
     this.ensureRenderBindGroup();
     this.ensureComputeBindGroups();
@@ -670,6 +735,10 @@ export class ParticleSystemComponent extends Component {
       this.curvesDirty = false;
       bakeParticleCurves(c, this.curves);
       device.queue.writeBuffer(this.curvesBuffer!, 0, this.curves);
+      this.maxCurveSize = 0;
+      for (let i = CURVE_SAMPLES * 4; i < CURVES_FLOATS; i++) {
+        this.maxCurveSize = Math.max(this.maxCurveSize, Math.abs(this.curves[i]!));
+      }
     }
     this.writeRenderParams(device);
 
@@ -703,10 +772,19 @@ export class ParticleSystemComponent extends Component {
     }
 
     this.writeSimParams(device, deltaTime, recordTrail);
+
+    // Dormido: sin vivas (según la última caja, posterior a la última ráfaga) ni nada que
+    // emitir. Ni update ni draw hasta la siguiente ráfaga (BloodFX, chispas de impacto…).
+    if (spawnCount === 0 && this.boundsCount === 0 && this.boundsFrame > this.lastSpawnFrame) return;
+
     if (this.lightsCompiled) device.queue.writeBuffer(this.emitterLightCountBuffer!, 0, this.zeroU32);
-    if (spawnCount > 0) this.writeSpawnParams(device, spawnCount, batch);
+    if (spawnCount > 0) {
+      this.writeSpawnParams(device, spawnCount, batch);
+      this.recordSpawn(batch);
+    }
 
     const encoder = device.createCommandEncoder({ label: 'Particle System' });
+    encoder.clearBuffer(this.boundsBuffer!);
     const pass = encoder.beginComputePass({ label: 'Particle Update + Spawn' });
     pass.setPipeline(this.pipelines.update);
     pass.setBindGroup(0, this.updateBindGroup!);
@@ -717,7 +795,200 @@ export class ParticleSystemComponent extends Component {
       pass.dispatchWorkgroups(Math.ceil(spawnCount / 64));
     }
     pass.end();
+    // La caja que dejó el update (antes del spawn de este frame) → CPU, si hay copia libre.
+    const readback = this.boundsReadbacks.find((r) => !r.busy);
+    if (readback) encoder.copyBufferToBuffer(this.boundsBuffer!, 0, readback.buffer, 0, BOUNDS_BYTES);
     device.queue.submit([encoder.finish()]);
+    if (readback) this.readBounds(readback);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Culling: caja de las vivas (GPU, con 1-3 frames de retraso) crecida por lo que han podido
+  // moverse desde entonces, más las ráfagas que esa caja aún no incluye.
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private readBounds(readback: BoundsReadback): void {
+    readback.busy = true;
+    readback.frame = this.frame;
+    readback.time = this.time;
+    const gen = this.generation;
+    readback.buffer.mapAsync(GPUMapMode.READ).then(
+      () => {
+        if (gen !== this.generation) return; // buffer destruido por un rebuild
+        const u = new Uint32Array(readback.buffer.getMappedRange());
+        if (readback.frame > this.boundsFrame) {
+          this.boundsFrame = readback.frame;
+          this.boundsTime = readback.time;
+          this.boundsCount = u[0]!;
+          this.boundsSpeed = this.decodeBits(u[1]!);
+          for (let i = 0; i < 3; i++) {
+            this.boundsMax[i] = this.decodeOrdered(u[2 + i]!);
+            this.boundsMin[i] = this.decodeOrdered(~u[5 + i]! >>> 0);
+          }
+        }
+        readback.buffer.unmap();
+        readback.busy = false;
+      },
+      () => {
+        readback.busy = false;
+      },
+    );
+  }
+
+  private decodeBits(bits: number): number {
+    this.decodeU32[0] = bits;
+    return this.decodeF32[0]!;
+  }
+
+  /** Inversa de orderedBits (particle_update.cs). */
+  private decodeOrdered(u: number): number {
+    return this.decodeBits(u & 0x80000000 ? u & 0x7fffffff : ~u >>> 0);
+  }
+
+  /** Recuerda la ráfaga de este frame hasta que una caja leída de la GPU la incluya. */
+  private recordSpawn(batch: QueuedBurst | null): void {
+    const c = this.config;
+    this.lastSpawnFrame = this.frame;
+    if (batch) this.maxBurstScale = Math.max(this.maxBurstScale, batch.sizeScale);
+    if (this.pendingCount >= MAX_PENDING_SPAWNS) {
+      this.pendingOverflowFrame = this.frame;
+      return;
+    }
+    // Origen en el espacio de las partículas (el del emisor si son locales).
+    const o = this.tmpVec;
+    if (!c.worldSpace) vec3.zero(o);
+    else if (batch?.position) vec3.copy(o, batch.position);
+    else mat4.getTranslation(o, this.computeEmitterMatrix(null));
+    const v = batch?.velocity ?? c.init.velocity;
+    const speed =
+      (Math.hypot(v[0]!, v[1]!, v[2]!) + c.init.velocitySpread * Math.sqrt(3) + Math.abs(c.spawn.radialSpeed)) *
+      Math.max(1, 1 - c.init.speedVariance);
+    const p = this.pendingSpawns;
+    const at = this.pendingCount * PENDING_FLOATS;
+    p[at] = this.frame;
+    p[at + 1] = this.time;
+    p[at + 2] = o[0]!;
+    p[at + 3] = o[1]!;
+    p[at + 4] = o[2]!;
+    p[at + 5] = speed;
+    this.pendingCount++;
+  }
+
+  /** RenderKey.cullTest: la caja del emisor contra la cámara del pase. */
+  private isVisibleTo(camera: Camera): boolean {
+    if (this.frame !== this.cullFrame) {
+      this.cullFrame = this.frame;
+      this.cullVisible = this.computeCullBox();
+    }
+    if (!this.cullVisible) return false;
+    if (this.boundsFrame < 0 || this.pendingOverflowFrame >= this.boundsFrame) return true;
+    return CPUCullingManager.isBoxVisible(camera, this.cullMin, this.cullMax);
+  }
+
+  /** Caja (mundo) donde pueden estar las vivas ahora; false si no hay ninguna. */
+  private computeCullBox(): boolean {
+    // Las ráfagas que la última caja leída ya incluye se olvidan.
+    const p = this.pendingSpawns;
+    let n = 0;
+    for (let i = 0; i < this.pendingCount; i++) {
+      if (p[i * PENDING_FLOATS]! <= this.boundsFrame) continue;
+      if (n !== i) p.copyWithin(n * PENDING_FLOATS, i * PENDING_FLOATS, (i + 1) * PENDING_FLOATS);
+      n++;
+    }
+    this.pendingCount = n;
+    if (this.boundsFrame < 0) return true; // aún sin caja: se dibuja
+
+    const c = this.config;
+    const f = c.forces;
+    const r = c.render;
+    const min = this.cullMin;
+    const max = this.cullMax;
+    vec3.set(min, Infinity, Infinity, Infinity);
+    vec3.set(max, -Infinity, -Infinity, -Infinity);
+    const accel =
+      Math.hypot(f.gravity[0], f.gravity[1], f.gravity[2]) +
+      (f.curlNoise.enabled ? Math.abs(f.curlNoise.strength) : 0) +
+      (f.attractor.enabled ? Math.abs(f.attractor.strength) : 0) +
+      (f.vortex.enabled ? Math.abs(f.vortex.pull) : 0);
+    const vortexRate = f.vortex.enabled ? Math.abs(f.vortex.strength) : 0;
+    const size = this.maxCurveSize * (1 + Math.abs(c.init.sizeVariance)) * this.maxBurstScale;
+    // Lo que ocupa una partícula alrededor de su posición: quad, estiramiento, vaivén y estela.
+    const extent = (speed: number): number =>
+      size +
+      speed * Math.max(0, r.stretch) +
+      Math.abs(r.flutter) * 1.35 +
+      (this.trailLength > 0 ? speed * this.trailLength * r.ribbon.interval : 0);
+    const grow = (lo: ArrayLike<number>, hi: ArrayLike<number>, by: number): void => {
+      for (let i = 0; i < 3; i++) {
+        min[i] = Math.min(min[i]!, lo[i]! - by);
+        max[i] = Math.max(max[i]!, hi[i]! + by);
+      }
+    };
+
+    if (this.boundsCount > 0) {
+      const e = Math.max(0, this.time - this.boundsTime);
+      const lo = this.boundsMin;
+      const hi = this.boundsMax;
+      // El vórtice gira posiciones sin tocar la velocidad: arco hasta su centro (sim f[28..30]).
+      const vc = this.simF32;
+      let radius2 = 0;
+      for (let i = 0; i < 3; i++) {
+        radius2 += Math.max(Math.abs(lo[i]! - vc[28 + i]!), Math.abs(hi[i]! - vc[28 + i]!)) ** 2;
+      }
+      const moved = this.boundsSpeed * e + 0.5 * accel * e * e + vortexRate * e * Math.sqrt(radius2);
+      grow(lo, hi, moved + extent(this.boundsSpeed + accel * e));
+    }
+    const shape = this.spawnRadius() * this.emitterScale();
+    for (let i = 0; i < this.pendingCount; i++) {
+      const at = i * PENDING_FLOATS;
+      const e = Math.max(0, this.time - p[at + 1]!);
+      const speed = p[at + 5]!;
+      const o = p.subarray(at + 2, at + 5);
+      grow(o, o, shape + speed * e + 0.5 * accel * e * e + extent(speed + accel * e));
+    }
+    if (min[0]! > max[0]!) return false; // ni vivas ni ráfagas en camino
+
+    // Espacio de las partículas → mundo (solo las locales): caja de Arvo.
+    if (!c.worldSpace) {
+      const m = this.computeEmitterMatrix(null);
+      const cx = (min[0]! + max[0]!) * 0.5;
+      const cy = (min[1]! + max[1]!) * 0.5;
+      const cz = (min[2]! + max[2]!) * 0.5;
+      const hx = (max[0]! - min[0]!) * 0.5;
+      const hy = (max[1]! - min[1]!) * 0.5;
+      const hz = (max[2]! - min[2]!) * 0.5;
+      for (let i = 0; i < 3; i++) {
+        const center = m[i]! * cx + m[4 + i]! * cy + m[8 + i]! * cz + m[12 + i]!;
+        const half = Math.abs(m[i]!) * hx + Math.abs(m[4 + i]!) * hy + Math.abs(m[8 + i]!) * hz;
+        min[i] = center - half;
+        max[i] = center + half;
+      }
+    }
+    return true;
+  }
+
+  /** Radio de la forma de spawn alrededor de su origen (particle_spawn.cs). */
+  private spawnRadius(): number {
+    const s = this.config.spawn;
+    const size = s.size.map(Math.abs);
+    switch (s.shape) {
+      case 'box':
+        return Math.hypot(size[0]!, size[1]!, size[2]!); // half-extents
+      case 'cone':
+      case 'cylinder':
+        return Math.abs(s.radius) + size[1]!;
+      case 'point':
+        return 0;
+      default:
+        return Math.abs(s.radius);
+    }
+  }
+
+  /** Mayor escala del emisor: sus formas de spawn en world space salen escaladas. */
+  private emitterScale(): number {
+    if (!this.config.worldSpace) return 1; // la caja local se transforma entera después
+    const m = this.computeEmitterMatrix(null);
+    return Math.max(Math.hypot(m[0]!, m[1]!, m[2]!), Math.hypot(m[4]!, m[5]!, m[6]!), Math.hypot(m[8]!, m[9]!, m[10]!));
   }
 
   public override renderInMenu(folder?: any): void {
@@ -758,9 +1029,13 @@ export class ParticleSystemComponent extends Component {
       this.emitterLightCountBuffer,
       this.dummyLightsBuffer,
       this.dummyLightCountBuffer,
+      this.boundsBuffer,
+      ...this.boundsReadbacks.map((r) => r.buffer),
     ]) {
       buffer?.destroy();
     }
+    this.boundsBuffer = null;
+    this.boundsReadbacks = [];
     this.particleBuffer = null;
     this.indirectDrawBuffer = null;
     this.freeListBuffer = null;
