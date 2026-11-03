@@ -1,0 +1,7 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/lens_flare_occlusion.fs",
+    "writesOn": "mask",
+    "z": "disable_all",
+    "uniforms": ["CameraUniforms", "GBufferUniforms", "GodRaysUniforms"]
+}

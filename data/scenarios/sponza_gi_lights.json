@@ -1,0 +1,1929 @@
+{
+ "description": "Fase 33: Sponza GI con 64 luces puntuales sin sombra que parpadean (4 filas de 16 en las naves y la galer\u00eda). Comprueba el light grid y la radiance cache: todas las luces deben verse en la GI sin ruido.",
+ "scenes": [
+  "sponza_gi.json"
+ ],
+ "environment": "environment_sponza_gi.json",
+ "entities": [
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight0",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight1",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight2",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight3",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight4",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight5",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight6",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight7",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      -0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight8",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight9",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight10",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight11",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight12",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight13",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight14",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight15",
+    "transform": {
+     "position": [
+      -4.5,
+      0.6,
+      13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight16",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight17",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight18",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight19",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight20",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight21",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight22",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight23",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      -0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight24",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight25",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight26",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight27",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight28",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight29",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight30",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight31",
+    "transform": {
+     "position": [
+      -4.5,
+      4.9,
+      13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight32",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight33",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight34",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight35",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight36",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight37",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight38",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight39",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      -0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight40",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight41",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight42",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight43",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight44",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight45",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight46",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight47",
+    "transform": {
+     "position": [
+      4.5,
+      0.6,
+      13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight48",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight49",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight50",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight51",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight52",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight53",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight54",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight55",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      -0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight56",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      0.87
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight57",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      2.6
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight58",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      4.33
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight59",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      6.07
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight60",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      7.8
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.35,
+      0.7,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight61",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      9.53
+     ]
+    },
+    "point_light": {
+     "color": [
+      1,
+      0.55,
+      0.25,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight62",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      11.27
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.35,
+      0.6,
+      1,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  },
+  {
+   "prefab": "lighting/point_light.prefab",
+   "components": {
+    "name": "GILight63",
+    "transform": {
+     "position": [
+      4.5,
+      4.9,
+      13.0
+     ]
+    },
+    "point_light": {
+     "color": [
+      0.4,
+      1,
+      0.45,
+      1
+     ],
+     "intensity": 3,
+     "radius": 4.5,
+     "startFallof": 0.5,
+     "hasShadows": false
+    },
+    "light_flicker": {
+     "amount": 0.35,
+     "speed": 6,
+     "jitter": 0.0
+    }
+   }
+  }
+ ]
+}

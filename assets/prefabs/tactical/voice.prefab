@@ -1,0 +1,40 @@
+{
+  "prefab": "tactical/hero.prefab",
+  "components": {
+    "name": "Voz",
+    "unit": {
+      "attributes": {
+        "FUE": 2,
+        "RES": 3,
+        "POT": 6,
+        "TEM": 6,
+        "REF": 3,
+        "AGU": 4
+      },
+      "armor": 0,
+      "attacks": [
+        {
+          "id": "pistol",
+          "name": "Pistola ligera",
+          "kind": "ranged",
+          "range": 12,
+          "damage": 3,
+          "metallic": true,
+          "clip": "Spell_Simple_Shoot"
+        }
+      ],
+      "skills": [
+        "read_intent",
+        "provoke",
+        "rally",
+        "soothe",
+        "serene",
+        "copper_cloud",
+        "zinc_mind"
+      ],
+      "metalminds": {
+        "zinc": 1
+      }
+    }
+  }
+}

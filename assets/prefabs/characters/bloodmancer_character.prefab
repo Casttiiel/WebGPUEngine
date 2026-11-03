@@ -1,0 +1,141 @@
+{
+  "gltf": "player.gltf",
+  "components": {
+    "name": "Player",
+    "transform": {
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "scale": [
+        0.6,
+        1.8,
+        0.6
+      ]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "PLAYER",
+      "collisionMask": "PLAYER_INTERACTIONS"
+    },
+    "bloodmancer_controller": {
+      "moveSpeed": 9,
+      "maxSpeed": 12,
+      "airControl": 0.6,
+      "groundAcceleration": 60,
+      "groundDeceleration": 60,
+      "airDrag": 0.3,
+      "jumpHeight": 1.2,
+      "jumpTimeToPeak": 0.38,
+      "jumpTimeToDescent": 0.32,
+      "jumpCutFactor": 0.7,
+      "jumpCutVerticalVelocityLimit": 1,
+      "coyoteTime": 0.15,
+      "mantleDetectionDistance": 1.5,
+      "mantleMaxHeight": -0.025,
+      "mantlingMinVerticalVelocity": -9,
+      "minMantleVelocity": 6,
+      "impulsePadInputDisableTime": 0.3
+    },
+    "fps_camera_controller": {
+      "eyeOffset": [
+        0,
+        0.8,
+        0
+      ],
+      "mouseSensitivity": 0.1,
+      "invertY": true
+    },
+    "head_bob": {},
+    "head_tilt": {
+      "maxTiltAmplitude": 0.03,
+      "tiltSpeed": 0.3,
+      "mantlingTiltAmplitude": 0.15,
+      "mantlingTiltSpeed": 1,
+      "enabled": true
+    },
+    "landing_camera": {
+      "maxDipAmplitude": 0.2,
+      "maxImpactSpeed": 12,
+      "minImpactSpeed": 2,
+      "dipStiffness": 200,
+      "dipDamping": 18,
+      "maxPitchPunch": 3,
+      "pitchStiffness": 120,
+      "pitchDamping": 18,
+      "enabled": true
+    },
+    "blood": {
+      "maxBlood": 100,
+      "regenRate": 15,
+      "regenDelay": 10
+    },
+    "health": {
+      "maxHp": 100
+    }
+  },
+  "children": [
+    {
+      "prefab": "cameras/player_camera.prefab"
+    },
+    {
+      "components": {
+        "name": "DaggerManager",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "bullet_pool": {
+          "prefab": "gameplay/dagger.prefab",
+          "size": 15,
+          "projectileType": "dagger_projectile"
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "BloodBallManager",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "bullet_pool": {
+          "prefab": "gameplay/blood_ball.prefab",
+          "size": 2,
+          "projectileType": "blood_ball_projectile"
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "BloodExplosiveManager",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "bullet_pool": {
+          "prefab": "gameplay/blood_explosive.prefab",
+          "size": 2,
+          "projectileType": "blood_explosive_projectile"
+        }
+      }
+    }
+  ]
+}

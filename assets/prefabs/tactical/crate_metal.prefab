@@ -1,0 +1,47 @@
+{
+  "children": [],
+  "components": {
+    "name": "MetalCrate",
+    "transform": {
+      "position": [0, 0.375, 0],
+      "scale": [0.75, 0.75, 0.75]
+    },
+    "capsule_collider": {
+      "height": 0.75,
+      "radius": 0.37,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 40,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_crate_metal.mat"
+        }
+      ]
+    },
+    "unit": {
+      "faction": "neutral",
+      "displayName": "Caja de hierro",
+      "movement": 0,
+      "moveSpeed": 6,
+      "sightRange": 0,
+      "attacks": [],
+      "hideWhenDown": true
+    },
+    "health": {
+      "maxHp": 45
+    },
+    "tactical_prop": {
+      "size": "large",
+      "metallic": true
+    }
+  }
+}

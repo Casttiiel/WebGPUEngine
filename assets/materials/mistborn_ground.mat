@@ -1,0 +1,55 @@
+{
+  "technique": "gbuffer/gbuffer_pom.tech",
+  "features": [
+    "BOX",
+    "POM_SHADOW",
+    "LAYER",
+    "ANTI_TILE",
+    "DIRT",
+    "ASH"
+  ],
+  "category": "solids",
+  "textures": {
+    "txAlbedo": "mistborn/cobblestone_floor_08_diff_1k.jpg",
+    "txNormal": "mistborn/cobblestone_floor_08_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/cobblestone_floor_08_rough_1k.jpg",
+    "txEmissive": "black.png",
+    "txHeight": "mistborn/cobblestone_floor_08_disp_1k.jpg",
+    "txAlbedo2": "mistborn/dirt_diff_1k.jpg",
+    "txNormal2": "mistborn/dirt_nor_gl_1k.jpg",
+    "txRoughness2": "mistborn/dirt_rough_1k.jpg",
+    "txHeight2": "mistborn/dirt_disp_1k.jpg"
+  },
+  "uvXScale": 0.4,
+  "uvYScale": 0.4,
+  "pomScale": 0.05,
+  "pomShadow": 0.85,
+  "baseColorFactor": [
+    0.42,
+    0.4,
+    0.4,
+    1
+  ],
+  "roughnessFactor": 1,
+  "metallicFactor": 0,
+  "layerCoverage": 0.55,
+  "layerNoiseScale": 0.15,
+  "layerSharpness": 0.1,
+  "layerUvScale": 0.5,
+  "layerTint": [
+    0.85,
+    0.83,
+    0.8
+  ],
+  "layerHeightOffset": -0.05,
+  "antiTileScale": 0.4,
+  "cavityDirt": 0.25,
+  "ashAmount": 0.55,
+  "ashNoiseScale": 0.2,
+  "ashColor": [
+    0.17,
+    0.165,
+    0.16
+  ]
+}

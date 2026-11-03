@@ -1,0 +1,44 @@
+{
+  "components": {
+    "name": "GrappleHookTarget",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        3,
+        4,
+        4
+      ]
+    },
+    "sphere_collider": {
+      "bodyType": "static",
+      "radius": 10,
+      "mass": 0,
+      "friction": 0,
+      "restitution": 0,
+      "isSensor": true,
+      "collisionGroups": "GRAPPLE_TRIGGER",
+      "collisionMask": "TRIGGER_PLAYER",
+      "ignoreTransformScale": true
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "decal_cracks_mana.mat"
+        }
+      ]
+    },
+    "grapple_target": {
+      "hookType": "PUNCTUAL"
+    }
+  }
+}

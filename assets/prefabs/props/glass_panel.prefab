@@ -1,0 +1,30 @@
+{
+  "components": {
+    "name": "GlassCube",
+    "transform": {
+      "position": [
+        0,
+        1.5,
+        5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        2,
+        0.05
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "glass.mat"
+        }
+      ]
+    }
+  }
+}

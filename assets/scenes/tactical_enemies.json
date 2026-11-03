@@ -1,0 +1,29 @@
+[
+  {
+    "prefab": "tactical/enemy_brute.prefab",
+    "components": {
+      "name": "Brute",
+      "transform": {
+        "position": [5, 0, 6]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy_archer.prefab",
+    "components": {
+      "name": "Archer",
+      "transform": {
+        "position": [7.5, 0, 4]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy_skirmisher.prefab",
+    "components": {
+      "name": "Skirmisher",
+      "transform": {
+        "position": [12, 1.5, -11]
+      }
+    }
+  }
+]

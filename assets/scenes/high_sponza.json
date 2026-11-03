@@ -1,0 +1,61 @@
+[
+  {
+    "components": {
+      "name": "Sponza",
+      "transform": {
+        "rotation": [0, 90, 0],
+        "scale": [0.01, 0.01, 0.01]
+      }
+    },
+    "gltf": "high_sponza.gltf"
+  },
+  {
+    "components": {
+      "name": "Courtains",
+      "transform": {
+        "rotation": [0, 90, 0]
+      }
+    },
+    "gltf": "NewSponza_Curtains_glTF.gltf"
+  },
+  {
+    "components": {
+      "name": "Ivy",
+      "transform": {
+        "rotation": [0, 90, 0]
+      }
+    },
+    "gltf": "NewSponza_IvyGrowth_glTF.gltf"
+  },
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "characters/player_character.prefab"
+  },
+  {
+    "components": {
+      "name": "BulletManager",
+      "transform": { "position": [0, 0, 0] },
+      "bullet_pool": {
+        "prefab": "gameplay/bullet.prefab",
+        "size": 30
+      }
+    }
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "primitives/ground.prefab"
+  },
+  {
+    "prefab": "lighting/point_light.prefab"
+  },
+  {
+    "prefab": "lighting/spot_light.prefab"
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  }
+]

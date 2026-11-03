@@ -1,0 +1,10 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "utility/oit_compose.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "blend": "premultiplied",
+    "uniforms": [
+        "OITComposeTextures"
+    ]
+}

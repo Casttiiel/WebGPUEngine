@@ -1,0 +1,1090 @@
+[
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_0",
+      "transform": {
+        "position": [
+          -16.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_1",
+      "transform": {
+        "position": [
+          -16.5,
+          1.5,
+          -8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_2",
+      "transform": {
+        "position": [
+          -16.5,
+          1.5,
+          -0.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_3",
+      "transform": {
+        "position": [
+          -16.5,
+          1.5,
+          7.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_4",
+      "transform": {
+        "position": [
+          -16.5,
+          1.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_5",
+      "transform": {
+        "position": [
+          -16.5,
+          4.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_6",
+      "transform": {
+        "position": [
+          -8.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_7",
+      "transform": {
+        "position": [
+          -8.5,
+          1.5,
+          -8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_8",
+      "transform": {
+        "position": [
+          -8.5,
+          1.5,
+          -0.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_9",
+      "transform": {
+        "position": [
+          -8.5,
+          1.5,
+          7.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_10",
+      "transform": {
+        "position": [
+          -8.5,
+          1.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_11",
+      "transform": {
+        "position": [
+          -8.5,
+          4.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_12",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_13",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          -8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_14",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          -0.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_15",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          7.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_16",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_17",
+      "transform": {
+        "position": [
+          -0.5,
+          4.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_18",
+      "transform": {
+        "position": [
+          7.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_19",
+      "transform": {
+        "position": [
+          8.9,
+          1.5,
+          -8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "indoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          -1.4,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_20",
+      "transform": {
+        "position": [
+          7.5,
+          1.5,
+          -0.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_21",
+      "transform": {
+        "position": [
+          7.5,
+          1.5,
+          7.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_22",
+      "transform": {
+        "position": [
+          7.5,
+          1.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_23",
+      "transform": {
+        "position": [
+          7.5,
+          4.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_24",
+      "transform": {
+        "position": [
+          15.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_25",
+      "transform": {
+        "position": [
+          15.5,
+          4.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_26",
+      "transform": {
+        "position": [
+          16.9,
+          1.5,
+          -8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          -1.4,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_27",
+      "transform": {
+        "position": [
+          15.5,
+          4.5,
+          -8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_28",
+      "transform": {
+        "position": [
+          15.5,
+          1.5,
+          -0.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_29",
+      "transform": {
+        "position": [
+          15.5,
+          4.5,
+          -0.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_30",
+      "transform": {
+        "position": [
+          15.5,
+          1.5,
+          7.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_31",
+      "transform": {
+        "position": [
+          15.5,
+          4.5,
+          7.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_32",
+      "transform": {
+        "position": [
+          15.5,
+          1.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "tactical_Probe_33",
+      "transform": {
+        "position": [
+          15.5,
+          4.5,
+          15.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 128,
+        "type": "outdoor",
+        "extents": [
+          4,
+          2.5,
+          4
+        ],
+        "boxOffset": [
+          0,
+          0,
+          0
+        ],
+        "fade": [
+          2,
+          0.5,
+          2
+        ]
+      }
+    }
+  }
+]

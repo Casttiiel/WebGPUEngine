@@ -1,0 +1,9 @@
+{
+  "technique": "particles/particle_blood.tech",
+  "textures": {
+    "txAlbedo": "white.png"
+  },
+  "casts_shadows": false,
+  "category": "particles",
+  "shadows": false
+}

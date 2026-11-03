@@ -1,0 +1,50 @@
+{
+  "name": "main_menu_buttons",
+  "alias": "main_menu_buttons_root",
+  "children": [
+    {
+      "name": "buttons",
+      "position": "900 800",
+      "children": [
+        {
+          "name": "bt_start",
+          "alias": "bt_start",
+          "position": "0 0",
+          "type": "button",
+          "texture": "ui/buttons/start.jpg",
+          "size": "374 198",
+          "font_size": "20 20",
+          "states": [
+            {
+              "name": "enabled",
+              "texture": "ui/buttons/start.jpg"
+            },
+            {
+              "name": "selected",
+              "texture": "ui/buttons/start.jpg"
+            }
+          ]
+        },
+        {
+          "name": "bt_exit",
+          "alias": "bt_exit",
+          "position": "400 0",
+          "type": "button",
+          "texture": "ui/buttons/exit.jpg",
+          "size": "374 198",
+          "font_size": "20 20",
+          "states": [
+            {
+              "name": "enabled",
+              "texture": "ui/buttons/exit.jpg"
+            },
+            {
+              "name": "selected",
+              "texture": "ui/buttons/exit.jpg"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "children": [
+    {
+      "components": {
+        "name": "GreatswordPommel",
+        "transform": { "position": [0, 0, -0.07], "rotation": [0, 0, 0], "scale": [0.05, 0.05, 0.05] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "metal.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "GreatswordHandle",
+        "transform": { "position": [0, 0, 0.115], "rotation": [0, 0, 0], "scale": [0.035, 0.035, 0.35] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "carbon.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "GreatswordGuard",
+        "transform": { "position": [0, 0, 0.3], "rotation": [0, 0, 0], "scale": [0.05, 0.32, 0.045] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "metal.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "GreatswordBlade",
+        "transform": { "position": [0, 0, 0.97], "rotation": [0, 0, 0], "scale": [0.016, 0.085, 1.3] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "metal.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "GreatswordTrail",
+        "transform": { "position": [0, 0, 1.07], "rotation": [0, 0, 0], "scale": [1, 1, 1.1] },
+        "trail_renderer": {
+          "type": "spline",
+          "maxNodes": 40,
+          "minNodeDistance": 0.02,
+          "lifetime": 0.18,
+          "material": "slash_alpha_crescent.mat",
+          "startColor": [1.0, 0.42, 0.08, 1.0],
+          "endColor": [0.9, 0.12, 0.02, 0.7],
+          "splineSubdivisions": 4,
+          "emitting": true,
+          "bladeMode": true
+        }
+      }
+    }
+  ],
+  "components": {
+    "name": "Greatsword",
+    "transform": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+    "bone_attachment": {
+      "boneName": "hand_l",
+      "positionOffset": [0.045, 0.095, 0],
+      "rotationOffset": [0, 0, 0]
+    }
+  }
+}

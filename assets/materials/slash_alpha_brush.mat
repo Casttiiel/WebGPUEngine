@@ -1,0 +1,9 @@
+{
+    "technique": "trail/slash_alpha.tech",
+    "textures": {
+        "txAlbedo": "vfx/slash_alpha_brush.png"
+    },
+    "casts_shadows": false,
+    "category": "transparent",
+    "shadows": false
+}

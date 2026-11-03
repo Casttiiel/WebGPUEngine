@@ -1,0 +1,56 @@
+{
+  "components": {
+    "name": "Sconce",
+    "transform": { "position": [0, 0, 0] }
+  },
+  "children": [
+    {
+      "components": {
+        "name": "SconceEmbers",
+        "transform": { "position": [0, 0, 0], "scale": [0.18, 0.18, 0.18] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "mistborn_ember.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "SconceFlames",
+        "transform": { "position": [0, 0.08, 0] },
+        "particle_system": {
+          "worldSpace": true,
+          "maxParticles": 60,
+          "emissionRate": 28,
+          "spawnRadius": [0.06, 0.02, 0.06],
+          "baseVelocity": [0, 0.9, 0],
+          "velocitySpread": 0.2,
+          "gravity": [0, 0.5, 0],
+          "startSize": 0.14,
+          "endSize": 0.02,
+          "particleLife": 0.55,
+          "particleLifeVarianceMin": -0.2,
+          "particleLifeVarianceMax": 0.15,
+          "startColor": [1, 0.7, 0.25, 0.9],
+          "endColor": [0.8, 0.15, 0.03, 0]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "SconceLight",
+        "transform": { "position": [0, 0.3, 0] },
+        "point_light": {
+          "color": [1, 0.58, 0.25, 1],
+          "intensity": 4,
+          "radius": 6,
+          "startFallof": 0.3,
+          "hasShadows": false
+        },
+        "light_flicker": {
+          "amount": 0.3,
+          "speed": 11,
+          "jitter": 0.03,
+          "dimColor": [1, 0.35, 0.1]
+        }
+      }
+    }
+  ]
+}

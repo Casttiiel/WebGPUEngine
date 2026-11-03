@@ -1,0 +1,59 @@
+{
+  "children": [],
+  "components": {
+    "name": "RelicFortune",
+    "transform": {
+      "position": [
+        0,
+        0.3,
+        0
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    },
+    "capsule_collider": {
+      "height": 0.6,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 40,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_relic_fortune.mat"
+        }
+      ]
+    },
+    "unit": {
+      "faction": "neutral",
+      "displayName": "Relicario de Fortuna",
+      "movement": 0,
+      "moveSpeed": 6,
+      "sightRange": 0,
+      "attacks": [],
+      "hideWhenDown": true
+    },
+    "health": {
+      "maxHp": 20
+    },
+    "tactical_prop": {
+      "size": "large",
+      "metallic": true,
+      "relic": {
+        "zone": "fortune",
+        "radius": 3
+      }
+    }
+  }
+}

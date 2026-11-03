@@ -1,0 +1,32 @@
+{
+  "children": [],
+  "components": {
+    "name": "AshFall",
+    "transform": {
+      "position": [0, 4.5, 0],
+      "scale": [1, 1, 1]
+    },
+    "particle_system": {
+      "worldSpace": true,
+      "material": "particle_ash.mat",
+      "maxParticles": 10000,
+      "emissionRate": 840,
+      "spawnRadius": [19, 4.5, 19],
+      "baseVelocity": [0.3, -0.55, 0.15],
+      "velocitySpread": 0.25,
+      "gravity": [0.05, -0.05, 0],
+      "startSize": 0.18,
+      "endSize": 0.15,
+      "particleLife": 10,
+      "particleLifeVarianceMin": -3,
+      "particleLifeVarianceMax": 2,
+      "startColor": [0.17, 0.16, 0.155, 0.95],
+      "endColor": [0.22, 0.21, 0.2, 0.7],
+      "spinSpeed": 1.5,
+      "tumbleSpeed": 2.5,
+      "atlas": [2, 2],
+      "flutter": 0.25,
+      "nearFade": 5
+    }
+  }
+}

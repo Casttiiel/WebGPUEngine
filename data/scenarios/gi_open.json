@@ -1,0 +1,7 @@
+{
+  "description": "GI en mundo abierto: suelo de 240 m (cascadas de cámara) con casas y un soportal con gi_volume (volúmenes locales finos). F9 off/realtime/compare, teclas 1–6 vistas (6 = lejos, acércate a la casa A).",
+  "scenes": [
+    "gi_open.json"
+  ],
+  "environment": "environment_sponza_gi.json"
+}

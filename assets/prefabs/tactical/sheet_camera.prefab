@@ -1,0 +1,10 @@
+{
+  "components": {
+    "name": "SheetCamera",
+    "camera": {
+      "fov": 35,
+      "near": 0.1,
+      "far": 300
+    }
+  }
+}

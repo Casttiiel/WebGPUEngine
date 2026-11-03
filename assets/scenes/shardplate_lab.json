@@ -1,0 +1,120 @@
+[
+  {
+    "components": {
+      "name": "PlayerCamera",
+      "camera": {
+        "controllable": false,
+        "fov": 40,
+        "position": [
+          4,
+          1.4,
+          0.8
+        ],
+        "target": [
+          0,
+          1,
+          0.8
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "prefab": "primitives/ground.prefab"
+  },
+  {
+    "components": {
+      "name": "Shardbearer",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "skeletal_mesh": {
+        "gltf": "shardplate.gltf"
+      },
+      "animator": {
+        "extraAnimations": [
+          "universal_animations.gltf",
+          "spear_combat.gltf"
+        ],
+        "states": [
+          {
+            "name": "Idle",
+            "clip": "Idle_Loop",
+            "loop": true
+          }
+        ],
+        "default": "Idle"
+      },
+      "cape": {
+        "color": [
+          0.06,
+          0.1,
+          0.28
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "TargetDummy",
+      "transform": {
+        "position": [
+          0,
+          0,
+          3.1
+        ],
+        "rotation": [
+          0,
+          180,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "skeletal_mesh": {
+        "gltf": "character.gltf",
+        "baseColorFactor": [
+          0.8,
+          0.25,
+          0.2,
+          1
+        ]
+      },
+      "animator": {
+        "extraAnimations": [
+          "universal_animations.gltf"
+        ],
+        "states": [
+          {
+            "name": "Idle",
+            "clip": "Idle_Loop",
+            "loop": true
+          }
+        ],
+        "default": "Idle"
+      }
+    }
+  }
+]

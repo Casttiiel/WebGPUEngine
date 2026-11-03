@@ -1,0 +1,13 @@
+{
+  "technique": "gbuffer/decal.tech",
+  "textures": {
+    "txAlbedo": "tactical/zone_fortune.png",
+    "txNormal": "no-normal.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "white.png",
+    "txEmissive": "black.png"
+  },
+  "casts_shadows": false,
+  "category": "decals",
+  "shadows": false
+}

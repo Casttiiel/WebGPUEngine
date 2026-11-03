@@ -1,0 +1,13 @@
+{
+    "technique": "gbuffer/decal.tech",
+    "textures":{
+        "txAlbedo": "blood.png",
+        "txNormal": "no-normal.jpg",
+        "txMetallic": "white.png",
+        "txRoughness": "black.png",
+        "txEmissive": "black.png"
+    },
+    "casts_shadows": false,
+    "category": "decals",
+    "shadows": false
+}

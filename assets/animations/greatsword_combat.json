@@ -1,0 +1,32 @@
+{
+  "clips": [
+    {
+      "name": "Greatsword_Whirlwind",
+      "tempo": "base",
+      "duration": 1.38,
+      "hit": 0.46,
+      "hit2": 0.74,
+      "cancel": 0.92,
+      "range": 2
+    },
+    {
+      "name": "Greatsword_Launcher",
+      "tempo": "base",
+      "duration": 1.2,
+      "hit": 0.5,
+      "cancel": 0.86,
+      "entry": 0.2,
+      "range": 1.7
+    },
+    {
+      "name": "Greatsword_AerialSpin",
+      "tempo": "base",
+      "duration": 1.56,
+      "hit": 0.86,
+      "spinHit": 0.6,
+      "cancel": 1.56,
+      "entry": 0.28,
+      "range": 1.7
+    }
+  ]
+}

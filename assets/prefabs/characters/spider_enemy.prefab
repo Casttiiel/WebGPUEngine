@@ -1,0 +1,189 @@
+{
+  "components": {
+    "name": "Spider",
+    "transform": {
+      "position": [
+        5,
+        0.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.25,
+        0.7
+      ]
+    },
+    "capsule_collider": {
+      "height": 1,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 50,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_sphere.obj",
+          "material": "metal.mat"
+        }
+      ]
+    },
+    "spider_controller": {
+      "numLegs": 8,
+      "legUpperLength": 0.55,
+      "legLowerLength": 0.5,
+      "legThickness": 0.06,
+      "stepThreshold": 0.55,
+      "stepDuration": 0.16,
+      "stepHeight": 0.2,
+      "stepAnticipation": 1.1,
+      "footSpread": 1,
+      "frontLegReach": 1,
+      "backLegReach": 1,
+      "bodyBobAmount": 0.04,
+      "bodyBobSpeed": 8,
+      "bodyTiltAmount": 0.08,
+      "moveSpeed": 1.8,
+      "chaseRange": 14,
+      "legMesh": "unit_cube.obj",
+      "legMaterial": "metal.mat",
+      "hipLocal": [
+        [
+          0.42,
+          -0.04,
+          0.48
+        ],
+        [
+          -0.42,
+          -0.04,
+          0.48
+        ],
+        [
+          0.42,
+          -0.04,
+          0.14
+        ],
+        [
+          -0.42,
+          -0.04,
+          0.14
+        ],
+        [
+          0.42,
+          -0.04,
+          -0.14
+        ],
+        [
+          -0.42,
+          -0.04,
+          -0.14
+        ],
+        [
+          0.42,
+          -0.04,
+          -0.48
+        ],
+        [
+          -0.42,
+          -0.04,
+          -0.48
+        ]
+      ],
+      "footRestLocal": [
+        [
+          1.05,
+          -0.55,
+          0.85
+        ],
+        [
+          -1.05,
+          -0.55,
+          0.85
+        ],
+        [
+          1.25,
+          -0.55,
+          0.22
+        ],
+        [
+          -1.25,
+          -0.55,
+          0.22
+        ],
+        [
+          1.25,
+          -0.55,
+          -0.22
+        ],
+        [
+          -1.25,
+          -0.55,
+          -0.22
+        ],
+        [
+          1.05,
+          -0.55,
+          -0.85
+        ],
+        [
+          -1.05,
+          -0.55,
+          -0.85
+        ]
+      ],
+      "kneeHint": [
+        [
+          1,
+          0.5,
+          0
+        ],
+        [
+          -1,
+          0.5,
+          0
+        ],
+        [
+          1,
+          0.5,
+          0
+        ],
+        [
+          -1,
+          0.5,
+          0
+        ],
+        [
+          1,
+          0.5,
+          0
+        ],
+        [
+          -1,
+          0.5,
+          0
+        ],
+        [
+          1,
+          0.5,
+          0
+        ],
+        [
+          -1,
+          0.5,
+          0
+        ]
+      ]
+    }
+  },
+  "children": []
+}

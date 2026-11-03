@@ -1,0 +1,245 @@
+{
+  "description": "Fase 11, Burbuja de bendaleo (Acción, 3 de metal; radio 1,75 + POT/4 = 2,5 m con POT 3; 2 rondas): quien acaba su turno dentro, aliado o enemigo, juega otro turno seguido (uno extra por ronda); ningún proyectil cruza el borde (sin línea de visión entre dentro y fuera); caduca a las 2 rondas y se rompe si quien la creó sale. La barra de iniciativa enseña dos veces seguidas a quien tiene turno extra; nadie sale andando de la burbuja; con la burbuja activa, la habilidad pasa a ser «Cerrar burbuja» (sin acción ni metal).",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 14,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__S = 'Deslizador'; window.__fresh = () => { __enc.resources = { action: 9, bonusAction: 9, movement: 99 }; __unit(__S).clearCooldowns(); __unit(__S).setMetal(9); }; window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__turns = (n) => __log.filter(l => l[0] === 'turn' && l[1] === n).length; window.__marks = {}; window.__mark = (n) => { __marks[n] = __turns(n); }; window.__turnOf = (n) => { const s = __engine.getCombatState(); if (__turns(n) > (__marks[n] ?? -1) && s.activeUnit === n && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__bubbles = () => __engine.getCombatState().bubbles; window.__ui = (a) => Engine.getModules().getModule('ui').getWidgetByAlias(a); window.__init = () => Array.from({ length: 16 }, (_, i) => __ui('init_' + (i + 1))).filter(w => w && w.isVisible()).map(w => __ui(w.getName() + '_name').getText())"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; } __enc.joinRadius = 60; __tp('Deslizador', -10, -14); __tp('Enemy1', -8.6, -14); __tp('Enemy2', -5, -14); __tp('Enemy3', -5, -16); __tp('Voz', -10, -10); __tp('Lanzamonedas', -13, -1); __tp('Artificiera', -13, -3)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "eval": "__mark(__S)"
+    },
+    {
+      "command": "start_combat"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf(__S)",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "log": "La burbuja: 2,5 m alrededor del Deslizador, 2 rondas, 3 de metal"
+    },
+    {
+      "eval": "__fresh(); window.__round0 = __engine.getCombatState().round"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'bendalloy_bubble' }).then(r => [r.ok, r.metalCost, r.affected.sort()])",
+        "value": [true, 3, ["Deslizador", "Enemy1"]]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "(() => { const b = __bubbles(); return [b.length, b[0].radius, b[0].untilRound - __round0, __unit(__S).getMetal()]; })()",
+        "value": [1, 2.5, 2, 6]
+      }
+    },
+    {
+      "screenshot": "01-bubble"
+    },
+    {
+      "log": "Iniciativa: el Deslizador y el Enemy1 (dentro, con su turno extra pendiente) salen dos veces seguidas"
+    },
+    {
+      "assert": {
+        "expr": "(() => { const n = __init(); const twice = (x) => n.some((v, k) => v === x && n[k + 1] === x); return [twice('Deslizador'), twice('Enemy1'), n.filter(v => v === 'Enemy2').length]; })()",
+        "value": [true, true, 1]
+      }
+    },
+    {
+      "log": "Nadie sale andando de la burbuja: el camino se para en el borde"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_move', { unit: __S, to: [-10, 0, -9] }).then(r => [r.canMove, r.affordable, r.walkLength < 2.3])",
+        "value": [true, false, true]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: __S, skill: 'slide', to: [-10, 0, -10.5] }).then(r => r.reason)",
+        "value": "bubble"
+      }
+    },
+    {
+      "log": "Con la burbuja activa, el hueco dice «Cerrar burbuja»"
+    },
+    {
+      "assert": {
+        "expr": "__ui('hotbar_7_name').getText()",
+        "value": "Cerrar burbuja"
+      }
+    },
+    {
+      "log": "El borde corta la línea de visión entre dentro y fuera (no entre dos de fuera)"
+    },
+    {
+      "assert": {
+        "expr": "Promise.all([__engine.gameCommand('plan_attack', { unit: 'Voz', target: 'Enemy1', attack: 'pistol' }), __engine.gameCommand('plan_attack', { unit: 'Voz', target: 'Enemy2', attack: 'pistol' })]).then(([a, b]) => [a.lineOfSight, b.lineOfSight])",
+        "value": [false, true]
+      }
+    },
+    {
+      "log": "Turnos: el Deslizador y el Enemy1 (dentro) juegan dos seguidos; el Enemy2 (fuera), uno"
+    },
+    {
+      "eval": "window.__from = __log.length; __engine.gameCommand('end_turn', {})"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "[__engine.getCombatState().activeUnit, __log.slice(__from).some(l => l[0] === 'extra-turn' && l[1] === __S)]",
+        "value": ["Deslizador", true],
+        "message": "acaba su turno dentro: otro turno seguido"
+      }
+    },
+    {
+      "eval": "__mark(__S)"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf(__S)",
+        "value": true
+      },
+      "timeout_frames": 4000
+    },
+    {
+      "assert": {
+        "expr": "(() => { const t = __log.slice(__from).filter(l => l[0] === 'turn').map(l => l[1]); const i = t.indexOf('Enemy1'); return [t.filter(n => n === 'Enemy1').length, t[i + 1], t.filter(n => n === 'Enemy2').length]; })()",
+        "value": [2, "Enemy1", 1],
+        "message": "una ronda: Enemy1 dos veces seguidas, Enemy2 una"
+      }
+    },
+    {
+      "log": "Caduca a las 2 rondas"
+    },
+    {
+      "wait_until": {
+        "expr": "(() => { if (__bubbles().length === 0) return true; const s = __engine.getCombatState(); if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 6000
+    },
+    {
+      "assert": {
+        "expr": "[__engine.getCombatState().round - __round0, __log.some(l => l[0] === 'bubble-end')]",
+        "value": [2, true]
+      }
+    },
+    {
+      "log": "Cerrar burbuja: sin acción ni metal"
+    },
+    {
+      "eval": "__mark(__S)"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf(__S)",
+        "value": true
+      },
+      "timeout_frames": 4000
+    },
+    {
+      "eval": "__fresh()"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'bendalloy_bubble' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "eval": "window.__before = [__unit(__S).getMetal(), __engine.getCombatState().resources.action]"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'bendalloy_bubble' }).then(r => [r.ok, __bubbles().length, __unit(__S).getMetal() === __before[0], __engine.getCombatState().resources.action === __before[1]])",
+        "value": [true, 0, true, true]
+      }
+    },
+    {
+      "log": "Se rompe si quien la creó sale de ella"
+    },
+    {
+      "eval": "__fresh()"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: __S, skill: 'bendalloy_bubble' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__bubbles().length",
+        "value": 1
+      }
+    },
+    {
+      "eval": "__tp(__S, -10, -10.5)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__bubbles().length",
+        "value": 0
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().aiTimeouts",
+        "value": 0
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

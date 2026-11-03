@@ -1,0 +1,48 @@
+{
+  "children": [],
+  "components": {
+    "name": "Cart",
+    "transform": {
+      "position": [0, 0.95, 0],
+      "scale": [1.2, 1.9, 1.2]
+    },
+    "capsule_collider": {
+      "height": 1.9,
+      "radius": 0.62,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 120,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_crate_metal.mat"
+        }
+      ]
+    },
+    "unit": {
+      "faction": "neutral",
+      "displayName": "Carro",
+      "movement": 0,
+      "moveSpeed": 6,
+      "sightRange": 0,
+      "attacks": [],
+      "hideWhenDown": true
+    },
+    "health": {
+      "maxHp": 80
+    },
+    "tactical_prop": {
+      "size": "large",
+      "metallic": true,
+      "breakOnImpact": false
+    }
+  }
+}

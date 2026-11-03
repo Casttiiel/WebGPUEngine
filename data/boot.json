@@ -1,0 +1,4 @@
+{
+  "scenes_to_load": ["street.json", "street_props.json", "street_enemies.json"],
+  "environment": "environment_mistborn.json"
+}

@@ -1,0 +1,52 @@
+{
+  "children": [],
+  "components": {
+    "name": "HitSparks",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "particle_system": {
+      "worldSpace": true,
+      "emitting": false,
+      "maxParticles": 64,
+      "spawnRadius": 0.06,
+      "baseVelocity": [
+        0,
+        3,
+        0
+      ],
+      "velocitySpread": 0.95,
+      "gravity": [
+        0,
+        -18,
+        0
+      ],
+      "particleLife": 0.22,
+      "particleLifeVarianceMin": -0.08,
+      "particleLifeVarianceMax": 0.08,
+      "startSize": 0.45,
+      "endSize": 0.08,
+      "startColor": [
+        1,
+        0.95,
+        0.35,
+        1
+      ],
+      "endColor": [
+        1,
+        0.25,
+        0,
+        0
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "components": {
+    "name": "MainCamera",
+    "camera": {},
+    "tsr": {
+      "renderScale": 0.75
+    },
+    "tone_mapping": {},
+    "contact_shadows": {},
+    "ambient_occlusion": {
+      "mode": "gtao"
+    },
+    "bloom": {},
+    "auto_exposure": {},
+    "vignette": {
+      "intensity": 0.3,
+      "smoothness": 0.2
+    }
+  }
+}

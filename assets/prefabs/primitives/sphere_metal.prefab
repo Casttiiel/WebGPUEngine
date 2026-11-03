@@ -1,0 +1,28 @@
+{
+    "children": [],
+    "components": {
+      "name": "Metal Cube",
+      "transform": {
+        "position": 
+          [0, 2, -3],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "sphere.obj",
+            "material": "metal.mat"
+          }
+        ]
+      }
+    }
+  }

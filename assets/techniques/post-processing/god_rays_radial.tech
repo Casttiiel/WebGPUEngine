@@ -1,0 +1,7 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/god_rays_radial.fs",
+    "writesOn": "mask",
+    "z": "disable_all",
+    "uniforms": ["CameraUniforms", "SingleTexture", "GodRaysUniforms"]
+}

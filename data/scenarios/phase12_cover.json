@@ -1,0 +1,189 @@
+{
+  "description": "Fase 12, cobertura (GDD §5): tapa o no tapa. Pegado a una columna, nadie del otro lado le puede apuntar (tampoco casi en diagonal); el que flanquea sí; una bola de fuego le alcanza igual; lo bajo (una caja suelta) no tapa; un prop alto (el carro) tapa a quien está pegado y corta la línea de visión que pasa a través; al atraer el carro, ya le pueden disparar; lo empujado choca con la cobertura, no con quien se esconde detrás; el destino se ajusta a la cobertura (snap).",
+  "scenes": ["tactical.json", "tactical_props.json", "tactical_dummies.json"],
+  "seed": 15,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__los = (from, to, attack) => __engine.gameCommand('plan_attack', { unit: from, target: to, attack }).then(r => r.lineOfSight); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); __unit('Artificiera').skills = ['fireball', 'thunderwave', 'heal']"
+    },
+    {
+      "log": "Snap: el destino se pega a la columna y queda a cubierto hacia ella (+z)"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('cover', { unit: 'Lanzamonedas', to: [-2, 0, -13.8] }).then(r => [r.snapped[2] > -13.1, r.faces.some(f => f[0] === 0 && f[1] === 1)])",
+        "value": [true, true]
+      }
+    },
+    {
+      "eval": "__tp('Cart1', -7, -11); for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) u.sightRange = 0; __tp('Enemy1', -2, -13.3); __tp('Lanzamonedas', -2, -6); __tp('Artificiera', 1, -8); __tp('Enemy2', -7, -12.1); __tp('Enemy3', -7, -13.6); __tp('Voz', -6, -5); __tp('Deslizador', -13, -1)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "log": "Pegado a la columna: a cubierto de quien está al otro lado, también casi en diagonal"
+    },
+    {
+      "assert": {
+        "expr": "__los('Lanzamonedas', 'Enemy1')",
+        "value": false,
+        "message": "de frente"
+      }
+    },
+    {
+      "eval": "__tp('Lanzamonedas', 1, -8)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__los('Lanzamonedas', 'Enemy1')",
+        "value": false,
+        "message": "en diagonal (≈30°)"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Lanzamonedas', target: 'Enemy1' }).then(r => [r.canAttack, r.approach !== null])",
+        "value": [true, true],
+        "message": "para atacarle, se mueve a flanquear"
+      }
+    },
+    {
+      "eval": "__tp('Lanzamonedas', 3, -14)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__los('Lanzamonedas', 'Enemy1')",
+        "value": true,
+        "message": "flanqueando, sí"
+      }
+    },
+    {
+      "log": "Una bola de fuego a su lado le alcanza igual (las áreas no se tapan)"
+    },
+    {
+      "command": "select",
+      "args": {
+        "unit": "Artificiera"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Artificiera', skill: 'fireball', to: [-1.2, 0, -13.6] }).then(r => [r.canCast, r.affected.includes('Enemy1')])",
+        "value": [true, true]
+      }
+    },
+    {
+      "log": "Lo bajo no tapa: pegado a una caja suelta (0,75 m) le ven"
+    },
+    {
+      "eval": "__tp('Crate', -13, -15); __tp('Deslizador', -13, -15.9); __tp('Artificiera', -13, -9.5)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Artificiera', skill: 'heal', target: 'Deslizador' }).then(r => r.lineOfSight)",
+        "value": true
+      }
+    },
+    {
+      "log": "Un prop alto (el carro): tapa al que está pegado y corta la línea al que está detrás"
+    },
+    {
+      "assert": {
+        "expr": "__los('Voz', 'Enemy2', 'pistol')",
+        "value": false,
+        "message": "pegado al carro"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__los('Voz', 'Enemy3', 'pistol')",
+        "value": false,
+        "message": "detrás del carro (a 1,5 m)"
+      }
+    },
+    {
+      "screenshot": "01-cart-cover"
+    },
+    {
+      "log": "Atraer el carro (Tirón): ya le pueden disparar"
+    },
+    {
+      "eval": "__tp('Lanzamonedas', -11, -11)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "command": "select",
+      "args": {
+        "unit": "Lanzamonedas"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Lanzamonedas', skill: 'iron_pull', target: 'Cart1' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__los('Voz', 'Enemy2', 'pistol')",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "expr": "__los('Voz', 'Enemy3', 'pistol')",
+        "value": true
+      }
+    },
+    {
+      "log": "Lo empujado en línea recta choca con la cobertura, no con quien se esconde detrás"
+    },
+    {
+      "eval": "__tp('Cart1', -7, -11); __tp('PushCrate2', -7, -7.5); __tp('Lanzamonedas', -7, -3.5)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Lanzamonedas', skill: 'steel_push', target: 'PushCrate2' }).then(r => r.motion.hit)",
+        "value": "Cart1"
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

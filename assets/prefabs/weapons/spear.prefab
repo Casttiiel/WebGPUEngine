@@ -1,0 +1,141 @@
+{
+  "children": [
+    {
+      "components": {
+        "name": "SpearShaft",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0.71
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.032,
+            0.032,
+            2.02
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "carbon.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "SpearHead",
+        "transform": {
+          "position": [
+            0,
+            0,
+            1.76
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.012,
+            0.18
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "SpearTrail",
+        "transform": {
+          "position": [
+            0,
+            0,
+            1.42
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            0.85
+          ]
+        },
+        "trail_renderer": {
+          "type": "spline",
+          "maxNodes": 40,
+          "minNodeDistance": 0.02,
+          "lifetime": 0.14,
+          "material": "slash_alpha_brush.mat",
+          "startColor": [
+            0.06,
+            0.32,
+            1.0,
+            1.0
+          ],
+          "endColor": [
+            0.05,
+            0.15,
+            0.9,
+            0.7
+          ],
+          "splineSubdivisions": 4,
+          "emitting": true,
+          "bladeMode": true
+        }
+      }
+    }
+  ],
+  "components": {
+    "name": "Spear",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "bone_attachment": {
+      "boneName": "hand_r",
+      "positionOffset": [
+        -0.045,
+        0.095,
+        0
+      ],
+      "rotationOffset": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

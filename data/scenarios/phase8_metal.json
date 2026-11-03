@@ -1,0 +1,216 @@
+{
+  "description": "Fase 8.1-8.7 (sin 8.5, Avivar descartado): Reserva de metal (máximo 6 + TEM, llena al empezar el combate), coste en metal de las habilidades alománticas (no deja lanzar una de 3 con 2; la hotbar la desactiva), ciclo quemar → Seco → lleno comprobado por eventos, recarga voluntaria y duraluminio (×2 con la Reserva llena, ×1,5 con la mitad), y el HUD de metal. Artificiera: TEM 5 → Reserva 11 (se fija a 10 para probar la mitad exacta); Bola de fuego (provisional) 4 + POT 4 = 8 de daño, 3 de metal.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 8,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__ui = Engine.getModules().getModule('ui'); window.__w = (a) => __ui.getWidgetByAlias(a); window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => window.__log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null, d.status ?? null, d.cause ?? null])); window.__k = () => __log.filter(l => l[1] === 'Artificiera' && ['metal', 'status', 'status-end', 'refill', 'duralumin', 'declare-drained'].includes(l[0])).map(l => l[0] + (l[3] ? ':' + l[3] : '') + (l[2] !== null ? '=' + Math.round(l[2] * 10) / 10 : '')); window.__turns = () => __log.filter(l => l[0] === 'turn' && l[1] === 'Artificiera').length; window.__mark = () => { window.__m = __turns(); }; window.__next = () => { const s = __engine.getCombatState(); if (__turns() > __m && s.activeUnit === 'Artificiera' && !s.busy && !__unit('Artificiera').isBusy()) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__at = () => { const p = __unit('Enemy1').getFeetPosition(); return [p[0], p[1], p[2]]; }; window.__fb = (cmd, skill = 'fireball') => __engine.gameCommand(cmd, { unit: 'Artificiera', skill, to: __at() }).then(r => [r.canCast, r.reason, r.metalCost, r.power]); window.__self = (skill) => __engine.gameCommand('skill', { unit: 'Artificiera', skill }).then(r => [r.ok, r.reason]); window.__skillHits = () => __log.filter(l => l[0] === 'damage' && l[1] === 'Enemy1' && l[4] === 'skill').map(l => l[2]); __unit('Artificiera').skills = ['fireball', 'thunderwave', 'heal']"
+    },
+    {
+      "eval": "for (const n of ['Enemy1', 'Enemy2']) { const h = __unit(n).getHealth(); h.setMaxHp(500); h.restore(); __unit(n).setArmor(0); }"
+    },
+
+    { "log": "8.1: Reserva máxima = 6 + TEM" },
+    {
+      "assert": {
+        "expr": "['Lanzamonedas', 'Artificiera', 'Voz', 'Enemy1'].map(n => [__unit(n).getMaxMetal(), __unit(n).getMetal()])",
+        "value": [
+          [9, 9],
+          [11, 11],
+          [12, 12],
+          [6, 6]
+        ]
+      }
+    },
+    { "eval": "__unit('Artificiera').maxMetal = 10; __unit('Artificiera').setMetal(2)" },
+    { "command": "start_combat" },
+    {
+      "assert": {
+        "expr": "__unit('Artificiera').getMetal()",
+        "value": 10,
+        "message": "la Reserva se llena al empezar el combate"
+      }
+    },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+
+    { "log": "8.2: no deja lanzar una habilidad de 3 con 2 en la Reserva; la hotbar la desactiva" },
+    { "eval": "__unit('Artificiera').setMetal(2)" },
+    { "wait_frames": 3 },
+    { "assert": { "expr": "__fb('plan_skill')", "value": [false, "not enough metal", 3, 1] } },
+    {
+      "assert": {
+        "expr": "[__w('hotbar_3_name').getText(), Math.round(__w('hotbar_3_icon').getColor().r * 100), Math.round(__w('res_metal_fill').getWidth())]",
+        "value": ["Bola de fuego", 15, 28],
+        "message": "hueco 3 (tras Pistola y Saltar) gris; barra de metal al 20 %"
+      }
+    },
+    { "assert": { "expr": "__w('res_metal_text').getText()", "value": "2/10" } },
+    { "eval": "__unit('Artificiera').setMetal(3)" },
+    { "wait_frames": 3 },
+    { "assert": { "expr": "__fb('plan_skill')", "value": [true, null, 3, 1] } },
+    {
+      "assert": {
+        "expr": "Math.round(__w('hotbar_3_icon').getColor().r * 100)",
+        "value": 34,
+        "message": "con 3 de metal, activa"
+      }
+    },
+    { "assert": { "expr": "__fb('skill')", "value": [true, null, 3, 1] } },
+    {
+      "wait_until": {
+        "expr": "__skillHits().length === 1 && !__engine.getCombatState().busy && !__unit('Artificiera').isBusy()",
+        "value": true
+      },
+      "timeout_frames": 1200
+    },
+    {
+      "assert": { "expr": "[__unit('Artificiera').getMetal(), __skillHits()]", "value": [0, [8]] }
+    },
+
+    { "log": "8.3: Reserva a 0 → al acabar el turno, Seco; el turno siguiente sin alomancia" },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+    { "assert": { "expr": "__unit('Artificiera').isDrained()", "value": true } },
+    { "assert": { "expr": "__fb('plan_skill')", "value": [false, "drained", 3, 1] } },
+    {
+      "assert": { "expr": "__fb('plan_skill', 'thunderwave')", "value": [false, "drained", 2, 1] }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Artificiera', skill: 'duralumin' }).then(r => r.reason)",
+        "value": "drained"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Artificiera', target: 'Enemy1' }).then(r => r.canAttack)",
+        "value": true,
+        "message": "estando Seco el autoataque sigue funcionando"
+      }
+    },
+    {
+      "assert": {
+        "expr": "[__w('res_metal_text').getText(), __w('portrait_4_status_1').isVisible(), __w('portrait_4_status_1').getTexture()]",
+        "value": ["Seco", true, "tactical/status_drained.png"]
+      }
+    },
+    { "screenshot": "01-seco" },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__unit('Artificiera').isDrained(), __unit('Artificiera').getMetal(), __w('portrait_4_status_1').isVisible()]",
+        "value": [false, 10, false]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__k()",
+        "value": ["metal=3", "status:drained", "status-end:drained", "refill=10"],
+        "message": "quemar → Seco → lleno, por eventos"
+      }
+    },
+
+    { "log": "8.4: recarga voluntaria (acción adicional): te declaras Seco aunque te quede metal" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_skill', { unit: 'Artificiera', skill: 'refill' }).then(r => r.reason)",
+        "value": "reserve full"
+      }
+    },
+    { "assert": { "expr": "__fb('skill', 'thunderwave').then(r => r[0])", "value": true } },
+    {
+      "wait_until": {
+        "expr": "!__engine.getCombatState().busy && !__unit('Artificiera').isBusy()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    { "assert": { "expr": "__self('refill')", "value": [true, null] } },
+    {
+      "assert": {
+        "expr": "[__unit('Artificiera').getMetal(), __unit('Artificiera').isDrainPending(), __engine.getCombatState().resources.bonusAction]",
+        "value": [8, true, 0]
+      }
+    },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__unit('Artificiera').isDrained(), __unit('Artificiera').getMetal()]",
+        "value": [true, 8]
+      }
+    },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__unit('Artificiera').isDrained(), __unit('Artificiera').getMetal(), __k().slice(4)]",
+        "value": [
+          false,
+          10,
+          ["metal=2", "declare-drained", "status:drained", "status-end:drained", "refill=10"]
+        ]
+      }
+    },
+
+    {
+      "log": "8.6: duraluminio con la Reserva llena: ×2 (Bola de fuego 16), gratis, y después Seco"
+    },
+    { "eval": "__unit('Artificiera').setMetal(10); __unit('Artificiera').clearCooldowns()" },
+    { "assert": { "expr": "__self('duralumin')", "value": [true, null] } },
+    { "wait_frames": 3 },
+    { "assert": { "expr": "__fb('plan_skill')", "value": [true, null, 0, 2] } },
+    {
+      "assert": {
+        "expr": "[__unit('Artificiera').getMetal(), __w('res_metal_text').getText(), __k().slice(-2)]",
+        "value": [0, "0 ×2", ["metal=10", "duralumin=2"]]
+      }
+    },
+    { "screenshot": "02-duraluminio" },
+    { "assert": { "expr": "__fb('skill').then(r => r[0])", "value": true } },
+    {
+      "wait_until": {
+        "expr": "__skillHits().length === 2 && !__engine.getCombatState().busy && !__unit('Artificiera').isBusy()",
+        "value": true
+      },
+      "timeout_frames": 1200
+    },
+    { "assert": { "expr": "__skillHits()[1]", "value": 16 } },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+    { "assert": { "expr": "__unit('Artificiera').isDrained()", "value": true } },
+    { "eval": "__mark()" },
+    { "wait_until": { "expr": "__next()", "value": true }, "timeout_frames": 3000 },
+
+    { "log": "8.6: duraluminio con media Reserva: ×1,5 (Bola de fuego 12)" },
+    { "eval": "__unit('Artificiera').setMetal(5); __unit('Artificiera').clearCooldowns()" },
+    { "assert": { "expr": "__self('duralumin')", "value": [true, null] } },
+    { "assert": { "expr": "__fb('plan_skill')", "value": [true, null, 0, 1.5] } },
+    { "assert": { "expr": "__k().slice(-1)", "value": ["duralumin=1.5"] } },
+    { "assert": { "expr": "__fb('skill').then(r => r[0])", "value": true } },
+    {
+      "wait_until": {
+        "expr": "__skillHits().length === 3 && !__engine.getCombatState().busy && !__unit('Artificiera').isBusy()",
+        "value": true
+      },
+      "timeout_frames": 1200
+    },
+    { "assert": { "expr": "__skillHits()[2]", "value": 12 } },
+
+    { "log": "8.7: barra de metal en los retratos de la party" },
+    {
+      "assert": {
+        "expr": "[Math.round(__w('portrait_4_metal').getWidth()), Math.round(__w('portrait_1_metal').getWidth())]",
+        "value": [0, 96]
+      }
+    },
+    { "assert": { "no_errors": true } }
+  ]
+}

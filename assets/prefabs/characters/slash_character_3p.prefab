@@ -1,0 +1,219 @@
+{
+  "children": [
+    {
+      "prefab": "cameras/player_camera.prefab",
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            1.6,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "children": [
+        {
+          "prefab": "weapons/sword.prefab",
+          "components": {}
+        }
+      ],
+      "components": {
+        "name": "PlayerMesh",
+        "transform": {
+          "position": [
+            0,
+            -0.9,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "skeletal_mesh": {
+          "gltf": "character.gltf"
+        },
+        "animator": {
+          "extraAnimations": [
+            "universal_animations.gltf"
+          ],
+          "states": [
+            {
+              "name": "Idle",
+              "clip": "Sword_Idle",
+              "loop": true
+            },
+            {
+              "name": "Run",
+              "clip": "Jog_Fwd_Loop",
+              "loop": true
+            },
+            {
+              "name": "InAir",
+              "clip": "Jump_Loop",
+              "loop": true
+            }
+          ],
+          "default": "Idle",
+          "transitions": [
+            {
+              "from": "Idle",
+              "to": "Run",
+              "condition": "isMoving",
+              "blendTime": 0.2
+            },
+            {
+              "from": "Run",
+              "to": "Idle",
+              "conditionFalse": "isMoving",
+              "blendTime": 0.3
+            },
+            {
+              "from": "Idle",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Run",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "InAir",
+              "to": "Idle",
+              "conditionFalse": "isInAir",
+              "blendTime": 0.2
+            }
+          ]
+        },
+        "foot_ik": {
+          "leftThigh": "thigh_l",
+          "leftKnee": "calf_l",
+          "leftFoot": "foot_l",
+          "rightThigh": "thigh_r",
+          "rightKnee": "calf_r",
+          "rightFoot": "foot_r",
+          "pelvis": "pelvis",
+          "ankleHeight": 0.09,
+          "raycastUpOffset": 0.3,
+          "raycastMaxDown": 0.5,
+          "footLerpSpeed": 12,
+          "pelvisLerpSpeed": 8
+        }
+      }
+    }
+  ],
+  "components": {
+    "name": "Player",
+    "transform": {
+      "position": [
+        0,
+        0.9,
+        -4
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "PLAYER",
+      "collisionMask": "PLAYER_INTERACTIONS"
+    },
+    "kcc_movement": {
+      "maxSpeed": 11,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airControl": 0.7,
+      "airDrag": 0.3,
+      "jumpHeight": 1.2,
+      "jumpTimeToPeak": 0.35,
+      "jumpTimeToDescent": 0.3,
+      "jumpCutFactor": 0.7,
+      "jumpCutVelocityLimit": 1,
+      "coyoteTime": 0.15,
+      "maxAirJumps": 1
+    },
+    "hack_and_slash_controller": {
+      "moveSpeed": 11,
+      "maxSpeed": 18,
+      "airControl": 0.7,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airDrag": 0.3,
+      "wallRunGravity": -2,
+      "startWallRunGravity": 2.5,
+      "wallRunAcceleration": 65,
+      "detectWallDistance": 0.5,
+      "wallJumpCoyoteTime": 0.15,
+      "disableInputAfterWallJumpTime": 0.3,
+      "mantleDetectionDistance": 1.5,
+      "mantleMaxHeight": -0.025,
+      "mantlingMinVerticalVelocity": -9,
+      "minMantleVelocity": 8,
+      "minSwingSpeed": 11,
+      "impulsePadInputDisableTime": 0.3
+    },
+    "health": {
+      "maxHp": 100,
+      "faction": "player"
+    },
+    "player_attack": {
+      "damage": 20,
+      "cooldown": 0.8,
+      "attackClip": "Sword_Attack_RM",
+      "bladeLength": 0.65,
+      "activeWindowStart": 0.2,
+      "activeWindowEnd": 0.6,
+      "sweepRadius": 0.15
+    },
+    "hit_stop": {},
+    "hit_reaction": {},
+    "camera_shake": {
+      "positionAmplitude": 0.06,
+      "frequency": 8,
+      "blendInRatio": 0.1,
+      "blendOutRatio": 0.5
+    },
+    "camera_arm": {
+      "armLength": 5,
+      "pivotOffset": [
+        0,
+        1.5,
+        0
+      ],
+      "socketOffset": [
+        0.5,
+        0,
+        0
+      ],
+      "cameraLag": true,
+      "cameraLagSpeed": 12,
+      "pivotLagSpeed": 18,
+      "pitchMin": -70,
+      "pitchMax": 75,
+      "enableCollision": true,
+      "collisionPullOutSpeed": 6,
+      "mouseSensitivity": 0.15
+    }
+  }
+}

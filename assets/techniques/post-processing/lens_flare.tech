@@ -1,0 +1,8 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/lens_flare.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "blend": "additive",
+    "uniforms": ["CameraUniforms", "SingleTexture", "GodRaysUniforms"]
+}

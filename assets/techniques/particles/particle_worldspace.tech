@@ -1,0 +1,15 @@
+{
+    "vs": "particles/particle_worldspace.vs",
+    "fs": "particles/particle.fs",
+    "writesOn": "texture",
+    "z": "greater_no_write",
+    "blend": "additive_by_src_alpha",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms",
+        "ParticleWorldSpaceUniforms"
+    ],
+    "instanced": true,
+    "rs": "double_sided"
+}

@@ -1,0 +1,63 @@
+{
+  "children": [],
+  "components": {
+    "name": "BloodMist",
+    "transform": {
+      "position": [
+        0,
+        -1000,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "particle_system": {
+      "worldSpace": true,
+      "material": "particle_blood.mat",
+      "shape": "mist",
+      "emitting": false,
+      "maxParticles": 256,
+      "spawnRadius": [
+        0.1,
+        0.12,
+        0.1
+      ],
+      "baseVelocity": [
+        0,
+        0.5,
+        0
+      ],
+      "velocitySpread": 0.9,
+      "speedVariance": 0.5,
+      "drag": 5,
+      "gravity": [
+        0,
+        -1.2,
+        0
+      ],
+      "particleLife": 0.5,
+      "particleLifeVarianceMin": -0.12,
+      "particleLifeVarianceMax": 0.15,
+      "startSize": 0.22,
+      "endSize": 0.65,
+      "sizeVariance": 0.35,
+      "spinSpeed": 1.5,
+      "startColor": [
+        0.1,
+        0.006,
+        0.005,
+        0.6
+      ],
+      "endColor": [
+        0.07,
+        0.005,
+        0.004,
+        0.35
+      ],
+      "translucency": 0.15
+    }
+  }
+}

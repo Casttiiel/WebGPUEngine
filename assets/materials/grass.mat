@@ -1,0 +1,8 @@
+{
+  "technique": "grass/grass.tech",
+  "category": "solids",
+  "casts_shadows": false,
+  "textures": {
+    "txAlbedo": "white.png"
+  }
+}

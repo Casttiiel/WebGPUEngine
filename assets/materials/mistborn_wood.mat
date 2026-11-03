@@ -1,0 +1,57 @@
+{
+  "technique": "gbuffer/gbuffer_pom.tech",
+  "features": [
+    "BOX",
+    "SILHOUETTE",
+    "POM_SHADOW",
+    "LAYER",
+    "DIRT",
+    "ASH"
+  ],
+  "category": "solids",
+  "textures": {
+    "txAlbedo": "mistborn/weathered_planks_diff_1k.jpg",
+    "txNormal": "mistborn/weathered_planks_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/weathered_planks_rough_1k.jpg",
+    "txEmissive": "black.png",
+    "txHeight": "mistborn/weathered_planks_disp_1k.jpg",
+    "txAlbedo2": "mistborn/peeling_painted_wall_diff_1k.jpg",
+    "txNormal2": "mistborn/peeling_painted_wall_nor_gl_1k.jpg",
+    "txRoughness2": "mistborn/peeling_painted_wall_rough_1k.jpg",
+    "txHeight2": "mistborn/peeling_painted_wall_disp_1k.jpg"
+  },
+  "uvXScale": 0.55,
+  "uvYScale": 0.55,
+  "pomScale": 0.015,
+  "pomShadow": 0.85,
+  "baseColorFactor": [
+    0.55,
+    0.5,
+    0.45,
+    1
+  ],
+  "roughnessFactor": 1.0,
+  "metallicFactor": 0,
+  "casts_shadows": true,
+  "shadows": false,
+  "layerCoverage": 0.5,
+  "layerNoiseScale": 0.6,
+  "layerSharpness": 0.05,
+  "layerUvScale": 0.6,
+  "layerTint": [
+    0.85,
+    0.75,
+    0.68
+  ],
+  "cavityDirt": 0.3,
+  "baseDirtHeight": 0.35,
+  "layerHeightOffset": 0.38,
+  "ashAmount": 0.95,
+  "ashNoiseScale": 0.6,
+  "ashColor": [
+    0.17,
+    0.165,
+    0.16
+  ]
+}

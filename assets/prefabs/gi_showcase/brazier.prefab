@@ -1,0 +1,64 @@
+{
+  "components": {
+    "name": "Brazier",
+    "transform": { "position": [0, 0, 0] }
+  },
+  "children": [
+    {
+      "components": {
+        "name": "BrazierBowl",
+        "transform": { "position": [0, 0.45, 0], "scale": [0.8, 0.9, 0.8] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "gi_brazier_stone.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "BrazierEmbers",
+        "transform": { "position": [0, 0.95, 0], "scale": [0.6, 0.12, 0.6] },
+        "render": { "meshes": [{ "mesh": "unit_cube.obj", "material": "mistborn_ember.mat" }] }
+      }
+    },
+    {
+      "components": {
+        "name": "BrazierFlames",
+        "transform": { "position": [0, 1.0, 0] },
+        "particle_system": {
+          "worldSpace": true,
+          "maxParticles": 160,
+          "emissionRate": 55,
+          "spawnRadius": [0.22, 0.03, 0.22],
+          "baseVelocity": [0, 1.4, 0],
+          "velocitySpread": 0.3,
+          "gravity": [0, 0.8, 0],
+          "startSize": 0.28,
+          "endSize": 0.04,
+          "particleLife": 0.7,
+          "particleLifeVarianceMin": -0.25,
+          "particleLifeVarianceMax": 0.2,
+          "startColor": [1, 0.65, 0.2, 0.9],
+          "endColor": [0.8, 0.12, 0.02, 0]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "BrazierLight",
+        "transform": { "position": [0, 1.45, 0] },
+        "point_light": {
+          "color": [1, 0.52, 0.2, 1],
+          "intensity": 7,
+          "radius": 9,
+          "startFallof": 0.5,
+          "hasShadows": true,
+          "shadowResolution": 256
+        },
+        "light_flicker": {
+          "amount": 0.35,
+          "speed": 9,
+          "jitter": 0.05,
+          "dimColor": [1, 0.32, 0.08]
+        }
+      }
+    }
+  ]
+}

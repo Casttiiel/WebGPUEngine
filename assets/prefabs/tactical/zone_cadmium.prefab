@@ -1,0 +1,20 @@
+{
+  "children": [],
+  "components": {
+    "name": "CadmiumBubble",
+    "transform": {
+      "position": [0, -1000, 0],
+      "rotation": [0, 0, 0],
+      "scale": [2, 0.8, 2]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_zone_cadmium.mat",
+          "visible": true
+        }
+      ]
+    }
+  }
+}

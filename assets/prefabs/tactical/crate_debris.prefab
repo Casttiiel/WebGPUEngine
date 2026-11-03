@@ -1,0 +1,27 @@
+{
+  "children": [],
+  "components": {
+    "name": "CrateDebris",
+    "transform": {
+      "position": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    "particle_system": {
+      "worldSpace": true,
+      "maxParticles": 90,
+      "oneShot": true,
+      "burstCount": 90,
+      "spawnRadius": [0.3, 0.3, 0.3],
+      "baseVelocity": [0, 3.2, 0],
+      "velocitySpread": 2.4,
+      "gravity": [0, -11, 0],
+      "startSize": 0.2,
+      "endSize": 0.06,
+      "particleLife": 0.9,
+      "particleLifeVarianceMin": -0.3,
+      "particleLifeVarianceMax": 0.2,
+      "startColor": [0.55, 0.9, 0.35, 1],
+      "endColor": [0.25, 0.35, 0.12, 0]
+    }
+  }
+}

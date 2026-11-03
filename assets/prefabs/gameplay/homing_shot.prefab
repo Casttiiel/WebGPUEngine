@@ -1,0 +1,37 @@
+{
+  "components": {
+    "name": "HomingShot",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.07,
+        0.07,
+        0.22
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "sphere.obj",
+          "material": "emissive.mat"
+        }
+      ]
+    },
+    "homing_projectile": {
+      "speed": 16,
+      "maxRange": 30,
+      "damage": 15,
+      "gravity": 0,
+      "trackingStrength": 1.2
+    }
+  }
+}
