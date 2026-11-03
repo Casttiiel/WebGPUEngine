@@ -40,6 +40,9 @@
 @group(2) @binding(3) var samplerGBuffer: sampler;
 
 @group(3) @binding(0) var outGather: texture_storage_2d<rgba16float, write>;
+// Denoise guide: the source pixel's normal (xyz) and linear depth (w), loaded exactly as
+// gi_gather_denoise.cs used to load them per tap.
+@group(3) @binding(1) var outGuide: texture_storage_2d<rgba32float, write>;
 
 #include "gi/common/gi_sampling"
 #include "gi/common/gi_cache"
@@ -74,6 +77,11 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         textureStore(outGather, gid.xy, vec4<f32>(0.0, 0.0, 0.0, -1.0));
         return;
     }
+    let src = vec2<i32>(floor(vec2<f32>(gid.xy) * scale));
+    textureStore(outGuide, gid.xy, vec4<f32>(
+        octahedral01ToNormal(textureLoad(gNormals, src, 0).xy),
+        textureLoad(gLinearDepth, src, 0).x,
+    ));
     let N = normalize(g.normal);
 
     // Interleaved gradient noise per texel, advanced by golden-ratio steps per frame.

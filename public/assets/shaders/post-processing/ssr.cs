@@ -84,19 +84,77 @@ fn pointToLineDistance(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>) -> f32 {
     return length(cross(p - a, p - b)) / length(b - a);
 }
 
+/** A pixel's linear depth and world normal (block reconstruction in cs). */
+fn surfaceAt(coords: vec2<i32>, resolution: vec2<f32>) -> vec4<f32> {
+    let uv = (vec2<f32>(coords) + 0.5) / resolution;
+    let n = octahedral01ToNormal(textureLoad(gNormals, ssrGBufferCoord(gNormals, uv), 0).xy);
+    return vec4<f32>(n, ssrSampleDepth(uv));
+}
+
+/** What a pixel reflects without tracing: the prefiltered environment along its mirror ray. */
+fn environmentAt(coords: vec2<i32>, resolution: vec2<f32>) -> vec4<f32> {
+    let uv = (vec2<f32>(coords) + 0.5) / resolution;
+    let depth = ssrSampleDepth(uv);
+    if (depth >= 1.0 || depth <= 0.0001) { return vec4<f32>(0.0, 0.0, 0.0, ENV_RAY_LENGTH); }
+    let normalData = textureLoad(gNormals, ssrGBufferCoord(gNormals, uv), 0);
+    let worldNormal = octahedral01ToNormal(normalData.xy);
+    let roughness = max(normalData.z, 0.045);
+    let worldPosition = (camera.invView * vec4<f32>(ssrViewPosition(uv, depth), 1.0)).xyz;
+    let R = normalize(reflect(normalize(worldPosition - camera.cameraPosition.xyz), worldNormal));
+    let env = sampleEnvironment(worldPosition, R, roughness);
+    let lum = max(ssrLuminance(env), 1e-4);
+    return vec4<f32>(max(env * min(params.maxLuminance / lum, 1.0) * params.intensity, vec3<f32>(0.0)), ENV_RAY_LENGTH);
+}
+
+/**
+ * traceStride 2: one ray per 2×2 block, at a pixel that cycles through the block every 4
+ * frames (each pixel gets its own ray every 4th frame). Block pixels on the same surface
+ * (depth within 2 %, normals within ~25°) take that ray's result; the others fall back to
+ * their environment. ssr_temporal.cs (3×3 neighbourhood + history) and the denoiser, still
+ * at full SSR resolution, reconstruct per-pixel detail over the frames.
+ */
 @compute @workgroup_size(8, 8, 1)
 fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let dims   = vec2<i32>(textureDimensions(outputSSR));
-    let coords = vec2<i32>(gid.xy);
-    if (coords.x >= dims.x || coords.y >= dims.y) { return; }
-
+    let dims = vec2<i32>(textureDimensions(outputSSR));
     let resolution = vec2<f32>(dims);
+    if (params.traceStride < 1.5) {
+        let coords = vec2<i32>(gid.xy);
+        if (coords.x >= dims.x || coords.y >= dims.y) { return; }
+        textureStore(outputSSR, coords, traceAt(coords, resolution));
+        return;
+    }
+
+    let block = vec2<i32>(gid.xy) * 2;
+    if (block.x >= dims.x || block.y >= dims.y) { return; }
+    var order = array<vec2<i32>, 4>(vec2<i32>(0, 0), vec2<i32>(1, 1), vec2<i32>(1, 0), vec2<i32>(0, 1));
+    let traced = min(block + order[u32(params.noiseIndex) % 4u], dims - vec2<i32>(1));
+    let result = traceAt(traced, resolution);
+    let refSurface = surfaceAt(traced, resolution);
+
+    for (var k = 0; k < 4; k++) {
+        let p = block + order[k];
+        if (p.x >= dims.x || p.y >= dims.y) { continue; }
+        if (all(p == traced)) {
+            textureStore(outputSSR, p, result);
+            continue;
+        }
+        let s = surfaceAt(p, resolution);
+        let sameSurface = abs(s.w - refSurface.w) <= 0.02 * max(refSurface.w, 1e-4) && dot(s.xyz, refSurface.xyz) > 0.9;
+        if (sameSurface) {
+            textureStore(outputSSR, p, result);
+        } else {
+            textureStore(outputSSR, p, environmentAt(p, resolution));
+        }
+    }
+}
+
+/** One stochastic SSR ray from the pixel at `coords`: rgb = radiance, a = world ray length. */
+fn traceAt(coords: vec2<i32>, resolution: vec2<f32>) -> vec4<f32> {
     let uv = (vec2<f32>(coords) + 0.5) / resolution;
 
     let depth = ssrSampleDepth(uv);
     if (depth >= 1.0 || depth <= 0.0001) {
-        textureStore(outputSSR, coords, vec4<f32>(0.0, 0.0, 0.0, ENV_RAY_LENGTH)); // background
-        return;
+        return vec4<f32>(0.0, 0.0, 0.0, ENV_RAY_LENGTH); // background
     }
 
     // ── Surface ───────────────────────────────────────────────────────────────
@@ -121,8 +179,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (roughness > SSR_MAX_ROUGHNESS) {
         let lumEnv = max(ssrLuminance(envColor), 1e-4);
         let env = envColor * min(params.maxLuminance / lumEnv, 1.0) * params.intensity;
-        textureStore(outputSSR, coords, vec4<f32>(max(env, vec3<f32>(0.0)), ENV_RAY_LENGTH));
-        return;
+        return vec4<f32>(max(env, vec3<f32>(0.0)), ENV_RAY_LENGTH);
     }
 
     // ── Stochastic GGX ray ────────────────────────────────────────────────────
@@ -244,5 +301,5 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let lum = max(ssrLuminance(output.rgb), 1e-4);
     output = vec4<f32>(output.rgb * min(params.maxLuminance / lum, 1.0) * params.intensity, output.a);
 
-    textureStore(outputSSR, coords, max(output, vec4<f32>(0.0)));
+    return max(output, vec4<f32>(0.0));
 }

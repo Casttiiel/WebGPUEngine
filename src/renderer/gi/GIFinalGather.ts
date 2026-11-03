@@ -23,6 +23,12 @@ export class GIFinalGather {
 
   private textures: GPUTexture[] = [];
   private views: GPUTextureView[] = [];
+  /**
+   * Edge-stopping guide per texel (xyz = source pixel's normal, w = its linear depth), written by
+   * the gather so the denoise taps read one compact texel instead of two scattered G-buffer
+   * loads + an octahedral decode each (same values: the G-buffer is r16float / rgba16float).
+   */
+  private guide: GPUTexture | null = null;
   private outBindGroup: GPUBindGroup | null = null;
   private denoiseBindGroups: GPUBindGroup[] = [];
 
@@ -34,6 +40,7 @@ export class GIFinalGather {
         visibility: C,
         storageTexture: { access: 'write-only', format: 'rgba16float' },
       },
+      { binding: 1, visibility: C, storageTexture: { access: 'write-only', format: 'rgba32float' } },
     ]);
     this.denoiseLayout = BindGroupFactory.getLayout('gi_gather_denoise_layout', [
       { binding: 0, visibility: C, texture: { sampleType: 'unfilterable-float' } },
@@ -43,6 +50,7 @@ export class GIFinalGather {
         storageTexture: { access: 'write-only', format: 'rgba16float' },
       },
       { binding: 2, visibility: C, buffer: { type: 'uniform' } },
+      { binding: 3, visibility: C, texture: { sampleType: 'unfilterable-float' } },
     ]);
     this.stepBuffers = DENOISE_STEPS.map((step) =>
       GPUUtils.createBuffer(
@@ -113,8 +121,16 @@ export class GIFinalGather {
       this.textures.push(texture);
       this.views.push(texture.createView());
     }
+    this.guide = device.createTexture({
+      label: 'gi_gather_guide',
+      size: { width, height },
+      format: 'rgba32float',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    const guideView = this.guide.createView();
     this.outBindGroup = BindGroupFactory.createBindGroup('gi_gather_out_bg', this.outLayout, [
       { binding: 0, resource: this.views[0]! },
+      { binding: 1, resource: guideView },
     ]);
     // Iteration i reads views[i % 2] and writes the other one.
     this.denoiseBindGroups = DENOISE_STEPS.map((_, i) =>
@@ -122,6 +138,7 @@ export class GIFinalGather {
         { binding: 0, resource: this.views[i % 2]! },
         { binding: 1, resource: this.views[(i + 1) % 2]! },
         { binding: 2, resource: { buffer: this.stepBuffers[i]! } },
+        { binding: 3, resource: guideView },
       ]),
     );
   }
@@ -158,6 +175,8 @@ export class GIFinalGather {
   private destroyTextures(): void {
     this.textures.forEach((t) => t.destroy());
     this.textures = [];
+    this.guide?.destroy();
+    this.guide = null;
     this.views = [];
     this.outBindGroup = null;
     this.denoiseBindGroups = [];

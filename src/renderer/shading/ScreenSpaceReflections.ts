@@ -96,6 +96,8 @@ export class ScreenSpaceReflections {
     enabled: true,
     // SSR
     quality: 0.5,
+    /** One ray per 2×2 block, rotating through it (ssr.cs); temporal + denoise reconstruct. */
+    halfResTrace: true,
     mirrorBias: 0.5,
     maxDistance: 10,
     intensity: 1,
@@ -368,6 +370,7 @@ export class ScreenSpaceReflections {
       pipeline: GPUComputePipeline,
       inputs: GPUBindGroup,
       output: GPUBindGroup,
+      stride = 1,
     ) => {
       const ts = profiler.getTimestampWrites(label);
       const pass = encoder.beginComputePass({ label, ...(ts ? { timestampWrites: ts } : {}) });
@@ -376,11 +379,13 @@ export class ScreenSpaceReflections {
       pass.setBindGroup(1, gBufferComputeBindGroup);
       pass.setBindGroup(2, inputs);
       pass.setBindGroup(3, output);
-      pass.dispatchWorkgroups(wx, wy, 1);
+      pass.dispatchWorkgroups(Math.ceil(wx / stride), Math.ceil(wy / stride), 1);
       pass.end();
     };
 
-    dispatch('SSR Trace', this.tracePipeline, this.traceInputBindGroups[p]!, this.rawOutputBindGroup);
+    // Half-res trace: one thread per 2×2 block (ssr.cs writes all four pixels).
+    const traceStride = this.params.halfResTrace ? 2 : 1;
+    dispatch('SSR Trace', this.tracePipeline, this.traceInputBindGroups[p]!, this.rawOutputBindGroup, traceStride);
     dispatch(
       'SSR Temporal',
       this.temporalPipeline,
@@ -455,6 +460,7 @@ export class ScreenSpaceReflections {
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
     d[o++] = ambientData.reflectionFactor;
     d[o++] = ambientData.environmentIntensity;
+    d[o++] = p.halfResTrace ? 2 : 1; // traceStride
     GPUUtils.writeBuffer(this.traceParamsBuffer, 0, d);
   }
 
@@ -474,6 +480,7 @@ export class ScreenSpaceReflections {
     const f = this._editorFolder;
     f.add(p, 'enabled').name('Enabled').listen();
     f.add(p, 'quality', 0, 1).name('Quality').listen();
+    f.add(p, 'halfResTrace').name('Half-res Trace').listen();
     f.add(p, 'mirrorBias', 0, 1).name('Mirror Bias').listen();
     f.add(p, 'maxDistance', 0.05, 50).name('Max Distance').listen();
     f.add(p, 'thickness', 0.001, 1).name('Thickness').listen();

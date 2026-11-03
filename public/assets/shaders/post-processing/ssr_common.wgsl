@@ -51,7 +51,7 @@ struct SSRTraceParams {
     multiBounce:        f32,
     specularBoost:      f32,
     environmentIntensity: f32, // scale of the environment on misses (as the IBL)
-    _pad0:              f32,
+    traceStride:        f32, // 2 = one ray per 2×2 block (ssr.cs), 1 = one per pixel
     _pad1:              f32,
     _pad2:              f32,
 }

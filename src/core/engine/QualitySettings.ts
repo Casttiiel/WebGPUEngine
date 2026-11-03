@@ -129,7 +129,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.5,
       aoTexture: 'r16float',
-      aoSampleCount: 16,
+      aoSampleCount: 12, // GTAO: 16 → 12 (−~25 % at 4K, TSR hides the extra noise)
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
