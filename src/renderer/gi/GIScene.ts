@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat3, mat4, vec3 } from 'gl-matrix';
 import { Logger } from '../../core/debug/Logger';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { RenderCategory } from '../../types/RenderCategory.enum';
@@ -32,6 +32,11 @@ const INSTANCE_SKINNED = 1;
 const SKINNED_BOUNDS_SCALE = 1.5;
 /** Albedo for triangles whose material has no texture view yet (linear grey). */
 const DEFAULT_ALBEDO = 0xffb4b4b4;
+/**
+ * Most triangles flattened into the merged static BLAS (world-space copies: an instanced mesh
+ * would be duplicated per instance, so only meshes used once are merged anyway).
+ */
+const MERGE_MAX_TRIS = 2_000_000;
 
 /**
  * A skinned character's own BLAS: built once in the bind pose, re-posed every frame on the GPU
@@ -42,10 +47,21 @@ interface SkinState {
   mesh: SkinnedMesh;
 }
 
+/** A static instance flattened into the merged BLAS (its triangles at firstTri.. of the concatenation). */
+interface MergedSource {
+  blas: BLASEntry;
+  world: mat4;
+  transform: TransformComponent;
+  key: RenderKey;
+  firstTri: number;
+}
+
 interface BLASEntry {
   mesh: Mesh;
   material: Material;
   skin?: SkinState;
+  /** The merged static BLAS: world-space triangles of these instances (mesh/material unused). */
+  merged?: MergedSource[];
   triCount: number;
   nodes: Float32Array;
   order: Uint32Array;
@@ -59,8 +75,12 @@ interface BLASEntry {
 interface InstanceEntry {
   blas: BLASEntry;
   world: mat4;
-  /** Followed every frame: a moved instance rebuilds the TLAS (rigid dynamic objects). */
-  transform: TransformComponent;
+  /**
+   * Followed every frame: a moved instance rebuilds the TLAS (rigid dynamic objects). null for
+   * the merged static BLAS (identity).
+   */
+  transform: TransformComponent | null;
+  key: RenderKey | null;
 }
 
 export interface GISceneStats {
@@ -68,6 +88,8 @@ export interface GISceneStats {
   blas: number;
   triangles: number;
   nodes: number;
+  /** Static instances flattened into the merged BLAS. */
+  merged: number;
   buildMs: number;
   boundsMin: number[];
   boundsMax: number[];
@@ -77,6 +99,11 @@ export interface GISceneStats {
  * The ray-traceable copy of the static scene: one BLAS per (mesh, material) in object space,
  * a TLAS over the instances, and per-triangle albedo/emissive baked from the material textures
  * at the triangle's UV centroid. Software ray tracing reads it through gi/common/bvh.wgsl.
+ *
+ * Static level geometry (static shadow casters whose mesh is used once) is flattened into one
+ * world-space BLAS: level meshes span whole rooms, so their instance boxes overlap and a short
+ * ray used to enter ~9 BLAS from their roots; one BVH over the merged triangles splits space
+ * instead. A merged instance that moves is demoted to a TLAS instance (one rebuild).
  *
  * Traceable = SOLIDS that the depth prepass draws, minus alpha-tested geometry (cut-outs would
  * block light). Skinned characters get their own BLAS, re-posed on the GPU every frame
@@ -100,6 +127,12 @@ export class GIScene {
   private ready = false;
   private signature = '';
   private stats: GISceneStats | null = null;
+  /** Merged static BLAS of the last build, reused while the same instances stay static. */
+  private merged: BLASEntry | null = null;
+  private mergedSignature = '';
+  /** Merged instances that moved: traced as TLAS instances from the next build on. */
+  private demoted = new Set<RenderKey>();
+  private forceStale = false;
 
   private bakePipeline: GPUComputePipeline | null = null;
   private bakeLayout: GPUBindGroupLayout | null = null;
@@ -135,7 +168,7 @@ export class GIScene {
 
   /** True when the traceable key set changed since the last build (entities added/removed). */
   public isStale(): boolean {
-    return !this.building && GIScene.computeSignature() !== this.signature;
+    return !this.building && (this.forceStale || this.computeSignature() !== this.signature);
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
@@ -145,7 +178,8 @@ export class GIScene {
     this.building = true;
     const t0 = performance.now();
     try {
-      const signature = GIScene.computeSignature();
+      this.forceStale = false;
+      const signature = this.computeSignature();
       const instances = this.collectInstances();
       if (instances.length === 0) {
         if (signature !== this.signature) {
@@ -160,16 +194,18 @@ export class GIScene {
         this.signature = signature;
         return;
       }
-      await this.buildMissingBLAS(instances);
+      const { traced, merged } = await this.mergeStatic(instances);
+      await this.buildMissingBLAS(traced);
       await Promise.all([this.ensureBakePipeline(), this.skinnedBLAS.load()]);
-      this.upload(instances);
+      this.upload(merged ? [...traced, { blas: merged, world: mat4.create(), transform: null, key: null }] : traced);
       this.signature = signature;
       this.ready = true;
       this.stats!.buildMs = performance.now() - t0;
       Logger.info(
         'RENDER',
-        `[GI] scene: ${this.stats!.instances} instances, ${this.stats!.blas} BLAS, ` +
-          `${this.stats!.triangles} tris, ${this.stats!.nodes} nodes, ${this.stats!.buildMs.toFixed(0)} ms`,
+        `[GI] scene: ${this.stats!.instances} instances (${this.stats!.merged} merged static), ` +
+          `${this.stats!.blas} BLAS, ${this.stats!.triangles} tris, ${this.stats!.nodes} nodes, ` +
+          `${this.stats!.buildMs.toFixed(0)} ms`,
       );
     } catch (e) {
       console.error('[GI] scene build failed:', e);
@@ -204,15 +240,22 @@ export class GIScene {
     return null;
   }
 
-  private static computeSignature(): string {
+  /** Traceable key set, and which of them are static (a key turning movable re-merges). */
+  private computeSignature(): string {
     let count = 0;
     let idSum = 0;
+    let staticSum = 0;
     for (const key of RenderManagerV2.getInstance().getAllKeys()) {
       if (!GIScene.isTraceable(key)) continue;
       count++;
       idSum = (idSum + key.id * 2654435761) >>> 0;
+      if (this.isStatic(key)) staticSum = (staticSum + (key.id + 1) * 2246822519) >>> 0;
     }
-    return `${count}:${idSum}`;
+    return `${count}:${idSum}:${staticSum}`;
+  }
+
+  private isStatic(key: RenderKey): boolean {
+    return !this.demoted.has(key) && RenderManagerV2.getInstance().isStaticShadowCaster(key);
   }
 
   private collectInstances(): InstanceEntry[] {
@@ -228,11 +271,11 @@ export class GIScene {
         for (const entity of group?.entities ?? []) {
           const transform = entity.getComponent('transform') as TransformComponent | null;
           if (!transform) continue;
-          out.push({ blas, world: mat4.clone(transform.getTransform().getWorldMatrix()), transform });
+          out.push({ blas, world: mat4.clone(transform.getTransform().getWorldMatrix()), transform, key });
         }
       } else {
         const transform = key.transform;
-        out.push({ blas, world: mat4.clone(transform.getTransform().getWorldMatrix()), transform });
+        out.push({ blas, world: mat4.clone(transform.getTransform().getWorldMatrix()), transform, key });
       }
     }
     return out;
@@ -309,12 +352,7 @@ export class GIScene {
         const [mesh, entries] = jobs[id]!;
         const positions = new Float32Array(mesh.getVertexPositions());
         const indices = new Uint32Array(mesh.getIndices().subarray(0, mesh.getIndexCount()));
-        const request: BLASRequest = { id, positions, indices, maxLeafSize: BLAS_LEAF_SIZE };
-        const response = await new Promise<BLASResponse>((resolve, reject) => {
-          worker.onmessage = (e: MessageEvent<BLASResponse>) => resolve(e.data);
-          worker.onerror = (e) => reject(e);
-          worker.postMessage(request, [positions.buffer, indices.buffer]);
-        });
+        const response = await GIScene.runBVHJob(worker, { id, positions, indices, maxLeafSize: BLAS_LEAF_SIZE });
         for (const entry of entries) {
           entry.nodes = entry.skin ? response.nodes.slice() : response.nodes;
           entry.order = response.order;
@@ -328,6 +366,92 @@ export class GIScene {
     } finally {
       workers.forEach((w) => w.terminate());
     }
+  }
+
+  /**
+   * Splits off the static instances to flatten (static shadow casters whose BLAS no other
+   * instance uses) and returns the merged BLAS over them — reused while the set is the same —
+   * plus the instances still traced through the TLAS.
+   */
+  private async mergeStatic(instances: InstanceEntry[]): Promise<{ traced: InstanceEntry[]; merged: BLASEntry | null }> {
+    const uses = new Map<BLASEntry, number>();
+    for (const inst of instances) uses.set(inst.blas, (uses.get(inst.blas) ?? 0) + 1);
+    const candidates = instances.filter(
+      (i) => !i.blas.skin && i.key && i.transform && uses.get(i.blas) === 1 && this.isStatic(i.key),
+    );
+    const triCount = candidates.reduce((sum, i) => sum + i.blas.triCount, 0);
+    if (candidates.length < 2 || triCount > MERGE_MAX_TRIS) {
+      this.merged = null;
+      this.mergedSignature = '';
+      return { traced: instances, merged: null };
+    }
+
+    const signature = candidates.map((i) => i.key!.id).sort((a, b) => a - b).join(',');
+    if (!this.merged || this.mergedSignature !== signature) {
+      this.merged = await GIScene.buildMerged(candidates);
+      this.mergedSignature = signature;
+    }
+    const mergedSet = new Set(candidates);
+    return { traced: instances.filter((i) => !mergedSet.has(i)), merged: this.merged };
+  }
+
+  /** One BVH (worker) over the world-space triangles of `sources`. */
+  private static async buildMerged(instances: InstanceEntry[]): Promise<BLASEntry> {
+    let vertexCount = 0;
+    let indexCount = 0;
+    for (const inst of instances) {
+      vertexCount += inst.blas.mesh.getVertexPositions().length / 3;
+      indexCount += inst.blas.triCount * 3;
+    }
+    const positions = new Float32Array(vertexCount * 3);
+    const indices = new Uint32Array(indexCount);
+    const sources: MergedSource[] = [];
+    const v = vec3.create();
+    let vBase = 0;
+    let iBase = 0;
+    for (const inst of instances) {
+      const pos = inst.blas.mesh.getVertexPositions();
+      const idx = inst.blas.mesh.getIndices();
+      for (let i = 0; i < pos.length; i += 3) {
+        vec3.set(v, pos[i]!, pos[i + 1]!, pos[i + 2]!);
+        vec3.transformMat4(v, v, inst.world);
+        positions.set(v, vBase * 3 + i);
+      }
+      const n = inst.blas.triCount * 3;
+      for (let i = 0; i < n; i++) indices[iBase + i] = idx[i]! + vBase;
+      sources.push({ blas: inst.blas, world: inst.world, transform: inst.transform!, key: inst.key!, firstTri: iBase / 3 });
+      vBase += pos.length / 3;
+      iBase += n;
+    }
+
+    const worker = new Worker(new URL('./bvh.worker.ts', import.meta.url), { type: 'module' });
+    try {
+      const response = await GIScene.runBVHJob(worker, { id: 0, positions, indices, maxLeafSize: BLAS_LEAF_SIZE });
+      const first = instances[0]!.blas;
+      const nodes = response.nodes;
+      return {
+        mesh: first.mesh,
+        material: first.material,
+        merged: sources,
+        triCount: indexCount / 3,
+        nodes,
+        order: response.order,
+        rootMin: vec3.fromValues(nodes[0]!, nodes[1]!, nodes[2]!),
+        rootMax: vec3.fromValues(nodes[4]!, nodes[5]!, nodes[6]!),
+        nodeOffset: 0,
+        triOffset: 0,
+      };
+    } finally {
+      worker.terminate();
+    }
+  }
+
+  private static runBVHJob(worker: Worker, request: BLASRequest): Promise<BLASResponse> {
+    return new Promise<BLASResponse>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent<BLASResponse>) => resolve(e.data);
+      worker.onerror = (e) => reject(e);
+      worker.postMessage(request, [request.positions.buffer, request.indices.buffer]);
+    });
   }
 
   /** Merges TLAS + BLAS nodes, triangles and instances into GPU buffers, then bakes albedo. */
@@ -368,37 +492,20 @@ export class GIScene {
     const tris = new Float32Array(Math.max(1, triCount) * TRI_FLOATS);
     const trisU = new Uint32Array(tris.buffer);
     for (const b of blasList) {
-      const pos = b.mesh.getVertexPositions();
-      const nrm = b.mesh.getNormals();
-      const idx = b.mesh.getIndices();
-      const hasNormals = !!nrm && nrm.length === pos.length;
-      for (let i = 0; i < b.triCount; i++) {
-        const t = b.order[i]!;
-        const ia = idx[t * 3]! * 3, ib = idx[t * 3 + 1]! * 3, ic = idx[t * 3 + 2]! * 3;
-        const o = (b.triOffset + i) * TRI_FLOATS;
-        tris[o] = pos[ia]!;
-        tris[o + 1] = pos[ia + 1]!;
-        tris[o + 2] = pos[ia + 2]!;
-        trisU[o + 3] = DEFAULT_ALBEDO;
-        tris[o + 4] = pos[ib]! - pos[ia]!;
-        tris[o + 5] = pos[ib + 1]! - pos[ia + 1]!;
-        tris[o + 6] = pos[ib + 2]! - pos[ia + 2]!;
-        tris[o + 7] = 0; // emissive
-        tris[o + 8] = pos[ic]! - pos[ia]!;
-        tris[o + 9] = pos[ic + 1]! - pos[ia + 1]!;
-        tris[o + 10] = pos[ic + 2]! - pos[ia + 2]!;
-        // Bit 0: the winding disagrees with the vertex normals (front face = vertex-normal side).
-        let flip = 0;
-        if (hasNormals) {
-          const gx = tris[o + 5]! * tris[o + 10]! - tris[o + 6]! * tris[o + 9]!;
-          const gy = tris[o + 6]! * tris[o + 8]! - tris[o + 4]! * tris[o + 10]!;
-          const gz = tris[o + 4]! * tris[o + 9]! - tris[o + 5]! * tris[o + 8]!;
-          const nx = nrm![ia]! + nrm![ib]! + nrm![ic]!;
-          const ny = nrm![ia + 1]! + nrm![ib + 1]! + nrm![ic + 1]!;
-          const nz = nrm![ia + 2]! + nrm![ib + 2]! + nrm![ic + 2]!;
-          flip = gx * nx + gy * ny + gz * nz < 0 ? 1 : 0;
+      if (b.merged) {
+        // Leaf order spans every source: find each triangle's source by its concatenated index.
+        const sourceOf = GIScene.mergedSourceIndex(b);
+        const normalMats = b.merged.map((s) => mat3.normalFromMat4(mat3.create(), s.world));
+        for (let i = 0; i < b.triCount; i++) {
+          const t = b.order[i]!;
+          const s = sourceOf[t]!;
+          const src = b.merged[s]!;
+          GIScene.writeTriangle(tris, trisU, (b.triOffset + i) * TRI_FLOATS, src.blas.mesh, t - src.firstTri, src.world, normalMats[s]!);
         }
-        trisU[o + 11] = flip;
+      } else {
+        for (let i = 0; i < b.triCount; i++) {
+          GIScene.writeTriangle(tris, trisU, (b.triOffset + i) * TRI_FLOATS, b.mesh, b.order[i]!, null, null);
+        }
       }
     }
 
@@ -427,15 +534,81 @@ export class GIScene {
       this.trisBuffer,
     );
 
+    const mergedCount = blasList.reduce((sum, b) => sum + (b.merged?.length ?? 0), 0);
     this.stats = {
-      instances: instances.length,
+      instances: instances.length - (mergedCount > 0 ? 1 : 0) + mergedCount,
       blas: blasList.length,
       triangles: triCount,
       nodes: nodeCount,
+      merged: mergedCount,
       buildMs: 0,
       boundsMin: tlas.sceneMin,
       boundsMax: tlas.sceneMax,
     };
+  }
+
+  private static readonly triScratch = [vec3.create(), vec3.create(), vec3.create(), vec3.create()];
+
+  /**
+   * Triangle `t` of `mesh` at float offset `o`: v0, e1, e2 (object space, or world space with
+   * `world`) + albedo / emissive slots (baked later) + the winding flag.
+   */
+  private static writeTriangle(
+    tris: Float32Array,
+    trisU: Uint32Array,
+    o: number,
+    mesh: Mesh,
+    t: number,
+    world: mat4 | null,
+    normalMat: mat3 | null,
+  ): void {
+    const pos = mesh.getVertexPositions();
+    const nrm = mesh.getNormals();
+    const idx = mesh.getIndices();
+    const ia = idx[t * 3]! * 3, ib = idx[t * 3 + 1]! * 3, ic = idx[t * 3 + 2]! * 3;
+    const [a, b, c, n] = GIScene.triScratch as [vec3, vec3, vec3, vec3];
+    vec3.set(a, pos[ia]!, pos[ia + 1]!, pos[ia + 2]!);
+    vec3.set(b, pos[ib]!, pos[ib + 1]!, pos[ib + 2]!);
+    vec3.set(c, pos[ic]!, pos[ic + 1]!, pos[ic + 2]!);
+    if (world) {
+      vec3.transformMat4(a, a, world);
+      vec3.transformMat4(b, b, world);
+      vec3.transformMat4(c, c, world);
+    }
+    vec3.sub(b, b, a);
+    vec3.sub(c, c, a);
+    tris[o] = a[0]!;
+    tris[o + 1] = a[1]!;
+    tris[o + 2] = a[2]!;
+    trisU[o + 3] = DEFAULT_ALBEDO;
+    tris[o + 4] = b[0]!;
+    tris[o + 5] = b[1]!;
+    tris[o + 6] = b[2]!;
+    tris[o + 7] = 0; // emissive
+    tris[o + 8] = c[0]!;
+    tris[o + 9] = c[1]!;
+    tris[o + 10] = c[2]!;
+    // Bit 0: the winding disagrees with the vertex normals (front face = vertex-normal side).
+    let flip = 0;
+    if (nrm && nrm.length === pos.length) {
+      vec3.set(
+        n,
+        nrm[ia]! + nrm[ib]! + nrm[ic]!,
+        nrm[ia + 1]! + nrm[ib + 1]! + nrm[ic + 1]!,
+        nrm[ia + 2]! + nrm[ib + 2]! + nrm[ic + 2]!,
+      );
+      if (normalMat) vec3.transformMat3(n, n, normalMat);
+      vec3.cross(a, b, c);
+      flip = vec3.dot(a, n) < 0 ? 1 : 0;
+    }
+    trisU[o + 11] = flip;
+  }
+
+  /** For the merged BLAS: concatenated triangle index → index of its source. */
+  private static mergedSourceIndex(b: BLASEntry): Uint32Array {
+    const sourceOf = new Uint32Array(b.triCount);
+    b.merged!.forEach((s, i) => sourceOf.fill(i, s.firstTri, s.firstTri + s.blas.triCount));
+    return sourceOf;
   }
 
   /**
@@ -447,6 +620,16 @@ export class GIScene {
     if (!this.ready || !this.nodesBuffer || !this.instancesBuffer) return;
     let moved = false;
     for (const inst of this.instances) {
+      if (!inst.transform) {
+        // Merged static BLAS: a source that moves leaves it on the next build.
+        for (const s of inst.blas.merged ?? []) {
+          if (s.transform.hasMovedThisFrame() && !this.demoted.has(s.key)) {
+            this.demoted.add(s.key);
+            this.forceStale = true;
+          }
+        }
+        continue;
+      }
       if (!inst.transform.hasMovedThisFrame()) continue;
       inst.transform.getTransform().getWorldMatrix(inst.world);
       moved = true;
@@ -566,22 +749,45 @@ export class GIScene {
     const temp: GPUBuffer[] = [];
     const black = Texture.get('black.png').getTextureView();
 
+    // Per (mesh, material): its triangles (index in the mesh) and where they landed in the buffer.
+    const jobs: { mesh: Mesh; material: Material; local: Uint32Array; dest: Uint32Array }[] = [];
     for (const b of blasList) {
-      const albedo = b.material.getSlotTexture('albedo');
-      const sampler = albedo?.texture.getSampler();
-      // Materials default to black.png emissive (G-buffer emissive = texture.x × factor).
-      const emissiveView = b.material.getSlotTexture('emissive')?.view ?? black;
-      if (!albedo || !sampler || !emissiveView) continue;
-
-      const uvs = b.mesh.getUVs();
-      const idx = b.mesh.getIndices();
-      const tex = albedo.texture.getTexture();
-      const texels = tex ? tex.width * tex.height : 1;
-      const sx = b.material.getUvXScale() || 1;
-      const sy = b.material.getUvYScale() || 1;
-      const uvLod = new Float32Array(b.triCount * 4);
+      if (!b.merged) {
+        const dest = new Uint32Array(b.triCount);
+        for (let i = 0; i < b.triCount; i++) dest[i] = b.triOffset + i;
+        jobs.push({ mesh: b.mesh, material: b.material, local: b.order, dest });
+        continue;
+      }
+      const sourceOf = GIScene.mergedSourceIndex(b);
+      const lists = b.merged.map((s) => ({ s, local: new Uint32Array(s.blas.triCount), dest: new Uint32Array(s.blas.triCount), n: 0 }));
       for (let i = 0; i < b.triCount; i++) {
         const t = b.order[i]!;
+        const l = lists[sourceOf[t]!]!;
+        l.local[l.n] = t - l.s.firstTri;
+        l.dest[l.n++] = b.triOffset + i;
+      }
+      for (const l of lists) jobs.push({ mesh: l.s.blas.mesh, material: l.s.blas.material, local: l.local, dest: l.dest });
+    }
+
+    for (const job of jobs) {
+      const albedo = job.material.getSlotTexture('albedo');
+      const sampler = albedo?.texture.getSampler();
+      // Materials default to black.png emissive (G-buffer emissive = texture.x × factor).
+      const emissiveView = job.material.getSlotTexture('emissive')?.view ?? black;
+      if (!albedo || !sampler || !emissiveView) continue;
+
+      const count = job.local.length;
+      const uvs = job.mesh.getUVs();
+      const idx = job.mesh.getIndices();
+      const tex = albedo.texture.getTexture();
+      const texels = tex ? tex.width * tex.height : 1;
+      const sx = job.material.getUvXScale() || 1;
+      const sy = job.material.getUvYScale() || 1;
+      const uvLod = new Float32Array(count * 4);
+      const uvLodU = new Uint32Array(uvLod.buffer);
+      for (let i = 0; i < count; i++) {
+        const t = job.local[i]!;
+        uvLodU[i * 4 + 3] = job.dest[i]!;
         const ia = idx[t * 3]!, ib = idx[t * 3 + 1]!, ic = idx[t * 3 + 2]!;
         let lod = 0;
         if (uvs && uvs.length >= (Math.max(ia, ib, ic) + 1) * 2) {
@@ -605,10 +811,10 @@ export class GIScene {
       );
       const params = new Float32Array(8);
       const paramsU = new Uint32Array(params.buffer);
-      paramsU[0] = b.triOffset;
-      paramsU[1] = b.triCount;
-      params[2] = b.material.getEmissiveFactor();
-      const base = b.material.getBaseColorFactor();
+      paramsU[0] = 0; // destinations come per triangle (uvLod.w)
+      paramsU[1] = count;
+      params[2] = job.material.getEmissiveFactor();
+      const base = job.material.getBaseColorFactor();
       params[4] = base[0] ?? 1;
       params[5] = base[1] ?? 1;
       params[6] = base[2] ?? 1;
@@ -632,7 +838,7 @@ export class GIScene {
       const pass = encoder.beginComputePass({ label: 'gi_bake_albedo' });
       pass.setPipeline(this.bakePipeline);
       pass.setBindGroup(0, bg);
-      pass.dispatchWorkgroups(Math.ceil(b.triCount / 64));
+      pass.dispatchWorkgroups(Math.ceil(count / 64));
       pass.end();
     }
 
@@ -653,6 +859,9 @@ export class GIScene {
     this.blasCache.clear();
     this.skinnedCache.clear();
     this.skinnedBLAS.destroy();
+    this.merged = null;
+    this.mergedSignature = '';
+    this.demoted.clear();
     this.instances = [];
     this.ready = false;
     this.signature = '';
