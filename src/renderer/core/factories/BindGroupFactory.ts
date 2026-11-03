@@ -1,4 +1,5 @@
 import { GPUUtils } from '../utils/GPUUtils';
+import { GISharedResources } from '../../gi/GISharedResources';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { TechniqueMaterialSlot } from '../../../types/TechniqueData.type';
 import { PerfRecorder } from '../../../core/debug/PerfRecorder';
@@ -1522,8 +1523,9 @@ export class BindGroupFactory {
 
   /**
    * Lit particles (particle_worldspace.vs + LIT): the common particle bindings plus everything
-   * the per-particle lighting reads — sun + its 3 shadow cascades, the probe set (ambient) and
-   * the froxel fog volume. All read in the vertex stage (one evaluation per particle).
+   * the per-particle lighting reads — sun + its 3 shadow cascades, the probe set (ambient), the
+   * froxel fog volume and the realtime GI probes (14–19, GISharedResources; empty when GI is
+   * off). All read in the vertex stage (one evaluation per particle).
    */
   public static getParticleLitUniformsLayout(): GPUBindGroupLayout {
     const V = GPUShaderStage.VERTEX;
@@ -1538,6 +1540,7 @@ export class BindGroupFactory {
       { binding: 8, visibility: V, texture: { sampleType: 'float', viewDimension: '3d' } }, // froxel integrated
       { binding: 9, visibility: V, buffer: { type: 'uniform' } }, // FroxelUniforms
       { binding: 10, visibility: V, sampler: { type: 'filtering' } },
+      ...GISharedResources.layoutEntries(V, 14),
     ]);
   }
 

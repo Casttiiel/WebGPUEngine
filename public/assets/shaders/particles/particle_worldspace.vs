@@ -4,6 +4,8 @@
 //  - RIBBON: una tira por partícula que une su posición con su historial (estela).
 // Color y tamaño salen de las curvas de vida horneadas (ParticleCurves).
 // Defines: LIT (sol + sombras + probes + niebla por partícula), BLOOD (datos para su FS).
+// Con la GI en tiempo real activa, el ambiente LIT sale de sus sondas (GISharedResources);
+// si no, sus recursos vienen vacíos (cobertura 0) y queda el de los probes horneados.
 #include "common/uniforms"
 #include "common/particles"
 #ifdef LIT
@@ -12,6 +14,7 @@
 #include "common/probes"
 #include "common/volumetric/structs"
 #include "common/volumetric/froxel"
+#include "gi/common/gi_common"
 #endif
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -34,6 +37,13 @@
 @group(3) @binding(8)  var fogVolume: texture_3d<f32>;
 @group(3) @binding(9)  var<uniform> froxelParams: FroxelUniforms;
 @group(3) @binding(10) var fogSampler: sampler;
+@group(3) @binding(14) var<uniform> giParams: GIParams;
+@group(3) @binding(15) var<storage, read> giProbeState: array<vec4<f32>>;
+@group(3) @binding(16) var<storage, read> giVolumes: array<GIVolume>;
+@group(3) @binding(17) var giIrradianceAtlas: texture_2d<f32>;
+@group(3) @binding(18) var giVisibilityAtlas: texture_2d<f32>;
+@group(3) @binding(19) var giSampler: sampler;
+#include "gi/common/gi_sampling"
 
 fn sunShadow(worldPos: vec3<f32>, viewDepth: f32) -> f32 {
     if (directionalLight.hasShadows < 0.5) { return 1.0; }
@@ -58,9 +68,15 @@ fn litColor(albedo: vec3<f32>, center: vec3<f32>, viewDepth: f32) -> vec3<f32> {
     let cosTheta = dot(V, normalize(-directionalLight.position));
     let forward = phaseHG(cosTheta, 0.6) * 4.0 * PI; // 1 = isótropo
     let sun = sunRadiance * sunShadow(center, viewDepth) * (0.5 + renderParams.translucency * forward);
-    // Copo de dos caras: irradiancia hacia la cámara y hacia arriba, promediadas.
-    let ambient = (probeIrradiance(center, V).irradiance + probeIrradiance(center, vec3<f32>(0.0, 1.0, 0.0)).irradiance)
-                * 0.5 * probeSet.ambientScale;
+    // Copo de dos caras: irradiancia hacia la cámara y hacia arriba, promediadas. La GI cubre lo
+    // que puede (coverage) y los probes horneados el resto.
+    let up = vec3<f32>(0.0, 1.0, 0.0);
+    let baked = (probeIrradiance(center, V).irradiance + probeIrradiance(center, up).irradiance)
+              * 0.5 * probeSet.ambientScale;
+    let giV = giSampleIrradiance(center, V, V);
+    let giUp = giSampleIrradiance(center, up, V);
+    let coverage = min(giV.a, giUp.a);
+    let ambient = (giV.rgb + giUp.rgb) * 0.5 * giParams.tuning.z + baked * (1.0 - coverage);
     return albedo * (sun + ambient) / PI;
 }
 

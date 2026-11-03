@@ -1,437 +1,177 @@
-# TODO — Roadmap de implementación del GDD
+## HITO 6 — Motor: animación, rendimiento y trazado
 
-Todo lo necesario para llegar a lo que describe [GDD.md](GDD.md), ordenado por dependencias y
-por riesgo de diseño: primero lo que decide si el juego es divertido. Cada tarea tiene un
-**Hecho cuando** comprobable con un escenario del MCP (`public/data/scenarios/`), como en
-[ROADMAP.md](ROADMAP.md). Los escenarios se llaman como su fase (`phase8_metal`,
-`phase10_push`…).
+Trabajo de motor, en paralelo a los hitos de juego. Tres bloques independientes entre sí; dentro
+de cada bloque las fases van en orden de dependencias. Recomendado: **A primero** (es lo que más
+nota el combate), luego B y C intercalados según dónde duela el rendimiento o la imagen.
+Cada medición de coste con `perf_capture` (mediana de GPU, ver memoria de medición).
 
-**Punto de partida (ya hecho):** turnos con iniciativa `2·REF + 1d4`, Acción / Acción adicional /
-Movimiento, catálogo de habilidades (`skills.json`: daño, curación, empuje, teletransporte,
-superficie, estado), cooldowns, estado `fear`, caído y reanimación, props empujables,
-lanzables y explosivos, superficies de fuego y aceite, bolsa de canicas para el crítico, IA
-táctica con habilidades, cámara de acción, vista previa de daño, ficha de personaje y hotbar.
-Fase 7: seis atributos y sus derivados, daño fijo con armadura → rango y crítico que la ignora.
-Fase 8: Reserva de metal, coste en metal, Seco, recarga voluntaria y duraluminio (IA incluida).
+### Bloque A — Animación
 
-**Lo que no existe y hará falta:** cobertura, reacciones, zonas genéricas, inventario/equipo,
-progresión, diálogos.
+#### Fase 23 — Inertialización (sustituye al crossfade)
 
----
+Referencia: Bollo, _Inertialization: High-Performance Animation Transitions in Gears of War_
+(GDC 2018). Hoy `AnimatorComponent` evalúa dos clips durante `blendTime` (`crossfadeFrom`).
 
-## HITO 2 — ¿Es divertido? (los 4 personajes)
+- [ ] **23.1 Offset de transición**: al cambiar de estado, guardar por hueso la diferencia
+      (rotación y traslación) entre la pose anterior y la nueva, y su velocidad (pose de los
+      2 últimos frames). Solo se evalúa el clip nuevo.
+- [ ] **23.2 Decaimiento** del offset con el polinomio quíntico (sin sobrepasar, velocidad y
+      aceleración 0 al final); duración por transición (`blendTime` se reutiliza).
+- [ ] **23.3 Modo por transición** `blend: 'inertial' | 'crossfade'` en los datos de la máquina
+      de estados; por defecto inercial. Las capas (`addLayer`) también.
+      _Hecho cuando:_ `anim_inertial`: idle → ataque → idle con la lanza; sin "flotar" (captura
+      comparando ambos modos) y la evaluación cuesta como un solo clip.
 
-Orden: primero la base de la party; después cada personaje, que trae los sistemas que necesita
-(siempre genéricos, como efectos de `skills.json`, porque los demás los reutilizan); las
-asistencias al final, cuando ya existen todos los disparadores; y el patio con los cuatro.
+#### Fase 24 — Clips aditivos y reacciones a golpes
 
-### Fase 9 — Party: base común
+- [ ] **24.1 Clip aditivo** = clip − pose de referencia (frame 0 o un clip base), calculado al
+      cargar. `AnimLayerOptions.mode: 'override' | 'additive'` junto a `jointMask`.
+- [ ] **24.2 Reacciones direccionales**: 4 clips (frente, espalda, izquierda, derecha) creados
+      con `tools/anim`; se elige por la dirección del golpe (evento de daño de `CombatEventBus`)
+      y el peso escala con el daño.
+- [ ] **24.3** Sustituir `setAdditiveRotation` en sus usos (respiración, apuntar) por clips
+      aditivos donde aplique.
+      _Hecho cuando:_ `anim_hit_react`: golpes desde las 4 direcciones mientras el objetivo corre,
+      ataca o está en idle, y la reacción se suma sin cortar la animación base.
 
-- [x] **9.1 Sustituir Hero1–4** por los 4 personajes: prefabs (llamados como su clase), reparto
-      inicial de atributos (GDD §3), autoataques (revólver, bastones, estoque o pistola ligera,
-      escopeta).
-- [x] **9.2 Duraciones fijas.** Quitar el bonus de turnos por POT (`statusBonusTurnsFor`, la
-      fila "Estados aplicados" de la ficha y su texto en ActionText): cada estado dura lo que
-      dice su habilidad (GDD §3).
+#### Fase 25 — Blend spaces 1D/2D y grupos de sincronización
 
-### Fase 10 — Lanzamonedas (GDD §10.1) y lo que necesita
+- [ ] **25.1 Blend space 1D** (velocidad: idle/andar/correr) y **2D** (dirección × velocidad,
+      triangulación de las muestras y pesos baricéntricos) como tipo de estado de la máquina.
+- [ ] **25.2 Grupos de sincronización**: fase normalizada compartida; el clip con más peso es
+      el líder y los demás siguen su fase.
+- [ ] **25.3 Marcadores de sincronía** (pie izquierdo/derecho en el suelo) exportados por
+      `tools/anim` como eventos; sincronizar por marcador si los clips tienen distinto ritmo.
+- [ ] **25.4** Parámetros float en el animator (`setFloat`), hoy solo hay bool y trigger.
+      _Hecho cuando:_ `anim_locomotion`: el personaje acelera de 0 a correr y gira en curva sin
+      deslizar los pies (Foot IK apagado para comprobarlo).
 
-**Sistemas** (GDD §5 y §6):
+#### Fase 26 — Montajes: slots y secciones
 
-- [x] **10.1 Datos de los props.** `metallic` y `size: small | large` en PropComponent, en
-      lugar de `pushable`/`throwable`/`pushDistance`. Pequeños: cuchillos, clavos, monedas
-      (munición del tirón y el empuje). Grandes: cajas, barriles, carros. Sin props fijos: lo
-      que no se mueve es escenario estático. Migrar los props que ya existen y añadir alguno
-      pequeño (cuchillos en una encimera).
-- [x] **10.2 Metal portado** en las unidades (`metallic` en el prefab; más adelante saldrá del
-      equipo) y la etiqueta `giant` (inmune a empuje y tirón).
-- [x] **10.3 Efecto `steelPush`.** Línea recta alejándose del lanzador, `3 + POT/2` m; solo
-      sobre lo metálico.
-      _Hecho cuando:_ `phase10_push`: caja metálica empujada `3 + POT/2` m, caja de madera
-      rechazada.
-- [x] **10.4 Efecto `ironPull`**: hacia el lanzador; un enemigo con armadura metálica llega
-      Derribado.
-- [x] **10.5 Efecto `disarm`**: un arma metálica cambia el ataque del enemigo por uno débil.
-- [x] **10.6 Regla de impacto.** Daño = base por tamaño (Pequeño 6 / Grande 10) + POT (con
-      alomancia) o FUE (con peltre); Grande → Aturdido, Pequeño → solo daño, unidad
-      empujada → Derribado; contra un muro +50 %; unidad contra unidad, las dos reciben daño.
-- [x] **10.7 Salto generalizado.** `jumpArc` (hoy `MAX_JUMP` = 4,5) acepta una distancia
-      máxima.
-- [x] **10.8 Sin Lanzar.** Los personajes ya no lanzan objetos a mano (la acción `throw` sigue
-      en el código, pero ningún personaje la tiene). Los objetos no tienen estados.
-- [x] **10.9 Targeting `line`**: todos los de una línea recta, con su vista previa.
-- [x] **10.10 Vista previa** de las trayectorias de empuje, tirón y rebote (AimArrow /
-      PathPreview), con los objetivos afectados marcados.
-- [x] **10.11 Estados físicos** (GDD §6): `stunned` (Aturdido: pierde la próxima Acción),
-      `prone` (Derribado: levantarse cuesta la mitad del movimiento; el melee contra él es
-      crítico seguro), `marked` (Marcado: el siguiente golpe que recibe hace +50 %, se consume).
-      Iconos sobre la unidad y en el retrato, con tooltip. La IA aprovecha a los Derribados y
-      Marcados.
-      _Hecho cuando:_ `phase10_statuses` cubre cada uno con una aserción.
+- [ ] **26.1 Slots** (`FullBody`, `UpperBody`…) definidos como capas con máscara de huesos; un
+      montaje se reproduce en un slot y mezcla con lo que haya debajo (inercial, fase 23).
+- [ ] **26.2 Secciones** con nombre y enlace a la siguiente; saltar de sección desde código.
+- [ ] **26.3 Ventanas de combo** (eventos de inicio/fin): una entrada dentro de la ventana
+      encadena la siguiente sección; fuera, el montaje termina. Interrupción con prioridad.
+- [ ] **26.4** Migrar el combo de lanza (4 clips de `tools/anim`) a un montaje de 4 secciones.
+      _Hecho cuando:_ `anim_combo`: el combo de lanza se encadena entrando en la ventana, se corta
+      fuera de ella y lo interrumpe una reacción a golpe.
 
-**Kit** (6 activas + duraluminio, GDD §10.0; cada una en `skills.json` con su `cost`, `metal` y
-`allomantic: true` salvo la mente de hierro):
+#### Fase 27 — Motion warping y animaciones emparejadas
 
-- [x] **Autoataque: revólver.** Ataque `ranged` de distancia larga (9.1).
-- [x] **Salto de acero** — Adicional, 1 de metal. Salto de `6 + POT` m que no gasta movimiento
-      (10.7).
-      _Hecho cuando:_ con POT 4 salta 10 m, el movimiento no baja y la Reserva pierde 1.
-- [x] **Empuje** — Acción, 2 de metal. `steelPush` (10.3): un prop o enemigo metálico en línea
-      recta. Hay que estar al menos a 3 m y se puede desviar ±20° (primer click: el objetivo;
-      segundo: hacia dónde).
-- [x] **Tirón** — Adicional, 1 de metal. `ironPull` (10.4): atrae algo metálico; un enemigo con
-      armadura metálica llega Derribado; si apunta a un arma metálica, `disarm` (10.5).
-- [x] **Bala empujada** — Acción, 3 de metal. Targeting `line` (10.9): atraviesa a todos los
-      enemigos de la línea, con +4 de penetración (campo `penetration` en el efecto de daño).
-      _Hecho cuando:_ tres enemigos alineados reciben el daño y el cuarto, fuera de la línea, no.
-- [x] **Marca del cazador** (estaño) — Adicional, 1 de metal. Marcado 2 turnos (10.11) con
-      +30 % + 5 %·POT (decidido: escala con POT).
-- [x] **Burbuja de acero** — Adicional, 2 de metal. Hasta su siguiente turno, los proyectiles
-      (ataques a distancia y la Bala empujada) contra él tienen un 50 % de fallar (decidido).
-- [x] **Mente de hierro** (feruquimia innata) — sin acción ni metal, 1 carga por combate que no
-      se recarga (versión mínima; el sistema completo de mentes llega en la 18.3): Ligero (saltos
-      ×2 este turno, combinable con el Salto de acero) o Pesado (no le pueden empujar, atraer ni
-      derribar).
+- [ ] **27.1 Ventanas de warping** en el clip (eventos): dentro de la ventana se escala la
+      traslación y se corrige la rotación del root motion para terminar en un transform
+      objetivo (posición del enemigo − distancia de golpe).
+- [ ] **27.2 Animación emparejada**: dos animators en la misma línea de tiempo; la víctima se
+      coloca respecto al atacante con el offset de referencia del clip, alineada con 27.1.
+- [ ] **27.3 Datos** en `skills.json`: una habilidad puede pedir un par (atacante/víctima) y su
+      toma en `ActionCameraComponent`.
+      _Hecho cuando:_ `anim_paired`: ataque emparejado contra enemigos a 1, 2 y 3 m y en ángulos
+      distintos; el golpe conecta en el mismo frame en todos los casos.
 
-### Fase 11 — Deslizador (GDD §10.2)
+### Bloque B — Rendimiento y escala
 
-El recurso principal sigue siendo el metal. Escenarios: `phase11_slider` y `phase11_bubble`.
+#### Fase 30 — LOD automático
 
-- [x] **Ritmo** (pasiva): cada golpe seguido al mismo objetivo +15 % (hasta 3 puntos); se
-      reinicia al cambiar de objetivo y se pierde al quedar Aturdido o tras un turno sin golpear.
-      Icono de estado (con el % en el tooltip) y un hueco pasivo en la hotbar ("Ritmo +N %").
-- [x] **Lanzar** (peltre) — Acción, 1 de metal. Pegado al objetivo (si no, se acerca): una unidad
-      o un prop Grande sale en arco hasta 10 m adonde elijas (o junto a una unidad, que recibe
-      el golpe). Al caer, IMPACTO de 10 + FUE; una unidad queda Derribada. Se apunta en dos
-      pasos, como el Empuje.
-- [x] **Avivar peltre** — Acción adicional, 2 de metal. 2 turnos: +3 m de movimiento (ya en el
-      turno en que se lanza), inmune a Derribado y Aturdido y +20 % de daño; después, Arrastre
-      (−50 % de movimiento y de daño durante 1 turno).
-- [x] **Deslizar** — Acción adicional, 1 de metal. 4 m en línea recta sin gastar movimiento; si
-      acaba a la espalda de un enemigo (pegado y detrás de hacia donde mira), queda Marcado.
-      "Sin provocar reacciones" se aplicará cuando existan (fase 16).
-- [x] **Remate** (peltre) — Acción, 1 de metal. Gasta todo el Ritmo contra el objetivo en un
-      golpe: daño del arma × (1 + 0,5 por punto); con 3 puntos, además deja Aturdido.
-- [x] **Mente de oro** innata — sin acción, 1 carga por combate que no se recarga: cura
-      `5 + RES` al decantar y al empezar sus dos turnos siguientes (3 curaciones).
-- [x] **Burbuja de bendaleo** — Acción, 3 de metal. Burbuja fija centrada en él, radio
-      `1,75 + POT/4` m, durante 2 rondas. Quien acaba su turno dentro (aliado o enemigo) juega
-      otro turno seguido, uno extra por ronda (también el turno en que se lanza); la barra de
-      iniciativa los enseña dos veces seguidas. Nadie sale andando (el camino se para en el
-      borde; saltos y Deslizar tampoco). Ningún proyectil cruza el borde. Con la burbuja
-      activa, el hueco pasa a "Cerrar burbuja" (sin acción ni metal). Se rompe si a él lo
-      sacan (empujado, lanzado) o cae.
+- [ ] **30.1 Generación offline** con `@gltf-transform` (`simplify`, usa meshoptimizer): 3 LODs
+      por malla en un script tipo `compress-textures`, guardados en el `.glb`.
+- [ ] **30.2 Selección en GPU** por tamaño en pantalla en `GPUCullingManager` (umbral
+      configurable por malla); sombras con LOD sesgado hacia abajo.
+- [ ] **30.3 Crossfade con dither** entre LODs (mismo patrón que `lodFadeStart` de la hierba),
+      compatible con TSR.
+- [ ] **30.4** Mallas con skin: LOD de huesos opcional (o solo simplificación de triángulos).
+      _Hecho cuando:_ escena con 200 props: los triángulos dibujados bajan al alejarse (contador
+      de debug) y no hay saltos visibles con TSR.
 
-### Fase 12 — Cobertura (GDD §5): tapa o no tapa
+#### Fase 31 — Impostores y HLOD
 
-Hecho en `Cover.ts` (escenario `phase12_cover`). Props altos nuevos: Carro (de hierro, se puede
-atraer y empujar) y Cajas apiladas (madera), de 1,9 m: por debajo de la altura de los ojos
-(~1,6 m) un prop no corta la línea de visión de quien está detrás.
+Depende de la fase 30. HLOD solo merece la pena con niveles grandes; hacer primero impostores.
 
-- [x] **12.1 Los props Grandes cortan la línea de visión.** Hoy `hasLineOfSight` solo mira la
-      geometría estática: los props Grandes vivos también tapan; al romperse o moverse, dejan
-      de tapar. Los Pequeños no.
-- [x] **12.2 Caras de cobertura.** Para un punto del suelo, qué coberturas tiene pegadas (a
-      menos de ~1 m) y hacia dónde mira cada una: rayos horizontales a la altura del pecho en 8–16
-      direcciones contra el escenario estático y los props Grandes → lista de normales de cara.
-      Lo bajo (por debajo de ~1,2 m) no cuenta.
-- [x] **12.3 Regla.** Una unidad está a cubierto de un atacante si alguna de sus caras de
-      cobertura lo tiene dentro de su arco (≈ 140°, configurable): entonces no hay línea de
-      visión para ataques a distancia ni habilidades `unit` con `lineOfSight`. Si no, vale el
-      rayo de siempre. No afecta al melee ni a las áreas.
-      _Hecho cuando:_ `phase12_cover`: pegado a una columna, ningún enemigo del otro lado le
-      puede apuntar (tampoco uno colocado casi en diagonal); el que flanquea sí; una bola de
-      fuego le alcanza igual; al atraer el prop Grande tras el que se escondía, ya le pueden
-      disparar.
-- [x] **12.4 Snap al moverse.** Si el destino elegido está cerca de una cobertura, se ajusta al
-      punto pegado a ella (en combate y en exploración). En el destino, un escudo por cada
-      dirección cubierta y qué enemigos dejarían de verle.
-- [x] **12.5 Vista previa al apuntar**: "a cubierto" (no se puede elegir) en lugar de la barra
-      de daño.
-- [x] **12.6 Lo empujado en línea recta choca con la cobertura**, no con quien se esconde
-      detrás (IMPACTO contra ella).
-- [x] **12.7 IA.** TacticalPlanner valora acabar a cubierto de las amenazas (usando el mismo
-      snap), flanquear al que lo está y quitarle la cobertura (empujar o atraer el prop, áreas).
+- [ ] **31.1 Impostores octaédricos**: bake offscreen (albedo, normal, profundidad) a un atlas
+      por malla; se dibujan al G-Buffer como último LOD, con mezcla entre las 3 vistas más
+      cercanas y profundidad por píxel.
+- [ ] **31.2 HLOD**: agrupar estáticos por celda, fusionar y simplificar a una malla con atlas
+      horneado; sustituye a la celda entera a partir de cierta distancia.
+      _Hecho cuando:_ bosque de 2000 árboles: los lejanos son impostores sin que se note el
+      cambio en una captura a 4K; draw calls y triángulos medidos.
 
-### Fase 13 — Artificiera (GDD §10.4)
+### Bloque C — Trazado con el BVH (sigue `docs/realtime-gi-plan.md`)
 
-Escenario `phase13_artificer`. Las burbujas de `Zones` pasan a tener tiempo (rápido / lento) y a
-poder ser ancladas (la del Deslizador) o lanzadas (una granada: no se rompen ni se cierran y
-duran hasta el siguiente turno de quien las lanzó, así todos juegan un turno con ellas).
+#### Fase 33 — GI fase 3: radiance cache y light grid
 
-- [x] Gadgets sin cargas por combate: gastan metal de la Reserva y tienen recarga (cooldown),
-      como el resto de habilidades.
-- [x] Granada de mano (autoataque arrojadizo, 10 m, 2 de daño): en arco, no necesita línea de
-      visión (la cobertura no protege; el borde de una burbuja de bendaleo sí la para) y estalla
-      en 1,5 m alrededor del objetivo, aliados incluidos, con el mismo crítico (campo `radius`
-      del ataque). Sustituye a la Pistola.
-- [x] Granada de cadmio (Acción, 3 de metal, recarga 3): burbuja lanzada de 3 m. Quien empieza
-      su turno dentro lo pierde (una vez por burbuja) y nadie sale andando. Los proyectiles sí
-      cruzan el borde.
-- ~~Granada de bendaleo~~: quitada (el bendaleo es del Deslizador). La habilidad sigue en el
-  catálogo (`bendalloy_grenade`).
-- [x] Dardo de cromo (Acción, 2 de metal, recarga 3): vacía la Reserva del objetivo y lo deja
-      **Seco** (al acabar ese turno, la Reserva se llena). Solo contra quien tiene Reserva.
-- [x] Pulso de ettmetal (Acción, 2 de metal, recarga 2): todo lo metálico a 4 m del punto
-      (menos ella) sale despedido hacia fuera `3 + POT/2` m, con IMPACTO; una flecha por cada uno
-      en la vista previa.
-- [x] Inyector de oro (Adicional, 2 de metal, recarga 2): cura a un aliado pegado `12 + POT`
-      (también la levanta si está caído).
-- La Artificiera **no crea zonas espirituales** (GDD §8): solo salen de los relicarios.
+- [x] **33.1 Light grid** en espacio de mundo: celdas con su lista de luces (sustituye al límite
+      de 32 luces cercanas); muestreo con varios candidatos pesados por contribución
+      (reservoir con más de una muestra) y rayo de sombra a la elegida.
+- [x] **33.2 Radiance cache** (tabla hash en espacio de mundo): guarda la radiancia en los puntos
+      de impacto de los rayos de las sondas y se actualiza unos pocos rayos por frame; los rayos
+      que impactan leen de la caché en lugar de sombrear desde cero.
+      _Hecho cuando:_ `sponza_gi` con 64 luces puntuales: sin ruido de luces en las sondas
+      (captura) y Trace ≤ coste actual. ✓ `sponza_gi_lights`: Trace 1,1 ms (antes 2,2 ms
+      sombreando en línea con 64 luces; 1,09 con ≤ 32), sondas sin ruido (diferencia media
+      entre frames 0,9/255).
 
-### Fase 14 — Zonas espirituales (GDD §8)
+#### Fase 34 — GI fase 4: final gather por píxel
 
-Hecho en `SpiritZones.ts`. Escenarios: `phase14_zones` y `phase14_ai`.
+- [x] **34.1** Rayos por píxel a media resolución que leen de la radiance cache (fase 33); las
+      sondas quedan para lo lejano y como respaldo.
+- [x] **34.2 Denoise** espacial y temporal (reutilizar el patrón de `ssr_denoise` y
+      `ssr_temporal`).
+- [x] **34.3** Integración pendiente de la fase 5: froxels, agua y transparentes
+      (`sponza_gi_fx`). Transparentes = partículas `LIT`; el resto no usa ambiente.
+- [x] **34.4 Fase 6 (skinned en el BVH)**: refit de los BLAS de los personajes a partir del
+      skinning; requisito de las fases 35 y 36 para los personajes (`sponza_gi_chars`).
+      _Hecho cuando:_ `sponza_gi`: GI de detalle en esquinas y bajo los objetos (comparar con F9
+      `compare`), estable al mover la cámara. ✓ ver `docs/realtime-gi-plan.md`.
 
-- [x] Fortuna: +10 % de crítico de quien ataca desde dentro (por encima de la bolsa de canicas,
-      sin cambiarla; también en la vista previa).
-- [x] Conexión: un estado aplicado dentro se copia al resto de unidades del mismo bando que
-      estén dentro (la vista previa dice a quién; el Seco del dardo de cromo también vacía la
-      Reserva de las copias).
-- [x] Investidura: las habilidades lanzadas desde dentro hacen +50 % de efecto (el `power` que
-      ya usa el duraluminio; se multiplica con él).
-- [x] Afectan a **los dos bandos**; la IA lo tiene en cuenta: prefiere acabar en Fortuna (si
-      ataca) o Investidura (si tiene habilidades), evita la Conexión con aliados dentro y cuenta
-      las copias de la Conexión al valorar una habilidad de estado.
-- [x] Liberar mente espiritual: tres habilidades (Fortuna, Conexión, Investidura; Acción, 3 de
-      metal, punto a 10 m, 3 m de radio) con la recarga compartida (`group`). Una zona activa a
-      la vez, durante 3 turnos suyos. **Ya no las tiene la Artificiera**: quedan en el catálogo
-      (`phase14_zones` se las da para probarlas) por si las usa un enemigo o un objeto.
-- [x] Relicarios (`relic_fortune/connection/investiture.prefab`): props metálicos que emiten
-      una zona que va con ellos (empuje y tirón la mueven); al romperse, sueltan la zona de
-      golpe donde estaban hasta la ronda siguiente.
-      _Hecho cuando:_ `phase14_zones`: el Lanzamonedas atrae un relicario de Conexión y una
-      Marca del cazador se reparte entre 3 enemigos (el Enfurecido llega con la Voz).
+#### Fase 28 — Resolución dinámica
 
-### Fase 15 — Voz (GDD §10.3)
+- [ ] **28.1 Controlador**: tiempo de GPU del frame (`GPUProfiler`, mediana de N frames) contra un
+      presupuesto (16,6 ms / 33,3 ms); un PI ajusta `renderScale` de TSR entre `min` y `max`.
+- [ ] **28.2 Sin tirones al cambiar**: escalones cuantizados (5 %) con histéresis para no
+      reasignar targets cada frame. Si aun así hay tirones, pasar a targets del tamaño máximo y
+      dibujar en un viewport parcial (las UV de los pases de pantalla escalan).
+- [ ] **28.3** Opción en `QualitySettings` y el menú (`off / 60 / 30`).
+      _Hecho cuando:_ en `sponza_gi` con GI activa, el frame se mantiene en presupuesto y la escala
+      se ve en el overlay del profiler; la escala vuelve a 1 cuando sobra GPU.
 
-Escenario `phase15_voice`. Autoataque: solo la **pistola ligera** (el estoque se quita). Kit:
-6 habilidades + la mente de cinc.
+#### Fase 29 — Caché de sombras estáticas
 
-- [x] **Estados emocionales** (GDD §6): `enraged` (Enfurecido: tiene que atacar a su objetivo,
-      aunque sea de su bando, y la IA lo respeta y no se retira; +25 % de daño hecho, −3 de
-      armadura), `soothed` (Aplacado: −2 m de movimiento y −20 % de daño, lo contrario de la
-      Arenga) y `rallied` (Arenga: +2 m y +20 %). Duran el siguiente turno de quien los recibe.
-- [x] Leer intenciones (bronce; Adicional, 1 de metal, 15 m): prevé el turno del enemigo con su
-      propia IA (`forecastTurn`: planTurn con él como activo, sus recursos de turno y las
-      recargas ya avanzadas) y se lo **compromete**: en su turno lo cumple si sigue siendo
-      posible; si no, improvisa. Una emoción nueva (Enfurecido, Aplacado, miedo) lo borra.
-      Rótulo "Intención: …" sobre la cabeza.
-- [x] Encender: Provocar (Acción, 2 de metal, recarga 1, 12 m): en dos pasos, el enemigo y a
-      quién tiene que atacar (la Voz, un aliado u **otro enemigo**).
-- [x] Encender: Arenga (Adicional, 1 de metal, recarga 1): un aliado, durante su siguiente
-      turno.
-- [x] Aplacar (Acción, 2 de metal): a un enemigo le quita los bufos; si no tiene ninguno, queda
-      Aplacado.
-- [x] Aplacar: Serenar (Adicional, 1 de metal, recarga 2): a un aliado le quita los estados
-      negativos (miedo, Aturdido, Derribado, Marcado, Enfurecido, Aplacado; no Seco ni el
-      Arrastre, que son la resaca de un poder propio).
-- [x] Nube de cobre (Acción, 2 de metal, recarga 3): zona de 4 m durante 2 rondas
-      (`CopperClouds`). A los aliados de dentro no les llega la alomancia enemiga lanzada desde
-      fuera: empujes, tirones, pulso, emociones, cromo y bronce (no el peltre ni la bala
-      empujada).
-- [x] Mente de cinc (feruquimia, 1 carga): lee las intenciones de todos los enemigos y +1
-      Acción adicional ese turno.
-- ~~Calma~~ y ~~Disturbio~~: descartadas. ~~Miedo~~: fuera del kit (sigue en el catálogo;
-  `phase10_statuses` se lo da a la Voz para probarlo).
-- [ ] Talentos de las dos ramas (cuando haya árbol de talentos): decidir **Agitadora** (AGU,
-      REF) o **Duelista** arreglada (talento _Desdén_).
-- [ ] Encender el ánimo (asistencia: BAJA o CRÍTICO de un aliado → 1 Acción adicional) va con
-      las asistencias, en la fase 16.
+- [ ] **29.1 Movilidad** en `RenderComponent`: `static | movable` (por defecto static si no tiene
+      física ni animación).
+- [ ] **29.2 Atlas de sombras** para focos y puntos (cubo como 6 caras del atlas), tamaño por luz
+      según su tamaño en pantalla.
+- [ ] **29.3 Caché**: los estáticos se dibujan una vez en una copia cacheada; cada frame se copia
+      la caché y se añaden solo los dinámicos. Se invalida si la luz se mueve o cambia un estático.
+- [ ] **29.4 (opcional)** cascada lejana de la CSM cacheada mientras la cámara táctica no se mueva.
+      _Hecho cuando:_ escena con 8 luces con sombra y personajes moviéndose: coste de sombras
+      ≥ 50 % menor (perf_capture antes/después) e imagen idéntica.
 
-### Fase 16 — Zonas ✓ (hecha por partes; sin sistema genérico)
+Optimice everything
+Culling of particles?
+Particle optimice
+Scene change? Editor? Spawn prefabs?
 
-Las zonas que pide el diseño ya existen, cada una con su sistema: `Zones` (burbujas de tiempo),
-`SpiritZones` (zonas espirituales y relicarios), `CopperClouds` (Nube de cobre), `Surfaces`
-(fuego, aceite) y `ResonanceAuras` (el aro de la Resonancia). Un sistema genérico con eventos
-(al entrar, al salir, al empezar el turno, al cruzar un proyectil) no hace falta: ninguna
-habilidad del diseño actual los necesita, y la Artificiera ya no crea zonas.
+#### Fase 35 — Reflejos trazados como respaldo del SSR
 
-- [x] **Borde que bloquea proyectiles**: `Zones.blocksProjectile` entra en la línea de visión
-      de ataques y habilidades, y así lo enseña la vista previa.
-- [x] **Burbuja de bendaleo** del Deslizador (fase 11) y **burbuja de cadmio** de la
-      Artificiera (fase 13), en `Zones`.
-- [x] **Nube de cobre** de la Voz (fase 15, `CopperClouds`), rediseñada: la alomancia enemiga
-      lanzada desde fuera no alcanza a los aliados de dentro.
-- ~~Zonas genéricas con eventos~~: descartado.
+- [ ] **35.1 Máscara de fallos** del SSR (confianza en la salida de `ssr.cs`).
+- [ ] **35.2 Trazar** en el BVH solo los píxeles fallidos con rugosidad < umbral, a media
+      resolución; sombrear el impacto con albedo/emisivo por triángulo + GI (sondas o
+      radiance cache) + rayo de sombra al sol.
+- [ ] **35.3** El compuesto de `ambient_specular.fs` usa SSR → trazado → cubemap, en ese orden.
+- [ ] **35.4 (si hace falta)**: albedo con textura en el impacto (atlas de texturas para el BVH,
+      no hay bindless).
+      _Hecho cuando:_ suelo pulido en Sponza: lo que sale de pantalla se sigue reflejando (captura
+      girando la cámara) y el coste medido está por debajo de 1 ms.
 
-Para cuando lleguen enemigos que creen zonas (p.ej. el Ahumador):
+#### Fase 36 — Sombras y AO trazados
 
-- [ ] **Base común de las zonas**: círculo, decal y duración en rondas compartidos, y un solo
-      sitio en EncounterComponent donde caducan (hoy cada tipo nuevo toca el inicio de turno,
-      el cambio de ronda, el fin de combate y el reinicio).
-- [ ] **La IA valora todas las zonas** al elegir dónde acabar el turno (hoy solo las
-      espirituales): acabar en una burbuja de bendaleo (turno extra), no empezar en una de
-      cadmio (lo pierde), refugiarse en una Nube de cobre de su bando, quedarse en el aro de
-      una Resonancia aliada.
-
-### Fase 17 — Reacciones y asistencias (GDD §7) ⚠️ el sistema más arriesgado
-
-Con los cuatro personajes ya hechos, todos los disparadores existen y se prueban las
-interacciones que se han diseñado, no unas de prueba.
-
-- [ ] **16.1 Reacción** por unidad y por ronda (hoy los recursos solo existen para la unidad
-      activa: hace falta un estado por unidad que se reponga al empezar su turno).
-- [ ] **16.2 Bus de disparadores**: `impact`, `prone`, `crit`, `kill`, emitidos desde los
-      puntos de resolución de EncounterComponent con origen, objetivo y quién causó la acción
-      original.
-- [ ] **16.3 Definición de asistencias en datos**: `assist: { trigger, skill }` en el prefab de
-      cada personaje.
-- [ ] **16.4 Las cuatro asistencias**: Tiro al plato (Lanzamonedas, DERRIBADO), Bateo
-      (Deslizador, IMPACTO de un enemigo que acaba a su lado; redirección de 3 m), Encender el
-      ánimo (Voz, BAJA o CRÍTICO de un aliado → ese aliado gana 1 Acción adicional; 1 de metal)
-      y Detonación (Artificiera, IMPACTO → área de 2 m y Marcado; si el prop lleva ettmetal,
-      explota).
-- [ ] **16.5 Cola de resolución.** No se reacciona a las acciones propias, una por ronda, rango
-      y línea de visión, las físicas se pueden hacer estando Seco, tope de 3 eslabones y bonus de
-      cadena ×1,1/×1,2/×1,3.
-      _Hecho cuando:_ `phase16_chain`: la cadena de ejemplo del GDD (§7) sale entera con los
-      cuatro personajes y se para en el eslabón 3.
-- [ ] **16.6 Guardia** del Deslizador: esquiva el primer melee y contraataca, gastando la
-      Reacción (compite con Bateo); recuperación 2. Es la única reacción defensiva.
-- [ ] **16.7 Previsualización de la cadena.** Simulación en seco al apuntar: retratos de los
-      aliados que van a reaccionar; los eslabones que dependen de un crítico se marcan como
-      "si hay crítico".
-- [ ] **16.8 Interruptor por personaje**: automático / preguntar / nunca. En "preguntar", la
-      cadena se pausa y sale un aviso.
-- [ ] **16.9 Presentación**: cámara de acción en las cadenas, contador "Cadena ×2" y ActionText.
-- [ ] **16.10 IA**: la IA intenta cortar las cadenas del jugador (Aplacar, matar al que remata).
-      Las asistencias de los enemigos de élite van con ellos (fase 20).
-
-### 🎯 Escenario de validación del Hito 2
-
-- [ ] **Guardias del patio**: prefabs básicos de guardia con placas (metal portado, 10.2) y con
-      aluminio (armadura alta sin metal: no se le puede empujar ni atraer). Su versión completa,
-      con perfil de IA, va en la fase 20.
-- [ ] **`phase16_patio`**: los 4 personajes contra un grupo de guardias (con placas y con
-      aluminio) en un patio con cajas, columnas para cubrirse, cuchillos en una encimera, una
-      farola y un charco (GDD §15).
-      _Hecho cuando:_ se juega entero sin errores. **Decisión de seguir o no:** si el combate no es
-      divertido, se revisan el metal, los empujes, la cobertura y las asistencias antes de
-      seguir.
+- [ ] **36.1 Sombras de luces de área**: un punto aleatorio en el rect/disco por píxel y frame +
+      denoise temporal → penumbra real.
+- [ ] **36.2 Sombras suaves del sol** más allá de la última cascada y como sustituto de las
+      contact shadows (rayos cortos; también para puntos y focos).
+- [ ] **36.3 AO trazado** (rayos cortos) como alternativa a GTAO.
+- [ ] **36.4** Geometría con alpha test en el BVH (follaje) o excluirla con una marca.
+      _Hecho cuando:_ luz de área con sombra que se ensancha con la distancia al oclusor;
+      personajes (con 34.4) proyectan sombra de contacto en todas las luces.
 
 ---
-
-## HITO 4 — Capa RPG
-
-### Fase 18 — Equipo y feruquimia (GDD §9)
-
-- [ ] **18.1 Inventario y equipo** (no existe): ranuras de arma, armadura y 2 mentes de metal;
-      UI en la ficha de personaje.
-- [ ] **18.2 Armaduras**: cuero / placas (metal portado → se le puede empujar, atraer y desarmar)
-      / aluminio (inmune al empuje). La armadura y la etiqueta `metallic` pasan a salir del equipo.
-- [ ] **18.3 Sistema genérico de mentes de metal**: 1 carga por combate que no se recarga
-      (en combate no se almacena); decantar no gasta acción. Las innatas (hierro del
-      Lanzamonedas, oro del Deslizador) pasan a usarlo. Llenarlas es cosa de la exploración.
-- [ ] **18.4 Las 11 mentes de la tabla del GDD**: oro, peltre, acero, hierro, estaño, cinc,
-      bronce, electrum, cromo, latón y cobre.
-- [ ] **18.5 Armas**: daño base, alcance, si son metálicas (pueden desarmarse) y penetración.
-
-### Fase 19 — Progresión (GDD §14)
-
-- [ ] XP y niveles; vida `+5` por nivel.
-- [ ] 2 puntos de atributo por nivel con coste creciente (1 / 2 / 3) y su UI de reparto.
-- [ ] **Sistema de talentos como modificadores** de las habilidades (parches sobre `SkillDef`:
-      +duración, +objetivos, efecto extra).
-- [ ] Árboles de 2 ramas por personaje (Aviador/Artillero, Virtuoso/Inmortal,
-      Titiritero/Duelista, Ingeniera/Tiradora) con los talentos ya nombrados en el GDD: Rebote,
-      Finta, Pullas, Arrollar, Peltre templado, Réplica…
-- [ ] Hitos de nivel que dan acciones extra (segunda Reacción, segunda carga de duraluminio).
-
-### Fase 20 — Enemigos (GDD §13)
-
-Cada uno con su prefab, su perfil de IA y un escenario que demuestre su contrajuego:
-
-- [ ] Guardia con placas (metal portado; el prefab básico ya existe desde el Hito 2)
-- [ ] Guardia con aluminio (inmune al empuje)
-- [ ] Koloss (Gigante, muy sensible a las emociones)
-- [ ] Lanzamonedas enemigo (empuja y desarma a la party si lleva metal)
-- [ ] Aplacador enemigo (quita Reacciones)
-- [ ] Ahumador (nube de cobre: anula Leer intenciones)
-- [ ] Inquisidor de Acero (élite con asistencias)
-- [ ] Kandra (disfraz; se detecta con bronce o Agudeza)
-
----
-
-## HITO 5 — Fuera del combate (GDD §12)
-
-### Fase 21 — Exploración
-
-- [ ] **21.1 Viales** como recurso de exploración (inventario, 18.1).
-- [ ] **21.2 Pruebas deterministas**: dificultad visible; pasas si tu atributo llega o pagas
-      1 vial por cada punto que falte; también se puede buscar otra solución.
-- [ ] **21.3 Elementos interactuables**: cerraduras, trampas, puertas forzables, palancas
-      lejanas, escombros.
-- [ ] **21.4 Bruma con efecto en el juego**: límite de apuntado `6 + AGU` m dentro de la bruma
-      froxel y sigilo de noche.
-- [ ] **21.5 Una lente por personaje:**
-  - [ ] Líneas azules: modo de visión que resalta el metal (trabajo de render: overlay o
-        post-proceso).
-  - [ ] Estaño: oír tras las paredes, oler la pólvora.
-  - [ ] Deslizar para pasar patrullas o trampas.
-  - [ ] Peltre para forzar puertas.
-  - [ ] Bronce para detectar alomantes que se esconden; cobre para ocultar a la party.
-  - [ ] Cerraduras y trampas mecánicas, fabricar viales y cargas.
-  - [ ] Cobre feruquímico: diario de pistas.
-
-### Fase 22 — Social (requiere un sistema de diálogo, que no existe)
-
-- [ ] Sistema de diálogo con opciones condicionadas por personaje, atributo o coste.
-- [ ] Aplacar y Encender en los diálogos (Voz), disfraces y acentos (Deslizador), intimidar
-      (Lanzamonedas), conocimiento técnico (Artificiera).
-
----
-
-## Decisiones pendientes que bloquean tareas
-
-- [ ] ¿`fear` se queda como estado? (fase 13)
-- [ ] Justificación narrativa de los personajes con varios metales (GDD §17)
-
----
-
-<details>
-<summary>Brief original del diseño (lo que dio origen al GDD)</summary>
-
-A partir de ahora actua como un experimentado diseñador de videojuegos.
-Como sabes quiero hacer mi juego como Baldurs Gate 3. Tematizado en los libros de nacidos de la bruma era 1 y 2.
-Quiero tener una party de 4 personajes predefinidos. Cada personaje debe tener un playstyle o tener una "clase" que tendra un conjunto de habilidades de nacido de la bruma.
-Quiero que me ayudes a diseñar qué 4 playstyles deberian/podrian tener. Y las habilidades/poderes de cada uno. Para ello usa como mecanicas los poderes de la alomancia, feruquimia y artilugios que salen en los libros.
-
-Mecanicas ya pensadas:
-Cada personaje tiene una barra de "mana" que realmente sera la cantidad de metales que tienen. Usar una habilidad, gasta de esa barra. Cuando te quedas sin, el proximo turno tu personaje no puede usar magias ya que ha bebido un vial y esta recargando los metales.
-Posibilidad de lanzar o empujar cajas pesadas o props que hayan por el escenario para aturdir/hacer daño a los enemigos.
-Combos/Asistencias: con algunas acciones concretas otros personajes pueden reaccionar a la accion que haya realizado un personaje y propinar un golpe extra o algo asi. Por ejemplo: Con un personaje lanzo una caja a un enemigo, al golpearlo, otro personaje de la party dispara tambien al enemigo para hacer daño extra. Me diseñas en qué momentos esto ocurriria? Y cuales serian las reacciones de los demas?
-Pensaba añadir tambien alguna manera de crear zonas/campos infusos de Fortuna (para mas probabilidad de critico), Conexion (si haces un bufo o debufo en el area, se comparte entre todos los personajes), Investidura (potencia las magias), pero no se como se formarian si como item,habilidad o prop del environment. Y si es ya muchas mecanicas juntas.
-
-En mi juego no hay % de acierto, aciertas siempre. Si hay % de critico.
-Los personajes hacen un daño "fijo", en base a sus stats. Pero ese daño puede convertirse en un rango de daño en base a la armadura del que recibe el golpe. Por ejemplo: mi personaje hace 10 de daño, pero como el enemigo tiene 5 de armadura, mi ataque pasa a hacer entre 7 a 10 de daño. Ayudame a diseñar una formula para eso.
-Los personajes tienen stats, pero no quiero usar los tipicos de DnD hasta cierto punto, quiero hacerlos de manera que tengan sentido en mi juego.
-Aqui te dejo un listado de estadisticas que creo que vale la pena que los atributos modifiquen: % Crit, Daño Magico, Daño fisico, Daño de asistencia/combo, Numero de acciones por turno, Vida, Armadura, Iniciativa. Ayudame a diseñar los atributos y dime si faltan estadisticas que añadirias.
-
-Ahora te voy a describir poderes/habilidades/aplicaciones de los poderes/magias de mistborn que se me han ocurrido que pueden trasladarse al juego.
-Autoataque: Puños/espada/pistola
-Steel Push/pull: Salto grande para moverse grandes distancias. Atraer /empujar objetos para lanzar los props del escenario como dije.
-Peltre: Modo berserker durante x turnos donde te mueves mas rapido y pegas mas. Durante los proximos X turnos te curas X puntos de vida. Lanzar props pero esta vez escogiendo el angulo.
-Estaño: Marca del cazador para que el siguiente ataque quite mas vida. Durante X turnos posibilidad de esquivar ataques melee. Contraataque instintivo.
-Cinc, encender emociones: Buff a aliados, taunts o efectos negativos al enemigo.
-Laton, aplacar emociones: Quitar debuffs de aliados y efectos positivos a enemigos.
-Cadmio/Bendaleo: Burbuja de tiempo para pegarte a otra velocidad con el enemigo concreto.
-Duralominio: Habilidad que tienen todos los de la party, al usarlo la siguiente habilidad es el doble de fuerte, pero te agota todo el mana.
-Steel push/pull: burbuja para % de esquivar balas. Mega disparo. Disparo encadenado. Disparo con rebote. Desarme
-Cromo: Silencio de habilidades
-Bronce: Revela proxima accion del enemigo
-Cubo de ettmetal: Para lanzarlo y crear burbujas de cadmio/bendaleo o steel para empujar o otros. Tendria X cargas por combate.
-Oro feruquimio: Reserva de salud / curacion pasiva. Una vez por combate.
-Peltre feruquimico: Mega ataque una vez por comate.
-Electrum feruquimico: Mega velocidad una vez por combate.
-
-Nose si quizas los poderes feruquimios podrian ser objetos que equipas. Para dar personalizacion o que habilidades/pasivas puedan dar los objetos equipables.
-
-Arquetipos/clases/estilos de juego que ya he pensado:
-Ranged/Rogue a distancia: Personaje que ataca a distancia con gran movilidad ya que puede hacer los saltos grandes del steel. Por balancear no lo se, pero quizas tambien es el que peude lanzar los props y cajas del environment?
-Berserker/bardo: Se bufa con peltre y cinc para pegar durante unos turnos y luego usa laton y cinc para evitar que le focuseen. (no me convence del todo)
-Personaje que usa en parte gadgets, como el ettmetal cube, y puede infundir de algunos metales el cubo.
-
-Tampoco he pensado en nada de stats o posibles acciones fuera del combate, como abrir cerraduras o deteccion de trampas o lo que sea, me ayudas a diseñar tambien algunos de eso?
-
-</details>

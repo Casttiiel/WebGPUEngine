@@ -1,4 +1,5 @@
 import { mat4, vec3 } from 'gl-matrix';
+import { GISharedResources } from '../../renderer/gi/GISharedResources';
 import { Component } from '../../core/ecs/Component';
 import { Material } from '../../renderer/resources/Material';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -443,6 +444,7 @@ export class ParticleSystemComponent extends Component {
       probes.getProbeSetBuffer(),
       fogView,
       fogParams,
+      GISharedResources.getVersion(),
     ];
     if (this.renderBindGroup && deps.every((d, i) => d === this.renderDeps[i])) return;
     this.renderDeps = deps;
@@ -460,6 +462,7 @@ export class ParticleSystemComponent extends Component {
         { binding: 8, resource: fogView },
         { binding: 9, resource: { buffer: fogParams } },
         { binding: 10, resource: SamplerLibrary.simpleSampler },
+        ...GISharedResources.entries(14),
       ],
     });
     this.registerRenderKey();

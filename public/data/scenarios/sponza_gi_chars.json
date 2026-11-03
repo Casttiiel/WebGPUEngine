@@ -1,0 +1,261 @@
+{
+ "description": "Fase 34.4: personajes con skinning en la GI. Cuatro personajes en el patio de Sponza (dos en idle, uno trotando, uno muerto en el suelo): deben recibir y proyectar oclusión de contacto en la GI (sombra suave a sus pies) y su pose animada debe seguirse en el BVH.",
+ "scenes": [
+  "sponza_gi.json"
+ ],
+ "environment": "environment_sponza_gi.json",
+ "entities": [
+  {
+   "components": {
+    "name": "GICharIdleA",
+    "transform": {
+     "position": [
+      -1.5,
+      0,
+      3
+     ],
+     "rotation": [
+      0,
+      180,
+      0
+     ]
+    },
+    "skeletal_mesh": {
+     "gltf": "character.gltf",
+     "baseColorFactor": [
+      0.9,
+      0.2,
+      0.15,
+      1
+     ]
+    },
+    "animator": {
+     "extraAnimations": [
+      "universal_animations.gltf"
+     ],
+     "states": [
+      {
+       "name": "Idle",
+       "clip": "Idle_Loop",
+       "loop": true
+      },
+      {
+       "name": "Walk",
+       "clip": "Jog_Fwd_Loop",
+       "loop": true
+      },
+      {
+       "name": "Dead",
+       "clip": "Death01",
+       "loop": false
+      }
+     ],
+     "default": "Idle",
+     "transitions": [
+      {
+       "from": "Idle",
+       "to": "Walk",
+       "condition": "moving",
+       "blendTime": 0.15
+      },
+      {
+       "from": "Idle",
+       "to": "Dead",
+       "condition": "dead",
+       "blendTime": 0.15
+      }
+     ]
+    }
+   }
+  },
+  {
+   "components": {
+    "name": "GICharIdleB",
+    "transform": {
+     "position": [
+      1.6,
+      0,
+      1
+     ],
+     "rotation": [
+      0,
+      140,
+      0
+     ]
+    },
+    "skeletal_mesh": {
+     "gltf": "character.gltf",
+     "baseColorFactor": [
+      0.2,
+      0.55,
+      0.2,
+      1
+     ]
+    },
+    "animator": {
+     "extraAnimations": [
+      "universal_animations.gltf"
+     ],
+     "states": [
+      {
+       "name": "Idle",
+       "clip": "Idle_Loop",
+       "loop": true
+      },
+      {
+       "name": "Walk",
+       "clip": "Jog_Fwd_Loop",
+       "loop": true
+      },
+      {
+       "name": "Dead",
+       "clip": "Death01",
+       "loop": false
+      }
+     ],
+     "default": "Idle",
+     "transitions": [
+      {
+       "from": "Idle",
+       "to": "Walk",
+       "condition": "moving",
+       "blendTime": 0.15
+      },
+      {
+       "from": "Idle",
+       "to": "Dead",
+       "condition": "dead",
+       "blendTime": 0.15
+      }
+     ]
+    }
+   }
+  },
+  {
+   "components": {
+    "name": "GICharJog",
+    "transform": {
+     "position": [
+      0,
+      0,
+      -2
+     ],
+     "rotation": [
+      0,
+      200,
+      0
+     ]
+    },
+    "skeletal_mesh": {
+     "gltf": "character.gltf",
+     "baseColorFactor": [
+      0.25,
+      0.35,
+      0.9,
+      1
+     ]
+    },
+    "animator": {
+     "extraAnimations": [
+      "universal_animations.gltf"
+     ],
+     "states": [
+      {
+       "name": "Idle",
+       "clip": "Idle_Loop",
+       "loop": true
+      },
+      {
+       "name": "Walk",
+       "clip": "Jog_Fwd_Loop",
+       "loop": true
+      },
+      {
+       "name": "Dead",
+       "clip": "Death01",
+       "loop": false
+      }
+     ],
+     "default": "Walk",
+     "transitions": [
+      {
+       "from": "Idle",
+       "to": "Walk",
+       "condition": "moving",
+       "blendTime": 0.15
+      },
+      {
+       "from": "Idle",
+       "to": "Dead",
+       "condition": "dead",
+       "blendTime": 0.15
+      }
+     ]
+    }
+   }
+  },
+  {
+   "components": {
+    "name": "GICharDead",
+    "transform": {
+     "position": [
+      2.5,
+      0,
+      4.5
+     ],
+     "rotation": [
+      0,
+      60,
+      0
+     ]
+    },
+    "skeletal_mesh": {
+     "gltf": "character.gltf",
+     "baseColorFactor": [
+      0.85,
+      0.8,
+      0.3,
+      1
+     ]
+    },
+    "animator": {
+     "extraAnimations": [
+      "universal_animations.gltf"
+     ],
+     "states": [
+      {
+       "name": "Idle",
+       "clip": "Idle_Loop",
+       "loop": true
+      },
+      {
+       "name": "Walk",
+       "clip": "Jog_Fwd_Loop",
+       "loop": true
+      },
+      {
+       "name": "Dead",
+       "clip": "Death01",
+       "loop": false
+      }
+     ],
+     "default": "Dead",
+     "transitions": [
+      {
+       "from": "Idle",
+       "to": "Walk",
+       "condition": "moving",
+       "blendTime": 0.15
+      },
+      {
+       "from": "Idle",
+       "to": "Dead",
+       "condition": "dead",
+       "blendTime": 0.15
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

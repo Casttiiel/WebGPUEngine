@@ -6,6 +6,10 @@
 //   3 bvh normal — primary ray through the BVH: world normal (back faces red)
 //   4 volumes    — first volume covering each G-buffer pixel (local → level/cascades), checker = probe cells
 //   5 coverage   — GI coverage (green) vs baked-probe fallback (red)
+//   6 cache      — radiance-cache cell at each G-buffer pixel: its radiance; missing cells show
+//                  a dim hash colour, cells never shaded magenta
+//   7 lightGrid  — local lights listed in the light-grid cell (black 0 → white ≥ 16, red = full)
+//   8 final      — the irradiance ambient_gi.fs applies (GI resolve, after gather/temporal) / π
 // ---------------------------------------------------------------------------
 
 #include "common/uniforms"
@@ -21,7 +25,11 @@
 @group(0) @binding(5) var giIrradianceAtlas: texture_2d<f32>;
 @group(0) @binding(6) var giVisibilityAtlas: texture_2d<f32>;
 @group(0) @binding(7) var giSampler: sampler;
+@group(0) @binding(3) var<storage, read> giLights: array<GILight>;
 @group(0) @binding(8) var<storage, read> giVolumes: array<GIVolume>;
+@group(0) @binding(9) var<storage, read> giLightGrid: array<u32>;
+@group(0) @binding(10) var<storage, read_write> giCacheKeys: array<atomic<u32>>;
+@group(0) @binding(11) var<storage, read_write> giCacheCells: array<GICacheCell>;
 
 @group(2) @binding(0) var gAlbedo:        texture_2d<f32>;
 @group(2) @binding(1) var gNormals:       texture_2d<f32>;
@@ -29,8 +37,11 @@
 @group(2) @binding(3) var samplerGBuffer: sampler;
 
 @group(3) @binding(0) var outDebug: texture_storage_2d<rgba16float, write>;
+@group(3) @binding(1) var giResolve: texture_2d<f32>;
 
 #include "gi/common/gi_sampling"
+#include "gi/common/gi_light_grid"
+#include "gi/common/gi_cache"
 
 @compute @workgroup_size(8, 8)
 fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -65,6 +76,23 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
             let gi = giSampleIrradiance(g.worldPos, N, normalize(g.viewDir));
             if (mode == 1u) {
                 color = gi.rgb * giParams.tuning.z * GI_INV_PI;
+            } else if (mode == 6u) {
+                let cell = giCacheFind(g.worldPos, N, false);
+                if (cell == GI_MISS) {
+                    let h = giCacheKey(g.worldPos, N).x;
+                    color = unpack4x8unorm(h).rgb * 0.08;
+                } else {
+                    let c = giCacheCells[cell].radiance;
+                    color = select(vec3<f32>(1.0, 0.0, 1.0), c.rgb, c.w > 0.0);
+                }
+            } else if (mode == 7u) {
+                let cell = giLightGridCell(g.worldPos);
+                var count = 0u;
+                if (cell != GI_MISS) { count = giLightGrid[cell]; }
+                color = select(vec3<f32>(f32(count) / 16.0), vec3<f32>(1.0, 0.1, 0.1), count >= GI_CELL_MAX_LIGHTS);
+            } else if (mode == 8u) {
+                let res = vec2<f32>(textureDimensions(giResolve));
+                color = textureLoad(giResolve, vec2<i32>(uv * res), 0).rgb * GI_INV_PI;
             } else if (mode == 5u) {
                 color = mix(vec3<f32>(1.0, 0.1, 0.05), vec3<f32>(0.1, 1.0, 0.2), gi.a);
             } else {

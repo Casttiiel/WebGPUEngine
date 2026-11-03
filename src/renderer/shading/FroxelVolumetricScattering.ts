@@ -21,6 +21,24 @@ import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
  * Modern Froxel-based Volumetric Scattering System
  * Implements industry-standard volumetric lighting using 3D frustum voxelization.
  */
+/**
+ * Extra light for the froxel volume (FroxelVolumetricScattering.setAmbientInjector): reads the
+ * light volume so far (`read`, rgb = in-scattered light, a = sun factor, pass a through) and
+ * writes it plus its own contribution to `write`. `camera` / `params` are the froxel passes'
+ * group 0 (camera) and group 1 (FroxelUniforms + VolumetricUniforms). Returns false when it
+ * wrote nothing (the volume then stays in `read`).
+ */
+export type FroxelAmbientInjector = (
+  encoder: GPUCommandEncoder,
+  io: {
+    camera: GPUBindGroup;
+    params: GPUBindGroup;
+    read: GPUTextureView;
+    write: GPUTextureView;
+    dimensions: { x: number; y: number; z: number };
+  },
+) => boolean;
+
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
   private isEnabled: boolean = true;
@@ -32,6 +50,10 @@ export class FroxelVolumetricScattering {
   // Froxel grid dimensions — half-res relative to the previous 240×135×128.
   // Smaller grid + temporal blue-noise dithering (already in raymarch shader)
   // lets TAA reconstruct detail without the cost of the full-res grid.
+  private ambientInjector: FroxelAmbientInjector | null = null;
+  private ambientInjectorFrame = -10;
+  private frameCounter = 0;
+
   private froxelDimensions = {
     x: 160,
     y: 90,
@@ -564,6 +586,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   public updateFroxelData(linearDepth: RenderTarget): void {
+    this.frameCounter++;
     this.applyEnvironmentSettings();
     if (!this.isVolumetricEnabled()) {
       this.historyValid = false;
@@ -594,6 +617,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       this.executeClearLightPass(commandEncoder);
     }
 
+    this.executeAmbientInjectionPass(commandEncoder);
+
     this.executePointLightInjectionPass(commandEncoder);
 
     this.executeSpotLightInjectionPass(commandEncoder);
@@ -602,6 +627,37 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     this.executeVolumetricIntegrationPass(commandEncoder);
     // No submit here — endFrame() submits everything together.
+  }
+
+  /**
+   * Replaces the constant ambient with the injector's (realtime GI) while one is set: called
+   * every frame by RealtimeGI; null (or not refreshed for a frame) restores the constant.
+   */
+  public setAmbientInjector(injector: FroxelAmbientInjector | null): void {
+    this.ambientInjector = injector;
+    this.ambientInjectorFrame = this.frameCounter;
+  }
+
+  /** Whether the injector is live this frame (set during this or the previous frame). */
+  private hasAmbientInjector(): boolean {
+    return !!this.ambientInjector && this.frameCounter - this.ambientInjectorFrame <= 1;
+  }
+
+  /** Adds the injector's ambient to the light volume: one more step of the ping-pong. */
+  private executeAmbientInjectionPass(commandEncoder: GPUCommandEncoder): void {
+    if (!this.hasAmbientInjector() || !this.cameraBindGroup || !this.parametersBindGroup) return;
+    const read = this.froxelLightTextureView;
+    const write = this.froxelLightTempTextureView;
+    const wrote = this.ambientInjector!(commandEncoder, {
+      camera: this.cameraBindGroup,
+      params: this.parametersBindGroup,
+      read,
+      write,
+      dimensions: this.froxelDimensions,
+    });
+    if (!wrote) return;
+    this.froxelLightTextureView = write;
+    this.froxelLightTempTextureView = read;
   }
 
   private executeDensityPass(commandEncoder: GPUCommandEncoder, linearDepth: RenderTarget): void {
@@ -1278,7 +1334,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     if (this.ambientUniformBuffer) {
       const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
-      const ambientUniform = new Float32Array([0.7, 0.8, 0.9, ambientData.globalFactor]);
+      // The ambient injector (realtime GI) adds its own ambient: no constant on top.
+      const ambient = this.hasAmbientInjector() ? 0 : ambientData.globalFactor;
+      const ambientUniform = new Float32Array([0.7, 0.8, 0.9, ambient]);
       this.device.queue.writeBuffer(this.ambientUniformBuffer, 0, ambientUniform.buffer);
     }
 

@@ -3,6 +3,8 @@
 // (gi/gi_resolve.cs, reduced resolution), upsampled here with depth/normal-aware weights so it
 // doesn't bleed across edges. In compare mode the left side uses the baked probes exactly as
 // ambient.fs does.
+// GI_DIRECT (RealtimeGI.renderDiffuseDirect, the water G-buffer): no resolve — the probe
+// volumes are sampled per pixel (group 3, GISharedResources), baked probes fill the rest.
 
 #include "common/uniforms"
 #include "common/structs"
@@ -21,10 +23,22 @@
 
 @group(2) @binding(0) var gAO:               texture_2d<f32>;
 @group(2) @binding(1) var samplerAO:         sampler;
+#ifndef GI_DIRECT
 @group(2) @binding(2) var<uniform> giParams: GIParams;
+#endif
 @group(2) @binding(3) var brdfLUT:           texture_2d<f32>;
 @group(2) @binding(4) var<storage, read> probeSet: ProbeSet;
 @group(2) @binding(5) var giResolve:         texture_2d<f32>;
+
+#ifdef GI_DIRECT
+@group(3) @binding(0) var<uniform> giParams: GIParams;
+@group(3) @binding(1) var<storage, read> giProbeState: array<vec4<f32>>;
+@group(3) @binding(2) var<storage, read> giVolumes: array<GIVolume>;
+@group(3) @binding(3) var giIrradianceAtlas: texture_2d<f32>;
+@group(3) @binding(4) var giVisibilityAtlas: texture_2d<f32>;
+@group(3) @binding(5) var giSampler: sampler;
+#include "gi/common/gi_sampling"
+#endif
 
 /** ambient.fs irradiance: baked probes, sky SH, hemisphere placeholder — × ambient boosts. */
 fn bakedIrradiance(g: GBuffer) -> vec3<f32> {
@@ -85,7 +99,12 @@ fn fs(@builtin(position) fragCoord: vec4<f32>, @location(0) uv: vec2<f32>) -> @l
     if (compare && uv.x < split) {
         irradiance = bakedIrradiance(g);
     } else {
+#ifdef GI_DIRECT
+        let gi = giSampleIrradiance(g.worldPos, N, normalize(g.viewDir));
+        irradiance = gi.rgb * giParams.tuning.z + bakedIrradiance(g) * (1.0 - gi.a);
+#else
         irradiance = upsampleGI(fragCoord.xy, g);
+#endif
     }
 
     // kD exactly as ambient.fs (LUT directional albedo + Kulla-Conty multiple scattering).

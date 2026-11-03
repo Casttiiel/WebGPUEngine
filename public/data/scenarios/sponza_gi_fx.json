@@ -1,0 +1,80 @@
+{
+ "description": "Fase 34.3: integración de la GI en el resto del pipeline. Sponza GI con un estanque en el patio (agua iluminada con las sondas GI por píxel), ceniza iluminada cayendo (ambiente de partículas desde las sondas GI) y un volumen de niebla en el patio (ambiente de los froxels desde las sondas GI). F9 off/realtime/compare.",
+ "scenes": [
+  "sponza_gi.json"
+ ],
+ "environment": "environment_sponza_gi.json",
+ "entities": [
+  {
+   "components": {
+    "name": "GIPond",
+    "transform": {
+     "position": [
+      0,
+      0.02,
+      0
+     ],
+     "scale": [
+      8,
+      0.1,
+      20
+     ]
+    },
+    "render": {
+     "meshes": [
+      {
+       "mesh": "unit_cube.obj",
+       "material": "blockout_water.mat"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "prefab": "tactical/ash_fall.prefab",
+   "components": {
+    "name": "GIAsh",
+    "transform": {
+     "position": [
+      0,
+      4,
+      0
+     ]
+    },
+    "particle_system": {
+     "spawnRadius": [
+      8,
+      4,
+      13
+     ],
+     "emissionRate": 400
+    }
+   }
+  },
+  {
+   "components": {
+    "name": "GIFog",
+    "transform": {
+     "position": [
+      0,
+      5,
+      0
+     ]
+    },
+    "fog_volume": {
+     "shape": "box",
+     "size": [
+      9,
+      6,
+      15
+     ],
+     "density": 0.08,
+     "scatteringCoeff": 1.0,
+     "absorptionCoeff": 0.2,
+     "falloff": 2.0,
+     "blendMode": "add"
+    }
+   }
+  }
+ ]
+}

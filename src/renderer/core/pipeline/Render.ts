@@ -110,6 +110,11 @@ export class Render {
         requiredFeatures,
         requiredLimits: {
           maxStorageBufferBindingSize: 1024 * 1024 * 1024, // 1GB de buffer máximo
+          // La GI en tiempo real traza con 11 storage buffers por pase (el mínimo garantizado es 8).
+          maxStorageBuffersPerShaderStage: Math.min(
+            this.adapter.limits.maxStorageBuffersPerShaderStage,
+            16,
+          ),
         },
       });
 

@@ -32,6 +32,16 @@ export class SkinnedMesh extends Mesh {
     }
   }
 
+  /** Joint indices per vertex (4 × u8), kept on the CPU (GI skinning, GIScene). */
+  public getJoints(): Uint8Array | undefined {
+    return this.joints;
+  }
+
+  /** Joint weights per vertex (4 × f32), kept on the CPU (GI skinning, GIScene). */
+  public getWeights(): Float32Array | undefined {
+    return this.weights;
+  }
+
   // ── Factory ──────────────────────────────────────────────────────────────
 
   public static createFromData(

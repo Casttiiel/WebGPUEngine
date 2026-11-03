@@ -4,8 +4,6 @@ import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
-import { PointLightComponent } from '../../components/render/PointLightComponent';
-import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory } from '../core/factories/PipelineFactory';
 import { ProbeManager } from '../core/managers/ProbeManager';
@@ -24,6 +22,11 @@ import {
 } from './GIProbeVolumes';
 import { GIVolumeComponent } from '../../components/render/GIVolumeComponent';
 import { GIScene } from './GIScene';
+import { GIWorldLightGrid } from './GIWorldLightGrid';
+import { GIRadianceCache } from './GIRadianceCache';
+import { GIFinalGather } from './GIFinalGather';
+import { GIProbeResources, GISharedResources } from './GISharedResources';
+import type { FroxelAmbientInjector } from '../shading/FroxelVolumetricScattering';
 
 export type GIMode = 'off' | 'realtime' | 'compare';
 export const GI_MODES: readonly GIMode[] = ['off', 'realtime', 'compare'];
@@ -36,23 +39,37 @@ export const GI_DEBUG_VIEWS = {
   bvhNormals: 3,
   volumes: 4,
   coverage: 5,
+  radianceCache: 6,
+  lightGrid: 7,
+  final: 8,
 } as const;
 export type GIDebugView = keyof typeof GI_DEBUG_VIEWS;
 
-/** Per quality: camera cascades (N³ each), rays per probe, probes traced per frame. */
-const QUALITY: Record<'high' | 'low', { cascadeProbes: number; cascades: number; raysPerProbe: number; batchSize: number }> = {
-  high: { cascadeProbes: 16, cascades: 4, raysPerProbe: 64, batchSize: 4096 },
-  low: { cascadeProbes: 12, cascades: 3, raysPerProbe: 32, batchSize: 2048 },
+/**
+ * Per quality: camera cascades (N³ each), rays per probe, probes traced per frame, radiance
+ * cache cells shaded per frame.
+ */
+const QUALITY: Record<
+  'high' | 'low',
+  { cascadeProbes: number; cascades: number; raysPerProbe: number; batchSize: number; cacheBudget: number }
+> = {
+  high: { cascadeProbes: 16, cascades: 4, raysPerProbe: 64, batchSize: 4096, cacheBudget: 16384 },
+  low: { cascadeProbes: 12, cascades: 3, raysPerProbe: 32, batchSize: 2048, cacheBudget: 8192 },
 };
+/** Radiance cache hash slots (power of two): 12 MB of cells. */
+const CACHE_CAPACITY = 1 << 18;
 /** Largest level volume (probes); bigger scenes coarsen the spacing, then fall back to cascades. */
 const MAX_LEVEL_PROBES = 16384;
 /** Probes of margin around the scene bounds in a level volume. */
 const LEVEL_MARGIN = 1;
 
-const MAX_LIGHTS = 32;
-const LIGHT_FLOATS = 12;
-/** GIParams in gi/common/gi_common.wgsl (13 × 16 bytes). */
-const PARAMS_BYTES = 208;
+/** GIParams.frameInfo.w bits (gi/common/gi_common.wgsl GI_FLAG_*). */
+const GI_FLAG_MULTIBOUNCE = 1;
+const GI_FLAG_COMPARE = 2;
+const GI_FLAG_CACHE = 4;
+const GI_FLAG_GATHER = 8;
+/** GIParams in gi/common/gi_common.wgsl (20 × 16 bytes). */
+const PARAMS_BYTES = 320;
 /** Cascade weights in the trace schedule (finest traced most often). */
 const CASCADE_WEIGHTS = [4, 2, 1, 1];
 /** Trace weight of a local volume near the camera. */
@@ -67,11 +84,18 @@ const SCENE_CHECK_INTERVAL = 120;
  *
  * Replaces only the ambient diffuse term: DeferredRenderer calls update() + renderDiffuse()
  * instead of AmbientLight.renderDiffuse() while the mode is not 'off'. Per frame:
- *   1. probe trace     — rays from the probes of one cascade through the scene BVH (GIScene),
- *                        hits lit by sun / one light / last frame's probes (multi-bounce)
- *   2. integrate       — rays → octahedral irradiance + visibility atlases (hysteresis)
- *   3. probe state     — relocation out of geometry, inactive probes, slot coordinates
- *   4. ambient_gi.fs   — per pixel: probe cascades (baked probes fill the gaps)
+ *   1. light grid      — every point/spot light binned into camera-centred world cells
+ *                        (GIWorldLightGrid)
+ *   2. radiance cache  — evict/list the hashed surface cells, shade a budget of them: sun,
+ *                        local lights of their grid cell, last frame's probes (GIRadianceCache)
+ *   3. probe trace     — rays from the probes of one batch through the scene BVH (GIScene);
+ *                        hits read their cache cell (shaded inline only while it's empty)
+ *   4. integrate       — rays → octahedral irradiance + visibility atlases (hysteresis)
+ *   5. probe state     — relocation out of geometry, inactive probes, slot coordinates
+ *   6. final gather    — one short ray per resolve texel: cache cells near, probes far, denoised
+ *                        (GIFinalGather); without it the resolve samples the probes
+ *   7. resolve         — reduced-resolution irradiance + specular scale, temporal accumulation
+ *   8. ambient_gi.fs   — per pixel: upsampled resolve (baked probes fill the gaps)
  * Created only while GI is on; destroy() releases every GPU resource.
  */
 export class RealtimeGI {
@@ -95,14 +119,33 @@ export class RealtimeGI {
     compareSplit: 0.5,
     /** Resolution of the GI resolve relative to the render (0.5 = a quarter of the pixels). */
     resolution: 0.5,
-    /** Screen-space temporal filter: weight of last frame's resolve (0 = off). */
+    /** Screen-space temporal filter: max weight of last frame's resolve (0 = off). */
     temporal: 0.9,
+    /** Probe rays read hashed surface cells instead of shading every hit (phase 3). */
+    radianceCache: true,
+    /** Shadow rays per cache update for the local lights of the cell's light-grid cell. */
+    lightSamples: 2,
+    /** Cache cell size near the camera (m); doubles every cacheLodDistance metres. */
+    cacheCellSize: 0.25,
+    cacheLodDistance: 6,
+    /** Minimum blend of a new cache sample (lower = smoother, slower to follow lights). */
+    cacheMinBlend: 0.15,
+    /** One short ray per resolve texel (phase 4): contact occlusion and near bounce. */
+    finalGather: true,
+    /** Gather ray length (m); past it the probes supply the far field. */
+    gatherRange: 3,
+    /** Temporal weight of the resolve while the gather is on (it needs more history). */
+    gatherTemporal: 0.95,
     debugView: 'none' as GIDebugView,
   };
 
   private mode: GIMode = 'realtime';
   private loaded = false;
   private scene = new GIScene();
+  private lightGrid: GIWorldLightGrid | null = null;
+  private cache: GIRadianceCache | null = null;
+  private gather: GIFinalGather | null = null;
+  private shared: GIProbeResources | null = null;
   private volumes: GIProbeVolumes | null = null;
   private volumeKey = '';
   private frame = 0;
@@ -123,6 +166,14 @@ export class RealtimeGI {
   private statePipeline!: GPUComputePipeline;
   private debugPipeline!: GPUComputePipeline;
   private ambientPipeline!: GPURenderPipeline;
+  /** ambient_gi.fs GI_DIRECT: per-pixel probe sampling for the water G-buffer. */
+  private ambientDirectPipeline!: GPURenderPipeline;
+  private directLayout!: GPUBindGroupLayout;
+  private directBindGroup: GPUBindGroup | null = null;
+  private directVersion = -1;
+  private froxelPipeline!: GPUComputePipeline;
+  private froxelIOLayout!: GPUBindGroupLayout;
+  private froxelIOBindGroups = new Map<GPUTextureView, GPUBindGroup>();
   private blitPipeline!: GPURenderPipeline;
   private specularPipeline!: GPURenderPipeline;
   private resolvePipeline!: GPUComputePipeline;
@@ -134,9 +185,6 @@ export class RealtimeGI {
   private paramsData = new ArrayBuffer(PARAMS_BYTES);
   private paramsF = new Float32Array(this.paramsData);
   private paramsU = new Uint32Array(this.paramsData);
-  private lightsBuffer!: GPUBuffer;
-  private lightsData = new Float32Array(MAX_LIGHTS * LIGHT_FLOATS);
-  private lightCount = 0;
   private rayRotation = mat4.create();
   private rotationQuat = quat.create();
 
@@ -148,7 +196,8 @@ export class RealtimeGI {
   private ambientBindGroups = new Map<GPUTextureView, GPUBindGroup>();
   private ambientKey: unknown[] = [];
   private debugTexture: GPUTexture | null = null;
-  private debugOutBindGroup: GPUBindGroup | null = null;
+  private debugOutBindGroups = new Map<GPUTextureView, GPUBindGroup>();
+  private debugView: GPUTextureView | null = null;
   private blitBindGroup: GPUBindGroup | null = null;
   private specularBindGroup: GPUBindGroup | null = null;
   /** Reduced-resolution GI irradiance (rgb) + specular scale (a), see gi/gi_resolve.cs. */
@@ -158,6 +207,8 @@ export class RealtimeGI {
    */
   private resolveTargets: { color: GPUTexture; distance: GPUTexture; colorView: GPUTextureView }[] = [];
   private resolveBindGroups: GPUBindGroup[] = [];
+  /** Gather result the resolve bind groups were built with (recreated when it changes). */
+  private resolveGatherView: GPUTextureView | null = null;
   private resolveParity = 0;
   private resolveView: GPUTextureView | null = null;
   private resolveLayout!: GPUBindGroupLayout;
@@ -166,10 +217,6 @@ export class RealtimeGI {
   private prevViewProj = mat4.create();
   private prevCameraPos = vec3.create();
   private historyValid = false;
-  private lightRefs: (PointLightComponent | SpotLightComponent)[] = [];
-  private lightOrder: number[] = [];
-  private lightDist: number[] = [];
-  private byLightDistance = (a: number, b: number) => this.lightDist[a]! - this.lightDist[b]!;
 
   public setMode(mode: GIMode): void {
     this.mode = mode;
@@ -181,6 +228,16 @@ export class RealtimeGI {
 
   public getScene(): GIScene {
     return this.scene;
+  }
+
+  /** Light-grid and radiance-cache figures (eval / tuning: is the cache budget big enough?). */
+  public getCacheStats(): { lights: number; liveCells: number; capacity: number; budget: number } {
+    return {
+      lights: this.lightGrid?.getLightCount() ?? 0,
+      liveCells: this.cache?.getLiveCells() ?? 0,
+      capacity: CACHE_CAPACITY,
+      budget: QUALITY[RealtimeGI.settings.quality].cacheBudget,
+    };
   }
 
   // ─── Load ─────────────────────────────────────────────────────────────────
@@ -200,6 +257,9 @@ export class RealtimeGI {
       { binding: 6, visibility: C, texture: { sampleType: 'float' } },
       { binding: 7, visibility: C, sampler: { type: 'filtering' } },
       { binding: 8, visibility: C, buffer: { type: 'read-only-storage' } }, // volumes
+      { binding: 9, visibility: C, buffer: { type: 'read-only-storage' } }, // light grid
+      { binding: 10, visibility: C, buffer: { type: 'storage' } }, // cache keys
+      { binding: 11, visibility: C, buffer: { type: 'storage' } }, // cache cells
     ]);
     this.traceLayout = BindGroupFactory.getLayout('gi_trace_layout', [
       { binding: 0, visibility: C, buffer: { type: 'storage' } },
@@ -225,6 +285,7 @@ export class RealtimeGI {
     ]);
     this.debugOutLayout = BindGroupFactory.getLayout('gi_debug_out_layout', [
       { binding: 0, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float' } },
+      { binding: 1, visibility: C, texture: { sampleType: 'unfilterable-float' } }, // GI resolve
     ]);
     this.blitLayout = BindGroupFactory.getLayout('gi_blit_layout', [
       { binding: 0, visibility: F, texture: { sampleType: 'float' } },
@@ -232,17 +293,23 @@ export class RealtimeGI {
     ]);
     this.resolveLayout = BindGroupFactory.getLayout('gi_resolve_layout', [
       { binding: 0, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float' } },
-      { binding: 1, visibility: C, storageTexture: { access: 'write-only', format: 'r32float' } },
+      { binding: 1, visibility: C, storageTexture: { access: 'write-only', format: 'rg32float' } },
       { binding: 2, visibility: C, texture: { sampleType: 'float' } },
       { binding: 3, visibility: C, texture: { sampleType: 'unfilterable-float' } },
       { binding: 4, visibility: C, buffer: { type: 'uniform' } },
+      { binding: 5, visibility: C, texture: { sampleType: 'unfilterable-float' } }, // gather
     ]);
     this.specularLayout = BindGroupFactory.getLayout('gi_specular_layout', [
       { binding: 0, visibility: F, texture: { sampleType: 'float' } }, // GI resolve
       { binding: 1, visibility: F, sampler: { type: 'filtering' } },
     ]);
 
-    const [traceCode, integrateCode, stateCode, debugCode, ambientCode, blitCode, vsCode, specCode, resolveCode] =
+    this.directLayout = BindGroupFactory.getLayout('gi_direct_layout', GISharedResources.layoutEntries(F, 0));
+    this.froxelIOLayout = BindGroupFactory.getLayout('gi_froxel_io_layout', [
+      { binding: 0, visibility: C, texture: { sampleType: 'float', viewDimension: '3d' } },
+      { binding: 1, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' } },
+    ]);
+    const [traceCode, integrateCode, stateCode, debugCode, ambientCode, blitCode, vsCode, specCode, resolveCode, directCode, froxelCode] =
       await Promise.all([
         ResourceManager.loadShader('gi/gi_probe_trace.cs'),
         ResourceManager.loadShader('gi/gi_probe_integrate.cs'),
@@ -253,9 +320,19 @@ export class RealtimeGI {
         ResourceManager.loadShader('utility/presentation.vs'),
         ResourceManager.loadShader('lighting/ambient_specular.fs', ['REALTIME_GI']),
         ResourceManager.loadShader('gi/gi_resolve.cs'),
+        ResourceManager.loadShader('lighting/ambient_gi.fs', ['GI_DIRECT']),
+        ResourceManager.loadShader('gi/gi_froxel_ambient.cs'),
       ]);
 
     const sceneLayout = GIScene.getLayout();
+    this.lightGrid = new GIWorldLightGrid();
+    this.cache = new GIRadianceCache(CACHE_CAPACITY);
+    this.gather = new GIFinalGather();
+    await Promise.all([
+      this.lightGrid.load(),
+      this.cache.load(this.frameLayout, sceneLayout),
+      this.gather.load(this.frameLayout, sceneLayout),
+    ]);
     const compute = (label: string, code: string, entryPoint: string, layouts: GPUBindGroupLayout[]) =>
       device.createComputePipelineAsync({
         label,
@@ -299,6 +376,8 @@ export class RealtimeGI {
       this.blitPipeline,
       this.specularPipeline,
       this.resolvePipeline,
+      this.ambientDirectPipeline,
+      this.froxelPipeline,
     ] = await Promise.all([
       compute('gi_probe_trace', traceCode, 'cs', [this.frameLayout, sceneLayout, this.traceLayout]),
       device.createComputePipelineAsync({
@@ -341,6 +420,18 @@ export class RealtimeGI {
         BindGroupFactory.getGBufferComputeLayout(),
         this.resolveLayout,
       ]),
+      fullscreen('gi_ambient_direct', directCode, [
+        BindGroupFactory.getCameraUniformsLayout(),
+        BindGroupFactory.getGBufferLayout(),
+        this.ambientLayout,
+        this.directLayout,
+      ]),
+      compute('gi_froxel_ambient', froxelCode, 'cs', [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        this.froxelIOLayout,
+        this.frameLayout,
+      ]),
     ]);
 
     this.fullscreenQuad = await Mesh.getAsync('fullscreenquad.obj');
@@ -355,11 +446,6 @@ export class RealtimeGI {
       this.temporalData.byteLength,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-    this.lightsBuffer = GPUUtils.createBuffer(
-      'gi_lights',
-      this.lightsData.byteLength,
-      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    );
     this.loaded = true;
   }
 
@@ -370,6 +456,28 @@ export class RealtimeGI {
    * yet (pipelines or scene BVH still building) — the caller keeps the baked ambient.
    */
   public update(): boolean {
+    const lit = this.traceFrame();
+    GISharedResources.publish(lit ? this.sharedResources() : null);
+    return lit;
+  }
+
+  /** The probe volumes for consumers outside the deferred ambient (GISharedResources). */
+  private sharedResources(): GIProbeResources | null {
+    const v = this.volumes;
+    if (!v) return null;
+    if (this.shared?.volumes !== v.volumesBuffer) {
+      this.shared = {
+        params: this.paramsBuffer,
+        probeState: v.stateBuffer,
+        volumes: v.volumesBuffer,
+        irradiance: v.irradianceReadView,
+        visibility: v.visibilityReadView,
+      };
+    }
+    return this.shared;
+  }
+
+  private traceFrame(): boolean {
     if (!this.loaded) return false;
     if (!this.scene.isReady()) {
       if (!this.scene.isBuilding()) void this.scene.build();
@@ -383,7 +491,8 @@ export class RealtimeGI {
     const volumes = this.ensureVolumes();
     const camera = Engine.getRender().getMainCamera();
     this.batch = volumes.advance(camera.getPosition());
-    this.gatherLights(camera.getPosition());
+    const lightGrid = this.lightGrid!;
+    lightGrid.prepare(camera.getPosition());
     this.writeParams(volumes);
     const frameBindGroup = this.ensureFrameBindGroup(volumes);
     if (!frameBindGroup) return false;
@@ -391,6 +500,7 @@ export class RealtimeGI {
     const encoder = Render.getInstance().getCommandEncoder();
     const profiler = GPUProfiler.getInstance();
     const probes = this.batch.count;
+    const s = RealtimeGI.settings;
 
     this.traceBindGroup ??= BindGroupFactory.createBindGroup('gi_trace_bg', this.traceLayout, [
       { binding: 0, resource: { buffer: volumes.raysBuffer } },
@@ -418,6 +528,12 @@ export class RealtimeGI {
       pass.end();
     };
 
+    if (this.scene.hasSkinned()) this.scene.dispatchSkinning(encoder, profiler.getTimestampWrites('GI Skin'));
+    lightGrid.dispatch(this.paramsBuffer, run);
+    // The gather reads the cache too, so it is maintained while either of them uses it.
+    if (s.radianceCache || s.finalGather) {
+      this.cache!.dispatch(encoder, frameBindGroup, sceneBindGroup, QUALITY[s.quality].cacheBudget, run);
+    }
     run('GI Trace', (pass) => {
       pass.setPipeline(this.tracePipeline);
       pass.setBindGroup(0, frameBindGroup);
@@ -524,80 +640,30 @@ export class RealtimeGI {
         { binding: 0, resource: { buffer: this.paramsBuffer } },
         { binding: 1, resource: { buffer: cameraBuffer } },
         { binding: 2, resource: { buffer: probeSet } },
-        { binding: 3, resource: { buffer: this.lightsBuffer } },
+        { binding: 3, resource: { buffer: this.lightGrid!.lightsBuffer } },
         { binding: 4, resource: { buffer: volumes.stateBuffer } },
         { binding: 5, resource: volumes.irradianceReadView },
         { binding: 6, resource: volumes.visibilityReadView },
         { binding: 7, resource: SamplerLibrary.simpleSampler! },
         { binding: 8, resource: { buffer: volumes.volumesBuffer } },
+        { binding: 9, resource: { buffer: this.lightGrid!.gridBuffer } },
+        { binding: 10, resource: { buffer: this.cache!.keysBuffer } },
+        { binding: 11, resource: { buffer: this.cache!.cellsBuffer } },
       ]);
     }
     return this.frameBindGroup;
-  }
-
-  /** The MAX_LIGHTS point/spot lights nearest the camera (by distance to their sphere). */
-  private gatherLights(cameraPos: vec3): void {
-    const lights = this.lightRefs;
-    const order = this.lightOrder;
-    const dist = this.lightDist;
-    lights.length = 0;
-    const entities = Engine.getEntities();
-    for (const comp of entities.getObjectManagerByName('point_light')?.getList() ?? []) {
-      const pl = comp as PointLightComponent;
-      if (pl.getIntensity() > 0) lights.push(pl);
-    }
-    for (const comp of entities.getObjectManagerByName('spot_light')?.getList() ?? []) {
-      const sl = comp as SpotLightComponent;
-      if (sl.getIntensity() > 0) lights.push(sl);
-    }
-    order.length = lights.length;
-    dist.length = lights.length;
-    for (let i = 0; i < lights.length; i++) {
-      const l = lights[i]!;
-      const pos = l instanceof SpotLightComponent ? l.getCamera().getPosition() : l.getWorldPosition();
-      dist[i] = vec3.distance(pos, cameraPos) - l.getRadius();
-      order[i] = i;
-    }
-    if (lights.length > MAX_LIGHTS) order.sort(this.byLightDistance);
-
-    const data = this.lightsData;
-    this.lightCount = Math.min(MAX_LIGHTS, lights.length);
-    for (let i = 0; i < this.lightCount; i++) {
-      const l = lights[order[i]!]!;
-      const o = i * LIGHT_FLOATS;
-      const col = l.getColor();
-      const k = l.getIntensity();
-      const isSpot = l instanceof SpotLightComponent;
-      const pos = isSpot ? l.getCamera().getPosition() : l.getWorldPosition();
-      data[o] = pos[0]!;
-      data[o + 1] = pos[1]!;
-      data[o + 2] = pos[2]!;
-      data[o + 3] = l.getRadius();
-      data[o + 4] = col[0]! * k;
-      data[o + 5] = col[1]! * k;
-      data[o + 6] = col[2]! * k;
-      data[o + 7] = l.getStartFalloff();
-      if (isSpot) {
-        const dir = l.getCamera().getFront();
-        data[o + 8] = dir[0]!;
-        data[o + 9] = dir[1]!;
-        data[o + 10] = dir[2]!;
-        data[o + 11] = Math.cos(l.getCamera().getFov() * 0.5);
-      } else {
-        data[o + 8] = data[o + 9] = data[o + 10] = 0;
-        data[o + 11] = -2; // point light
-      }
-    }
-    if (this.lightCount > 0) {
-      GPUUtils.writeBuffer(this.lightsBuffer, 0, data.subarray(0, this.lightCount * LIGHT_FLOATS));
-    }
   }
 
   private writeParams(volumes: GIProbeVolumes): void {
     const s = RealtimeGI.settings;
     const f = this.paramsF;
     const u = this.paramsU;
-    u.set([this.frame, this.lightCount, GI_DEBUG_VIEWS[s.debugView], (s.multiBounce ? 1 : 0) | (this.mode === 'compare' ? 2 : 0)], 0);
+    const flags =
+      (s.multiBounce ? GI_FLAG_MULTIBOUNCE : 0) |
+      (this.mode === 'compare' ? GI_FLAG_COMPARE : 0) |
+      (s.radianceCache ? GI_FLAG_CACHE : 0) |
+      (s.finalGather ? GI_FLAG_GATHER : 0);
+    u.set([this.frame, this.lightGrid!.getLightCount(), GI_DEBUG_VIEWS[s.debugView], flags], 0);
     u.set([volumes.tilesPerRow, volumes.volumeCount, Math.min(volumes.config.raysPerProbe, GI_MAX_RAYS), this.batch.volume], 4);
     u.set([this.batch.first, this.batch.count, 0, 0], 8);
 
@@ -628,6 +694,11 @@ export class RealtimeGI {
     f.set([iw, ih, vw, vh], 44);
     const ambient = Engine.getEnvironmentManager().getAmbientLightData();
     f.set([ambient.globalFactor, ambient.diffuseFactor, 0, 0], 48);
+    f.set(this.lightGrid!.origins, 52);
+    f.set([s.cacheCellSize, s.cacheLodDistance, s.cacheMinBlend, s.gatherRange], 68);
+    u.set([CACHE_CAPACITY, QUALITY[s.quality].cacheBudget, Math.max(1, Math.min(4, Math.round(s.lightSamples))), 0], 72);
+    const cameraPos = Engine.getRender().getMainCamera().getPosition();
+    f.set([cameraPos[0]!, cameraPos[1]!, cameraPos[2]!, 0], 76);
     GPUUtils.writeBuffer(this.paramsBuffer, 0, f);
   }
 
@@ -680,16 +751,80 @@ export class RealtimeGI {
   }
 
   /**
+   * Froxel fog ambient from the GI probes (FroxelVolumetricScattering.setAmbientInjector, set by
+   * DeferredRenderer on the frames GI lights): replaces the fog's constant ambient.
+   */
+  public readonly injectFroxelAmbient: FroxelAmbientInjector = (encoder, io) => {
+    if (!this.loaded || !this.frameBindGroup) return false;
+    let ioBindGroup = this.froxelIOBindGroups.get(io.read);
+    if (!ioBindGroup) {
+      ioBindGroup = BindGroupFactory.createBindGroup('gi_froxel_io_bg', this.froxelIOLayout, [
+        { binding: 0, resource: io.read },
+        { binding: 1, resource: io.write },
+      ]);
+      this.froxelIOBindGroups.set(io.read, ioBindGroup);
+    }
+    const ts = GPUProfiler.getInstance().getTimestampWrites('GI Froxel Ambient');
+    const pass = encoder.beginComputePass({ label: 'GI Froxel Ambient', ...(ts ? { timestampWrites: ts } : {}) });
+    pass.setPipeline(this.froxelPipeline);
+    pass.setBindGroup(0, io.camera);
+    pass.setBindGroup(1, io.params);
+    pass.setBindGroup(2, ioBindGroup);
+    pass.setBindGroup(3, this.frameBindGroup);
+    pass.dispatchWorkgroups(Math.ceil(io.dimensions.x / 8), Math.ceil(io.dimensions.y / 8), Math.ceil(io.dimensions.z / 4));
+    pass.end();
+    return true;
+  };
+
+  /**
+   * Same contract as renderDiffuse for another G-buffer (the water surface): the probe volumes
+   * sampled per pixel, no resolve / gather / temporal. Call after renderDiffuse this frame.
+   */
+  public renderDiffuseDirect(target: GPUTextureView, gBufferBindGroup: GPUBindGroup, aoView: GPUTextureView): void {
+    const resolveView = this.resolveView;
+    const probeSet = ProbeManager.getInstance().getProbeSetBuffer();
+    if (!resolveView || !probeSet) return;
+    const ambient = BindGroupFactory.createBindGroup('gi_ambient_direct_bg', this.ambientLayout, [
+      { binding: 0, resource: aoView },
+      { binding: 1, resource: SamplerLibrary.simpleSampler! },
+      { binding: 2, resource: { buffer: this.paramsBuffer } },
+      { binding: 3, resource: this.brdfLUT.getTextureView()! },
+      { binding: 4, resource: { buffer: probeSet } },
+      { binding: 5, resource: resolveView },
+    ]);
+    if (!this.directBindGroup || this.directVersion !== GISharedResources.getVersion()) {
+      this.directVersion = GISharedResources.getVersion();
+      this.directBindGroup = BindGroupFactory.createBindGroup('gi_direct_bg', this.directLayout, GISharedResources.entries(0));
+    }
+
+    const desc = GPUUtils.createRenderPassDescriptor('gi ambient direct pass', [
+      GPUUtils.createColorAttachment(target, 'clear', 'store'),
+    ]);
+    const pass = Render.getInstance().getCommandEncoder().beginRenderPass(desc);
+    GPUUtils.configureViewportAndScissor(pass);
+    pass.setPipeline(this.ambientDirectPipeline);
+    this.fullscreenQuad.activate(pass);
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, gBufferBindGroup);
+    pass.setBindGroup(2, ambient);
+    pass.setBindGroup(3, this.directBindGroup);
+    this.fullscreenQuad.renderGroup(pass);
+    pass.end();
+  }
+
+  /**
    * Probe irradiance + specular scale for the G-buffer at RealtimeGI.settings.resolution,
    * temporally filtered against last frame's result.
    */
   private resolve(gBufferComputeBindGroup: GPUBindGroup): GPUTextureView {
-    const scale = RealtimeGI.settings.resolution;
+    const s = RealtimeGI.settings;
+    const scale = s.resolution;
     const width = Math.max(1, Math.ceil(Render.width * scale));
     const height = Math.max(1, Math.ceil(Render.height * scale));
+    const gatherView = this.gather!.getResultView(width, height);
     const current = this.resolveTargets[0]?.color;
-    if (!current || current.width !== width || current.height !== height) {
-      this.createResolveTargets(width, height);
+    if (!current || current.width !== width || current.height !== height || gatherView !== this.resolveGatherView) {
+      this.createResolveTargets(width, height, gatherView);
     }
 
     // History: last frame's camera, valid unless the targets were just (re)created.
@@ -697,12 +832,25 @@ export class RealtimeGI {
     const t = this.temporalData;
     t.set(this.prevViewProj, 0);
     t.set([this.prevCameraPos[0]!, this.prevCameraPos[1]!, this.prevCameraPos[2]!, this.historyValid ? 1 : 0], 16);
-    t.set([RealtimeGI.settings.temporal, 0, 0, 0], 20);
+    t.set([s.finalGather ? Math.max(s.temporal, s.gatherTemporal) : s.temporal, 0, 0, 0], 20);
     GPUUtils.writeBuffer(this.temporalBuffer, 0, t);
 
-    const p = this.resolveParity;
     const encoder = Render.getInstance().getCommandEncoder();
-    const ts = GPUProfiler.getInstance().getTimestampWrites('GI Resolve');
+    const profiler = GPUProfiler.getInstance();
+    if (s.finalGather) {
+      const sceneBindGroup = this.scene.getBindGroup();
+      if (sceneBindGroup) {
+        this.gather!.dispatch(this.frameBindGroup!, sceneBindGroup, gBufferComputeBindGroup, (label, fn) => {
+          const ts = profiler.getTimestampWrites(label);
+          const pass = encoder.beginComputePass({ label, ...(ts ? { timestampWrites: ts } : {}) });
+          fn(pass);
+          pass.end();
+        });
+      }
+    }
+
+    const p = this.resolveParity;
+    const ts = profiler.getTimestampWrites('GI Resolve');
     const pass = encoder.beginComputePass({ label: 'GI Resolve', ...(ts ? { timestampWrites: ts } : {}) });
     pass.setPipeline(this.resolvePipeline);
     pass.setBindGroup(0, this.frameBindGroup!);
@@ -720,13 +868,14 @@ export class RealtimeGI {
     return this.resolveView;
   }
 
-  private createResolveTargets(width: number, height: number): void {
+  private createResolveTargets(width: number, height: number, gatherView: GPUTextureView): void {
     this.destroyResolveTargets();
     const device = GPUUtils.getDevice();
     const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
     for (let i = 0; i < 2; i++) {
       const color = device.createTexture({ label: `gi_resolve_${i}`, size: { width, height }, format: 'rgba16float', usage });
-      const distance = device.createTexture({ label: `gi_resolve_dist_${i}`, size: { width, height }, format: 'r32float', usage });
+      // r = distance to the camera (disocclusion test), g = history length.
+      const distance = device.createTexture({ label: `gi_resolve_dist_${i}`, size: { width, height }, format: 'rg32float', usage });
       this.resolveTargets.push({ color, distance, colorView: color.createView() });
     }
     const views = this.resolveTargets.map((r) => ({ color: r.colorView, distance: r.distance.createView() }));
@@ -737,8 +886,10 @@ export class RealtimeGI {
         { binding: 2, resource: views[1 - i]!.color },
         { binding: 3, resource: views[1 - i]!.distance },
         { binding: 4, resource: { buffer: this.temporalBuffer } },
+        { binding: 5, resource: gatherView },
       ]),
     );
+    this.resolveGatherView = gatherView;
     this.resolveParity = 0;
     this.historyValid = false;
   }
@@ -751,6 +902,7 @@ export class RealtimeGI {
     this.resolveTargets = [];
     this.resolveBindGroups = [];
     this.resolveView = null;
+    this.resolveGatherView = null;
   }
 
   /** Pipeline + group 3 for AmbientLight.renderSpecular (GI-scaled reflections). */
@@ -782,13 +934,24 @@ export class RealtimeGI {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       });
       const view = this.debugTexture.createView();
-      this.debugOutBindGroup = BindGroupFactory.createBindGroup('gi_debug_out_bg', this.debugOutLayout, [
-        { binding: 0, resource: view },
-      ]);
+      this.debugView = view;
+      this.debugOutBindGroups.clear();
       this.blitBindGroup = BindGroupFactory.createBindGroup('gi_blit_bg', this.blitLayout, [
         { binding: 0, resource: view },
         { binding: 1, resource: SamplerLibrary.simpleSampler! },
       ]);
+    }
+
+    const resolveView = this.resolveView ?? this.resolveTargets[0]?.colorView;
+    if (!resolveView || !this.debugView) return;
+    let debugOut = this.debugOutBindGroups.get(resolveView);
+    if (!debugOut) {
+      if (this.debugOutBindGroups.size > 4) this.debugOutBindGroups.clear();
+      debugOut = BindGroupFactory.createBindGroup('gi_debug_out_bg', this.debugOutLayout, [
+        { binding: 0, resource: this.debugView },
+        { binding: 1, resource: resolveView },
+      ]);
+      this.debugOutBindGroups.set(resolveView, debugOut);
     }
 
     const encoder = Render.getInstance().getCommandEncoder();
@@ -797,7 +960,7 @@ export class RealtimeGI {
     cpass.setBindGroup(0, this.frameBindGroup);
     cpass.setBindGroup(1, sceneBindGroup);
     cpass.setBindGroup(2, gBufferComputeBindGroup);
-    cpass.setBindGroup(3, this.debugOutBindGroup!);
+    cpass.setBindGroup(3, debugOut);
     cpass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
     cpass.end();
 
@@ -823,6 +986,14 @@ export class RealtimeGI {
     folder.add(s, 'compareSplit', 0, 1).name('Compare Split').listen();
     folder.add(s, 'resolution', [0.25, 0.5, 1]).name('Resolve Resolution').listen();
     folder.add(s, 'temporal', 0, 0.97).name('Temporal Filter').listen();
+    folder.add(s, 'finalGather').name('Final Gather').listen();
+    folder.add(s, 'gatherRange', 0.5, 8, 0.25).name('Gather Range (m)').listen();
+    folder.add(s, 'gatherTemporal', 0, 0.98).name('Gather Temporal').listen();
+    folder.add(s, 'radianceCache').name('Radiance Cache').listen();
+    folder.add(s, 'lightSamples', 1, 4, 1).name('Light Samples').listen();
+    folder.add(s, 'cacheCellSize', 0.0625, 1, 0.0625).name('Cache Cell (m)').listen();
+    folder.add(s, 'cacheLodDistance', 1, 32, 1).name('Cache LOD Dist (m)').listen();
+    folder.add(s, 'cacheMinBlend', 0.02, 1).name('Cache Min Blend').listen();
     folder.add(s, 'quality', ['high', 'low']).name('Quality').listen();
     folder.add(s, 'volumes', ['auto', 'level', 'cascades']).name('Probe Volumes').listen();
     folder.add(s, 'spacing', 0.25, 4, 0.25).name('Probe Spacing (m)').listen();
@@ -836,6 +1007,8 @@ export class RealtimeGI {
   }
 
   public destroy(): void {
+    GISharedResources.publish(null);
+    this.shared = null;
     this.scene.destroy();
     this.volumes?.destroy();
     this.volumes = null;
@@ -844,7 +1017,16 @@ export class RealtimeGI {
     this.destroyResolveTargets();
     this.temporalBuffer?.destroy();
     this.paramsBuffer?.destroy();
-    this.lightsBuffer?.destroy();
+    this.lightGrid?.destroy();
+    this.cache?.destroy();
+    this.gather?.destroy();
+    this.lightGrid = null;
+    this.cache = null;
+    this.gather = null;
+    this.debugOutBindGroups.clear();
+    this.debugView = null;
+    this.directBindGroup = null;
+    this.froxelIOBindGroups.clear();
     this.frameBindGroup = null;
     this.traceBindGroup = null;
     this.integrateBindGroup = null;

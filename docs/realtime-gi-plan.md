@@ -12,13 +12,26 @@ conmutable en caliente con el pipeline actual (sondas F7/F8) sin romper nada de 
 | 0 Switch | ✅ `off/realtime/compare`, F9, `?gi=`, menú *Global Illumination*, `QualitySettings.realtimeGI/giQuality` (HIGH/ULTRA activados). Off = módulo destruido |
 | 1 BVH | ✅ BLAS por (malla, material) en Workers + TLAS; albedo/emisivo por triángulo; bit de winding desde normales de vértice. Sponza: 228k tris, ~200 ms |
 | 2 Sondas | ✅ `auto`: una rejilla de 1 m ajustada al nivel si cabe en 16k sondas (Sponza 22×17×34), si no 4 cascadas 16³ en la cámara; lotes de 4096 sondas/frame; 64 rayos, intercalado (patrón 0,1,0,2,0,1,0,3; histéresis h^(intervalo/2) para que todas reaccionen igual de rápido), toroidal, Chebyshev, recolocación/inactivas, multi-rebote |
-| 3 Radiance cache + light grid | ⏳ pendiente. Hoy: hasta 32 luces cercanas, 1 elegida por impacto (reservoir) con rayo de sombra |
-| 4 Final gather | ⏳ pendiente |
-| 5 Integración | 🟡 especular renormalizado (`ambient_specular.fs` `#ifdef REALTIME_GI`). Pendiente: froxels, agua, transparentes |
-| 6 Dinámicos | 🟡 rígidos: TLAS se reconstruye si una instancia se mueve. Pendiente: skinned |
+| 3 Radiance cache + light grid | ✅ `GIWorldLightGrid`: todas las luces (≤ 256) en 4 cascadas 16³ de 1–8 m en la cámara, ≤ 31 por celda; se reconstruye solo si cambia el conjunto, una luz se mueve > 10 cm, la rejilla se desplaza o cada 30 frames. Sombreado: K reservoirs (K = `lightSamples`, 2) pesados por contribución, exacto si llegan ≤ K luces. `GIRadianceCache`: hash de 2¹⁸ celdas de 25 cm (LOD ×2 cada 6 m de distancia, separadas por la cara dominante de la normal), compactación + actualización de 16k celdas/frame (8k `low`), mezcla ≥ 0,15. Los rayos de sondas leen la celda; solo sombrean en línea las que aún no tienen valor |
+| 4 Final gather | ✅ `GIFinalGather`: 1 rayo coseno de 3 m por texel del resolve; impacto → celda de la caché, fuera de alcance → la irradiancia de sondas del píxel × fracción de rayos que escapan (oclusión de contacto + rebote cercano). À-trous 5×5 ×2 + temporal con longitud de historia por texel (bilineal, rechazo por distancia) |
+| 5 Integración | ✅ especular renormalizado; niebla froxel (`gi_froxel_ambient.cs`, sustituye al ambiente constante); agua (`ambient_gi.fs` `GI_DIRECT`, sondas por píxel); partículas `LIT` (`GISharedResources`: recursos vacíos con GI apagada → sondas horneadas). El resto de transparentes no usa ambiente |
+| 6 Dinámicos | ✅ rígidos (TLAS) y skinned: `GISkinnedBLAS` re-posa en GPU cada frame (skinning por triángulo con la paleta de huesos + refit por niveles); el TLAS usa una caja conservadora por personaje. Los rayos de sondas ignoran a los personajes (`giTraceIgnore`); el gather y las sombras de la caché sí los ven |
 
 Coste medido (Sponza, `?scenario=sponza_gi`, 1280×720 con TSR 0.75, `high` = 64 rayos/sonda):
 Trace 1,09 · Integrate 0,45 · Ambient 0,64 · sobrecoste especular +0,5 ms (`low`: 32 rayos, 12³×3).
+
+Fases 3–6 (2026-11-02, mismas condiciones, `?scenario=sponza_gi_lights` con 64 luces; la GPU de
+este portátil ajusta la frecuencia a la carga con vsync: medir con la GPU por debajo de 16 ms y
+comparar contra un pase que no cambia, p. ej. GI Integrate): Trace 1,1 (2,2 sombreando en línea)
+· Cache Update 0,2–0,45 · Gather 0,55–1,1 (según lo cerca que esté la geometría) · Denoise 0,13
+· Resolve 0,1 · Light Grid ≈ 0,1 solo al reconstruir · Froxel Ambient ≈ 0,3 · Skin 0,09 (4
+personajes, 55k triángulos). Escenarios: `sponza_gi_lights`, `sponza_gi_fx` (agua, ceniza,
+niebla), `sponza_gi_chars` (personajes). Vistas de debug nuevas: `radianceCache`, `lightGrid`,
+`final`.
+
+Lecciones: el gather no debe muestrear sondas por rayo (cuesta más que el trazado); el refit
+de personajes en CPU costaba 1,1 ms/frame de JS → GPU. El trazado usa 11 storage buffers por
+pase: `Render.ts` pide el límite del adaptador (el mínimo garantizado es 8).
 
 Cascadas concéntricas en un nivel cerrado = saltos al acercarse (una pared lejana cae en una cascada de 4 m y toma luz de la nave). Por eso `auto` prefiere la rejilla de nivel.
 

@@ -32,6 +32,10 @@ struct GIParams {
     tuning2:     vec4<f32>,     // x = normal bias, y = view bias (× spacing), z = ray length, w = bounce strength
     atlasSize:   vec4<f32>,     // xy = irradiance atlas texels, zw = visibility atlas texels
     ambient:     vec4<f32>,     // x = global ambient boost, y = diffuse boost (ambient.fs probe path)
+    lightGrid:   array<vec4<f32>, 4>,  // per light-grid cascade: xyz = world min corner, w = cell size (gi_light_grid)
+    cache:       vec4<f32>,     // x = cache cell size at LOD 0, y = LOD distance, z = min update blend, w = gather ray length
+    cacheInfo:   vec4<u32>,     // x = cache capacity (power of 2), y = cells updated per frame, z = light samples per shade
+    cameraPos:   vec4<f32>,     // xyz = camera position (cache LOD)
 }
 
 struct GIVolume {
@@ -52,8 +56,14 @@ const GI_VIS_RES: u32 = 14u;
 const GI_INACTIVE_RATIO: f32 = 0.25;
 const GI_FLAG_MULTIBOUNCE: u32 = 1u;
 const GI_FLAG_COMPARE: u32 = 2u;
+/** Probe rays read the world radiance cache (gi/common/gi_cache) instead of shading every hit. */
+const GI_FLAG_CACHE: u32 = 4u;
+/** Per-pixel final gather (gi_gather.cs) replaces the probe lookup in the resolve. */
+const GI_FLAG_GATHER: u32 = 8u;
 const GI_PI: f32 = 3.14159265359;
 const GI_INV_PI: f32 = 0.31830988618;
+/** No triangle / light / cache slot. */
+const GI_MISS: u32 = 0xffffffffu;
 /** Ray distance written for misses (sky). */
 const GI_MISS_DISTANCE: f32 = 1.0e4;
 

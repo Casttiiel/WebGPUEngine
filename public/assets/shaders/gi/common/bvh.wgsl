@@ -7,7 +7,8 @@
 //
 // Triangle = 3 × vec4: (v0.xyz, albedo rgba8) (e1.xyz, emissive) (e2.xyz, flags), object space;
 // flags bit 0 = winding opposite to the vertex normals (GIScene).
-// Instance = 4 × vec4: rows 0–2 of inverse(world), then (blasRoot, -, -, -).
+// Instance = 4 × vec4: rows 0–2 of inverse(world), then (blasRoot, flags, -, -); flags
+// GI_INSTANCE_SKINNED = a skinned character (its BLAS is refitted to the pose, GIScene).
 //
 // Rays are transformed into object space without renormalising, so `t` stays a world-space
 // distance across instances.
@@ -16,8 +17,14 @@
 @group(1) @binding(1) var<storage, read> bvhTris:      array<vec4<f32>>;
 @group(1) @binding(2) var<storage, read> bvhInstances: array<vec4<f32>>;
 
-const GI_MISS: u32 = 0xffffffffu;
 const GI_STACK_SIZE: u32 = 40u;
+const GI_INSTANCE_SKINNED: u32 = 1u;
+
+/**
+ * Instance flags giTrace skips (set by the caller before tracing, e.g. probe rays ignore
+ * characters: a body crossing a probe would darken its whole cell).
+ */
+var<private> giTraceIgnore: u32 = 0u;
 const GI_NO_HIT: f32 = 1.0e30;
 
 struct GIHit {
@@ -115,18 +122,21 @@ fn giTrace(origin: vec3<f32>, dir: vec3<f32>, tMax: f32, anyHit: bool) -> GIHit 
             if (hl) { node = l; continue; }
             if (hr) { node = r; continue; }
         } else if (!inBlas) {
-            // TLAS leaf: enter the instance's BLAS with the ray in object space.
+            // TLAS leaf: enter the instance's BLAS with the ray in object space (unless ignored).
             instance = first;
-            let r0 = bvhInstances[instance * 4u];
-            let r1 = bvhInstances[instance * 4u + 1u];
-            let r2 = bvhInstances[instance * 4u + 2u];
-            o = vec3<f32>(dot(r0.xyz, origin) + r0.w, dot(r1.xyz, origin) + r1.w, dot(r2.xyz, origin) + r2.w);
-            d = vec3<f32>(dot(r0.xyz, dir), dot(r1.xyz, dir), dot(r2.xyz, dir));
-            invD = giSafeInverse(d);
-            inBlas = true;
-            blasBase = sp;
-            node = bitcast<u32>(bvhInstances[instance * 4u + 3u].x);
-            continue;
+            let r3 = bvhInstances[instance * 4u + 3u];
+            if ((bitcast<u32>(r3.y) & giTraceIgnore) == 0u) {
+                let r0 = bvhInstances[instance * 4u];
+                let r1 = bvhInstances[instance * 4u + 1u];
+                let r2 = bvhInstances[instance * 4u + 2u];
+                o = vec3<f32>(dot(r0.xyz, origin) + r0.w, dot(r1.xyz, origin) + r1.w, dot(r2.xyz, origin) + r2.w);
+                d = vec3<f32>(dot(r0.xyz, dir), dot(r1.xyz, dir), dot(r2.xyz, dir));
+                invD = giSafeInverse(d);
+                inBlas = true;
+                blasBase = sp;
+                node = bitcast<u32>(r3.x);
+                continue;
+            }
         } else {
             for (var i = first; i < first + count; i++) {
                 let t0 = bvhTris[i * 3u];

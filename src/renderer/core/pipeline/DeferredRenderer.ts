@@ -671,6 +671,7 @@ export class DeferredRenderer {
     this.giMode = mode;
     this.giMenu.mode = mode;
     if (mode === 'off') {
+      this.froxelVolumetrics.setAmbientInjector(null);
       this.realtimeGI?.destroy();
       this.realtimeGI = null;
     } else {
@@ -702,6 +703,10 @@ export class DeferredRenderer {
       });
     }
     this.giLitThisFrame = this.realtimeGI.update();
+    // The fog takes its ambient from the GI probes on the frames GI lights.
+    this.froxelVolumetrics.setAmbientInjector(
+      this.giLitThisFrame ? this.realtimeGI.injectFroxelAmbient : null,
+    );
     return this.giLitThisFrame ? this.realtimeGI : null;
   }
 
@@ -958,8 +963,17 @@ export class DeferredRenderer {
 
     const white = this.whiteTexture.getTextureView()!;
 
-    // Ambient diffuse (uses loadOp:'clear' internally, so this also clears rtWaterLit).
-    this.ambientLight.renderDiffuse(this.rtWaterLit.getView(), this.waterGBufferBindGroup, white);
+    // Ambient diffuse (uses loadOp:'clear' internally, so this also clears rtWaterLit). With the
+    // realtime GI lighting the frame, the water samples its probes per pixel.
+    if (this.giLitThisFrame && this.realtimeGI) {
+      this.realtimeGI.renderDiffuseDirect(
+        this.rtWaterLit.getView(),
+        this.waterGBufferBindGroup,
+        white,
+      );
+    } else {
+      this.ambientLight.renderDiffuse(this.rtWaterLit.getView(), this.waterGBufferBindGroup, white);
+    }
 
     // Directional lights — secondary bind group (white CS), no rebuild triggered.
     for (const comp of Engine.getEntities()

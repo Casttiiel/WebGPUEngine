@@ -112,7 +112,7 @@ export class SkeletalMeshComponent extends Component {
     this.jointMatrixBuffer = device.createBuffer({
       label: `${gltf}_joints`,
       size: MAX_JOINTS * MAT4_BYTES,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
     this.skinBindGroup = device.createBindGroup({
       label: `${gltf}_skinBG`,
@@ -194,6 +194,15 @@ export class SkeletalMeshComponent extends Component {
     device.queue.writeBuffer(this.previousJointMatrixBuffer, 0, this.previousJointPalette, 0, floatCount);
     this.previousJointPalette.set(palette.subarray(0, floatCount));
     device.queue.writeBuffer(this.jointMatrixBuffer, 0, palette, 0, floatCount);
+  }
+
+  /**
+   * GPU joint palette of the current pose (mat4 per joint; bind-pose local → model space, as
+   * gbuffer_skinned.vs reads it), null once disposed. The realtime GI copies it to pose its
+   * ray-tracing copy of the character (GISkinnedBLAS).
+   */
+  public getJointMatrixBuffer(): GPUBuffer | null {
+    return this.loaded ? this.jointMatrixBuffer : null;
   }
 
   public update(_dt: number): void {}

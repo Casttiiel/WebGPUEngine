@@ -12,7 +12,10 @@ import { Material } from '../resources/Material';
 import { Mesh } from '../resources/Mesh';
 import { Texture } from '../resources/Texture';
 import { TransformComponent } from '../../components/core/TransformComponent';
+import { SkeletalMeshComponent } from '../../components/render/SkeletalMeshComponent';
+import { SkinnedMesh } from '../resources/SkinnedMesh';
 import { BVH_NODE_FLOATS, buildBVH } from './BVHBuilder';
+import { GISkinnedBLAS } from './GISkinnedBLAS';
 import type { BLASRequest, BLASResponse } from './bvh.worker';
 
 /** Floats per triangle in the GPU buffer (gi/common/bvh.wgsl GITriangle). */
@@ -20,12 +23,29 @@ const TRI_FLOATS = 12;
 /** Floats per instance (gi/common/bvh.wgsl): invWorld rows ×3, then blasRoot. */
 const INSTANCE_FLOATS = 16;
 const BLAS_LEAF_SIZE = 4;
+/** Instance flag (gi/common/bvh.wgsl GI_INSTANCE_SKINNED). */
+const INSTANCE_SKINNED = 1;
+/**
+ * TLAS box of a character: its bind-pose box, grown to a cube this many times its largest
+ * half-extent (the refitted bounds stay on the GPU; any pose must fit).
+ */
+const SKINNED_BOUNDS_SCALE = 1.5;
 /** Albedo for triangles whose material has no texture view yet (linear grey). */
 const DEFAULT_ALBEDO = 0xffb4b4b4;
+
+/**
+ * A skinned character's own BLAS: built once in the bind pose, re-posed every frame on the GPU
+ * (GISkinnedBLAS: skinning + refit, topology fixed).
+ */
+interface SkinState {
+  component: SkeletalMeshComponent;
+  mesh: SkinnedMesh;
+}
 
 interface BLASEntry {
   mesh: Mesh;
   material: Material;
+  skin?: SkinState;
   triCount: number;
   nodes: Float32Array;
   order: Uint32Array;
@@ -58,8 +78,9 @@ export interface GISceneStats {
  * a TLAS over the instances, and per-triangle albedo/emissive baked from the material textures
  * at the triangle's UV centroid. Software ray tracing reads it through gi/common/bvh.wgsl.
  *
- * Traceable = SOLIDS that the depth prepass draws, minus skinned and alpha-tested geometry
- * (the same set the probe bake treats as static, without cut-outs that would block light).
+ * Traceable = SOLIDS that the depth prepass draws, minus alpha-tested geometry (cut-outs would
+ * block light). Skinned characters get their own BLAS, re-posed on the GPU every frame
+ * (GISkinnedBLAS) and flagged so the probe rays skip them.
  */
 export class GIScene {
   private nodesBuffer: GPUBuffer | null = null;
@@ -69,6 +90,9 @@ export class GIScene {
   private static layout: GPUBindGroupLayout | null = null;
 
   private blasCache = new Map<Mesh, Map<Material, BLASEntry>>();
+  /** Skinned BLAS, one per render key (poses differ per character). */
+  private skinnedCache = new Map<number, BLASEntry>();
+  private skinnedBLAS = new GISkinnedBLAS();
   /** Current instances (collection order) and the size of the TLAS at the start of the node buffer. */
   private instances: InstanceEntry[] = [];
   private tlasNodeCount = 0;
@@ -137,7 +161,7 @@ export class GIScene {
         return;
       }
       await this.buildMissingBLAS(instances);
-      await this.ensureBakePipeline();
+      await Promise.all([this.ensureBakePipeline(), this.skinnedBLAS.load()]);
       this.upload(instances);
       this.signature = signature;
       this.ready = true;
@@ -163,10 +187,16 @@ export class GIScene {
     const material = key.material;
     if (material.getCategory() !== RenderCategory.SOLIDS) return `category:${material.getCategory()}`;
     // Vertex-animated (wind grass) and custom-bound draws (particles) aren't static triangles.
-    if (key.skipDepthPrepass || key.renderBindGroup) return 'custom draw';
+    if (key.skipDepthPrepass) return 'custom draw';
     const technique = material.getTechnique();
     if (!technique) return 'no technique';
-    if (technique.getIsSkinned()) return 'skinned';
+    if (technique.getIsSkinned()) {
+      // Characters: their renderBindGroup is the joint palette; GIScene re-poses them.
+      if (!(key.owner instanceof SkeletalMeshComponent) || !(key.mesh instanceof SkinnedMesh)) return 'skinned';
+      if (!key.mesh.getJoints() || !key.mesh.getWeights()) return 'skinned (no CPU weights)';
+    } else if (key.renderBindGroup) {
+      return 'custom draw';
+    }
     const name = technique.getName();
     if (name.includes('mask') || name.includes('dither')) return `alpha-tested:${name}`;
     const mesh = key.mesh;
@@ -190,7 +220,9 @@ export class GIScene {
     const out: InstanceEntry[] = [];
     for (const key of RenderManagerV2.getInstance().getAllKeys()) {
       if (!GIScene.isTraceable(key)) continue;
-      const blas = this.getOrCreateBLASEntry(key.mesh, key.material);
+      const blas = key.owner instanceof SkeletalMeshComponent
+        ? this.getOrCreateSkinnedEntry(key)
+        : this.getOrCreateBLASEntry(key.mesh, key.material);
       if (key.isInstanced) {
         const group = groups.find((g) => g.instanceBindGroup === key.instanceBindGroup);
         for (const entity of group?.entities ?? []) {
@@ -230,6 +262,27 @@ export class GIScene {
     return entry;
   }
 
+  private getOrCreateSkinnedEntry(key: RenderKey): BLASEntry {
+    let entry = this.skinnedCache.get(key.id);
+    if (!entry) {
+      const mesh = key.mesh as SkinnedMesh;
+      entry = {
+        mesh,
+        material: key.material,
+        skin: { component: key.owner as unknown as SkeletalMeshComponent, mesh },
+        triCount: Math.floor(mesh.getIndexCount() / 3),
+        nodes: new Float32Array(0),
+        order: new Uint32Array(0),
+        rootMin: vec3.create(),
+        rootMax: vec3.create(),
+        nodeOffset: 0,
+        triOffset: 0,
+      };
+      this.skinnedCache.set(key.id, entry);
+    }
+    return entry;
+  }
+
   /** Builds every BLAS that has no nodes yet on a small worker pool. */
   private async buildMissingBLAS(instances: InstanceEntry[]): Promise<void> {
     const pending = [...new Set(instances.map((i) => i.blas))].filter((b) => b.nodes.length === 0);
@@ -263,7 +316,7 @@ export class GIScene {
           worker.postMessage(request, [positions.buffer, indices.buffer]);
         });
         for (const entry of entries) {
-          entry.nodes = response.nodes;
+          entry.nodes = entry.skin ? response.nodes.slice() : response.nodes;
           entry.order = response.order;
           vec3.set(entry.rootMin, response.nodes[0]!, response.nodes[1]!, response.nodes[2]!);
           vec3.set(entry.rootMax, response.nodes[4]!, response.nodes[5]!, response.nodes[6]!);
@@ -279,7 +332,9 @@ export class GIScene {
 
   /** Merges TLAS + BLAS nodes, triangles and instances into GPU buffers, then bakes albedo. */
   private upload(instances: InstanceEntry[]): void {
-    const blasList = [...new Set(instances.map((i) => i.blas))];
+    // Skinned BLAS last: their triangles form one contiguous range (GISkinnedBLAS).
+    const blasList = [...new Set(instances.map((i) => i.blas))].sort((a, b) => Number(!!a.skin) - Number(!!b.skin));
+    for (const b of blasList) if (b.skin) GIScene.setSkinnedBounds(b);
 
     const tlas = GIScene.buildTLAS(instances);
     this.instances = instances;
@@ -349,6 +404,11 @@ export class GIScene {
 
     const inst = GIScene.instanceData(instances, tlas.order);
 
+    const skinned = blasList.filter((b) => b.skin);
+    for (const [id, entry] of this.skinnedCache) {
+      if (!skinned.includes(entry)) this.skinnedCache.delete(id);
+    }
+
     this.destroyBuffers();
     const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
     this.nodesBuffer = GPUUtils.createBuffer('gi_bvh_nodes', nodes.byteLength, usage, nodes);
@@ -361,6 +421,11 @@ export class GIScene {
     ]);
 
     this.bakeMaterials(blasList);
+    this.skinnedBLAS.build(
+      skinned.map((b) => ({ ...b.skin!, order: b.order, nodes: b.nodes, triOffset: b.triOffset, triCount: b.triCount, nodeOffset: b.nodeOffset })),
+      this.nodesBuffer,
+      this.trisBuffer,
+    );
 
     this.stats = {
       instances: instances.length,
@@ -392,6 +457,28 @@ export class GIScene {
     const queue = GPUUtils.getDevice().queue;
     queue.writeBuffer(this.nodesBuffer, 0, tlas.nodes);
     queue.writeBuffer(this.instancesBuffer, 0, GIScene.instanceData(this.instances, tlas.order));
+  }
+
+  /** Re-poses the characters' BLAS to this frame's skeletons (before anything traces). */
+  public dispatchSkinning(encoder: GPUCommandEncoder, timestampWrites?: GPUComputePassTimestampWrites): void {
+    if (this.ready) this.skinnedBLAS.dispatch(encoder, timestampWrites);
+  }
+
+  public hasSkinned(): boolean {
+    return this.skinnedBLAS.hasCharacters();
+  }
+
+  /** Conservative TLAS box of a skinned BLAS: a cube around its bind-pose box (see SKINNED_BOUNDS_SCALE). */
+  private static setSkinnedBounds(b: BLASEntry): void {
+    const n = b.nodes;
+    let half = 0;
+    for (let k = 0; k < 3; k++) half = Math.max(half, (n[4 + k]! - n[k]!) * 0.5);
+    half *= SKINNED_BOUNDS_SCALE;
+    for (let k = 0; k < 3; k++) {
+      const c = (n[k]! + n[4 + k]!) * 0.5;
+      b.rootMin[k] = c - half;
+      b.rootMax[k] = c + half;
+    }
   }
 
   /** TLAS (one instance per leaf) over the instances' world bounds. */
@@ -443,6 +530,7 @@ export class GIScene {
         inst[o + r * 4 + 3] = inv[12 + r]!;
       }
       instU[o + 12] = src.blas.nodeOffset;
+      instU[o + 13] = src.blas.skin ? INSTANCE_SKINNED : 0;
     }
     return inst;
   }
@@ -563,6 +651,8 @@ export class GIScene {
   public destroy(): void {
     this.destroyBuffers();
     this.blasCache.clear();
+    this.skinnedCache.clear();
+    this.skinnedBLAS.destroy();
     this.instances = [];
     this.ready = false;
     this.signature = '';
